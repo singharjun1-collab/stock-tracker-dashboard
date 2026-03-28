@@ -88,13 +88,13 @@ function AlertCard({ alert, index }) {
       </div>
       <div className="price-row">
         <span className="price-alert">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
-        <span className="arrow">\u2192</span>
-        <span className="price-current">${latest?.price?.toFixed(2) || '\u2014'}</span>
+        <span className="arrow">→</span>
+        <span className="price-current">${latest?.price?.toFixed(2) || '—'}</span>
         <span className={`pct-change ${pctClass(pct)}`}>{fmtPct(pct)}</span>
       </div>
       <div className="meta-row">
         <span className="meta-tag">{alert.signal_type}</span>
-        <span style={{ color: '#4a6a85', fontSize: '0.72rem' }}>\ud83d\udcc5 Alerted {alert.alert_date}</span>
+        <span style={{ color: '#4a6a85', fontSize: '0.72rem' }}>📅 Alerted {alert.alert_date}</span>
       </div>
       <SparklineChart prices={alert.prices} canvasId={`spark-${index}`} />
       <div className="alert-reason">{alert.alert_reason}</div>
@@ -170,8 +170,8 @@ export default function Dashboard() {
   return (
     <>
       <header className="header">
-        <h1>\ud83d\udcc8 Social Stock <span>Intelligence Monitor</span></h1>
-        <div className="subtitle">Last updated: {dateStr} \u00b7 Auto-scan complete</div>
+        <h1>📈 Social Stock <span>Intelligence Monitor</span></h1>
+        <div className="subtitle">Last updated: {dateStr} · Auto-scan complete</div>
       </header>
 
       <div className="stats-bar">
@@ -195,16 +195,16 @@ export default function Dashboard() {
         </div>
       </div>
 
-      <p className="section-title">\ud83d\udce1 Signal Sources</p>
+      <p className="section-title">📡 Signal Sources</p>
       <div className="sources-row">
-        <span className="source-badge src-wsb">\ud83d\udfe0 WallStreetBets</span>
-        <span className="source-badge src-poly">\ud83d\udfe2 Polymarket</span>
-        <span className="source-badge src-yahoo">\ud83d\udfe3 Yahoo Finance</span>
-        <span className="source-badge src-google">\ud83d\udfe2 Google Finance</span>
-        <span className="source-badge src-st">\ud83d\udd34 StockTwits</span>
+        <span className="source-badge src-wsb">🟠 WallStreetBets</span>
+        <span className="source-badge src-poly">🟢 Polymarket</span>
+        <span className="source-badge src-yahoo">🟣 Yahoo Finance</span>
+        <span className="source-badge src-google">🟢 Google Finance</span>
+        <span className="source-badge src-st">🔴 StockTwits</span>
       </div>
 
-      <p className="section-title">\ud83d\udd25 Active Picks \u2014 Performance Scoreboard</p>
+      <p className="section-title">🔥 Active Picks — Performance Scoreboard</p>
       <div className="filter-bar">
         {signalTypes.map(type => (
           <button
@@ -224,9 +224,9 @@ export default function Dashboard() {
       </div>
 
       <div className="archive-section">
-        <p className="section-title" style={{ marginLeft: 0 }}>\ud83d\udcc5 Archive \u2014 All Historical Picks</p>
+        <p className="section-title" style={{ marginLeft: 0 }}>📅 Archive — All Historical Picks</p>
         <button className="archive-toggle-btn" onClick={() => setShowArchive(!showArchive)}>
-          \ud83d\udcc2 {showArchive ? 'Hide' : 'Show'} Archive
+          📂 {showArchive ? 'Hide' : 'Show'} Archive
         </button>
         {showArchive && (
           <div className="archive-table-wrap">
@@ -259,7 +259,7 @@ export default function Dashboard() {
                         <td><span className="signal-chip">{alert.signal_type}</span></td>
                         <td style={{ maxWidth: 260, color: '#7a9bc0', fontSize: '0.73rem' }}>{alert.alert_reason}</td>
                         <td>${parseFloat(alert.price_at_alert).toFixed(2)}</td>
-                        <td>${latest?.price?.toFixed(2) || '\u2014'}</td>
+                        <td>${latest?.price?.toFixed(2) || '—'}</td>
                         <td className={`tbl-${status}`}>{fmtPct(pct)}</td>
                         <td className={`tbl-${status}`}>{statusLabel(pct)}</td>
                       </tr>
@@ -272,7 +272,7 @@ export default function Dashboard() {
       </div>
 
       <footer>
-        \u26a1 Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB \u00b7 Polymarket \u00b7 Yahoo Finance \u00b7 Google Finance \u00b7 StockTwits</span>
+        ⚡ Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB · Polymarket · Yahoo Finance · Google Finance · StockTwits</span>
       </footer>
     </>
   );
