@@ -412,6 +412,64 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
 .pick-dropped { background: rgba(122,155,192,0.08); color: #7a9bc0; border: 1px solid #3a5a78; }
 .row-dropped td { opacity: 0.6; }
 
+/* ── AI RECOMMENDATION BAR ── */
+.rec-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.78rem;
+}
+.rec-bar.rec-buy {
+  background: rgba(34,197,94,0.08);
+  border: 1px solid rgba(34,197,94,0.3);
+}
+.rec-bar.rec-sell {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.3);
+}
+.rec-bar.rec-hold {
+  background: rgba(245,158,11,0.06);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.rec-label {
+  font-weight: 800;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  letter-spacing: 0.5px;
+}
+.rec-buy .rec-label { color: #22c55e; }
+.rec-sell .rec-label { color: #ef4444; }
+.rec-hold .rec-label { color: #f59e0b; }
+.rec-reason {
+  color: #8faabf;
+  font-size: 0.73rem;
+  line-height: 1.4;
+}
+.rec-chip {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.rec-chip.rec-buy { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid #22c55e; }
+.rec-chip.rec-sell { background: rgba(239,68,68,0.12); color: #ef4444; border: 1px solid #ef4444; }
+.rec-chip.rec-hold { background: rgba(245,158,11,0.08); color: #f59e0b; border: 1px solid #f59e0b; }
+.stat-buy-glow {
+  border-color: rgba(34,197,94,0.4);
+  box-shadow: 0 0 12px rgba(34,197,94,0.15);
+}
+.disclaimer {
+  margin-top: 12px;
+  font-size: 0.65rem;
+  color: #2a4560;
+  font-style: italic;
+}
+
 /* ── FOOTER ── */
 footer {
   text-align: center;

@@ -33,6 +33,8 @@ export async function GET(request) {
     const combined = alerts.map(alert => ({
       ...alert,
       status: alert.status || 'active',
+      recommendation: alert.recommendation || 'HOLD',
+      recommendation_reason: alert.recommendation_reason || '',
       prices: prices
         .filter(p => p.alert_id === alert.id)
         .map(p => ({

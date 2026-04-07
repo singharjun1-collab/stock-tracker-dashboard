@@ -26,6 +26,18 @@ function fmtPct(pct) {
   return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
 }
 
+function recLabel(rec) {
+  if (rec === 'BUY') return '🟢 BUY';
+  if (rec === 'SELL') return '🔴 SELL';
+  return '🟡 HOLD';
+}
+
+function recClass(rec) {
+  if (rec === 'BUY') return 'rec-buy';
+  if (rec === 'SELL') return 'rec-sell';
+  return 'rec-hold';
+}
+
 function SparklineChart({ prices, canvasId }) {
   const canvasRef = useRef(null);
 
@@ -103,6 +115,12 @@ function AlertCard({ alert, index, sectionPrefix }) {
         <span style={{ color: '#4a6a85', fontSize: '0.72rem' }}>📅 Alerted {alert.alert_date}</span>
       </div>
       <SparklineChart prices={alert.prices} canvasId={`${sectionPrefix}-spark-${index}`} />
+      {alert.recommendation && (
+        <div className={`rec-bar ${recClass(alert.recommendation)}`}>
+          <span className="rec-label">{recLabel(alert.recommendation)}</span>
+          <span className="rec-reason">{alert.recommendation_reason || ''}</span>
+        </div>
+      )}
       <div className="alert-reason">{alert.alert_reason}</div>
     </div>
   );
@@ -169,6 +187,8 @@ export default function Dashboard() {
   const currentPicks = [...newPicks, ...activePicks];
   const totalAlerts = alerts.length;
   const totalCurrent = currentPicks.length;
+  const buys = currentPicks.filter(a => a.recommendation === 'BUY').length;
+  const sells = currentPicks.filter(a => a.recommendation === 'SELL').length;
   const wins = currentPicks.filter(a => getStatus(getLatestPct(a)) === 'win').length;
   const losses = currentPicks.filter(a => getStatus(getLatestPct(a)) === 'loss').length;
   const avgPct = currentPicks.length > 0
@@ -207,13 +227,13 @@ export default function Dashboard() {
           <div className="stat-value" style={{ color: '#00e5ff' }}>{newPicks.length}</div>
           <div className="stat-label">🆕 New Today</div>
         </div>
-        <div className="stat-card">
-          <div className="stat-value" style={{ color: '#22c55e' }}>{wins}</div>
-          <div className="stat-label">Winners (&gt;10%)</div>
+        <div className="stat-card stat-buy-glow">
+          <div className="stat-value" style={{ color: '#22c55e' }}>{buys}</div>
+          <div className="stat-label">🟢 AI Says BUY</div>
         </div>
         <div className="stat-card">
-          <div className="stat-value" style={{ color: '#ef4444' }}>{losses}</div>
-          <div className="stat-label">Losses (&lt;-10%)</div>
+          <div className="stat-value" style={{ color: '#ef4444' }}>{sells}</div>
+          <div className="stat-label">🔴 AI Says SELL</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: avgPct >= 0 ? '#22c55e' : '#ef4444' }}>
@@ -312,6 +332,7 @@ export default function Dashboard() {
                   <th>Price at Alert</th>
                   <th>Latest Price</th>
                   <th>% Change</th>
+                  <th>AI Rec</th>
                   <th>Performance</th>
                 </tr>
               </thead>
@@ -342,6 +363,7 @@ export default function Dashboard() {
                         <td>${parseFloat(alert.price_at_alert).toFixed(2)}</td>
                         <td>${latest?.price?.toFixed(2) || '—'}</td>
                         <td className={`tbl-${perfStatus}`}>{fmtPct(pct)}</td>
+                        <td><span className={`rec-chip ${recClass(alert.recommendation || 'HOLD')}`}>{recLabel(alert.recommendation || 'HOLD')}</span></td>
                         <td className={`tbl-${perfStatus}`}>{statusLabel(pct)}</td>
                       </tr>
                     );
@@ -354,6 +376,7 @@ export default function Dashboard() {
 
       <footer>
         ⚡ Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB · Polymarket · Yahoo Finance · Google Finance · StockTwits</span>
+        <div className="disclaimer">⚠️ AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
       </footer>
     </>
   );
