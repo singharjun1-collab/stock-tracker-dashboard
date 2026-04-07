@@ -29,9 +29,10 @@ export async function GET(request) {
 
     if (pricesError) throw pricesError;
 
-    // Combine alerts with their prices
+    // Combine alerts with their prices and status
     const combined = alerts.map(alert => ({
       ...alert,
+      status: alert.status || 'active',
       prices: prices
         .filter(p => p.alert_id === alert.id)
         .map(p => ({

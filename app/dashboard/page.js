@@ -11,9 +11,9 @@ function getStatus(pct) {
 
 function statusLabel(pct) {
   const s = getStatus(pct);
-  if (s === 'win') return '\u2705 WIN';
-  if (s === 'loss') return '\u274c LOSS';
-  return '\u26a0\ufe0f NEUTRAL';
+  if (s === 'win') return '✅ WIN';
+  if (s === 'loss') return '❌ LOSS';
+  return '⚠️ NEUTRAL';
 }
 
 function pctClass(pct) {
@@ -72,19 +72,25 @@ function SparklineChart({ prices, canvasId }) {
   );
 }
 
-function AlertCard({ alert, index }) {
+function AlertCard({ alert, index, sectionPrefix }) {
   const latest = alert.prices[alert.prices.length - 1];
   const pct = latest?.pct_change || 0;
-  const status = getStatus(pct);
+  const perfStatus = getStatus(pct);
+  const isNew = alert.status === 'new';
+  const isDropped = alert.status === 'dropped';
 
   return (
-    <div className={`card ${status}`}>
+    <div className={`card ${perfStatus}${isNew ? ' card-new' : ''}${isDropped ? ' card-dropped' : ''}`}>
       <div className="card-top">
         <div>
-          <div className="ticker">{alert.ticker}</div>
+          <div className="ticker">
+            {alert.ticker}
+            {isNew && <span className="new-badge">🆕 NEW</span>}
+            {isDropped && <span className="dropped-badge">📦 DROPPED</span>}
+          </div>
           <div className="company">{alert.company}</div>
         </div>
-        <span className={`status-badge badge-${status}`}>{statusLabel(pct)}</span>
+        <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
       </div>
       <div className="price-row">
         <span className="price-alert">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
@@ -96,7 +102,7 @@ function AlertCard({ alert, index }) {
         <span className="meta-tag">{alert.signal_type}</span>
         <span style={{ color: '#4a6a85', fontSize: '0.72rem' }}>📅 Alerted {alert.alert_date}</span>
       </div>
-      <SparklineChart prices={alert.prices} canvasId={`spark-${index}`} />
+      <SparklineChart prices={alert.prices} canvasId={`${sectionPrefix}-spark-${index}`} />
       <div className="alert-reason">{alert.alert_reason}</div>
     </div>
   );
@@ -107,6 +113,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
   const [showArchive, setShowArchive] = useState(false);
+  const [showDropped, setShowDropped] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -134,7 +141,8 @@ export default function Dashboard() {
     return latest?.pct_change || 0;
   }, []);
 
-  const sorted = [...alerts].sort((a, b) => {
+  // Sort: wins first, then neutral, then losses
+  const sortByPerf = (list) => [...list].sort((a, b) => {
     const pa = getLatestPct(a);
     const pb = getLatestPct(b);
     const sa = getStatus(pa) === 'win' ? 0 : getStatus(pa) === 'neutral' ? 1 : 2;
@@ -143,16 +151,31 @@ export default function Dashboard() {
     return pb - pa;
   });
 
-  const filtered = filter === 'ALL' ? sorted : sorted.filter(a => a.signal_type === filter);
+  // Split by pick status
+  const newPicks = sortByPerf(alerts.filter(a => a.status === 'new'));
+  const activePicks = sortByPerf(alerts.filter(a => a.status === 'active'));
+  const droppedPicks = sortByPerf(alerts.filter(a => a.status === 'dropped'));
+
+  // Apply signal type filter
+  const applyFilter = (list) => filter === 'ALL' ? list : list.filter(a => a.signal_type === filter);
+
+  const filteredNew = applyFilter(newPicks);
+  const filteredActive = applyFilter(activePicks);
+  const filteredDropped = applyFilter(droppedPicks);
+
   const signalTypes = ['ALL', ...new Set(alerts.map(a => a.signal_type))];
 
+  // Stats (only for active + new picks — the ones you should be watching)
+  const currentPicks = [...newPicks, ...activePicks];
   const totalAlerts = alerts.length;
-  const wins = alerts.filter(a => getStatus(getLatestPct(a)) === 'win').length;
-  const losses = alerts.filter(a => getStatus(getLatestPct(a)) === 'loss').length;
-  const avgPct = alerts.length > 0
-    ? (alerts.reduce((sum, a) => sum + getLatestPct(a), 0) / alerts.length)
+  const totalCurrent = currentPicks.length;
+  const wins = currentPicks.filter(a => getStatus(getLatestPct(a)) === 'win').length;
+  const losses = currentPicks.filter(a => getStatus(getLatestPct(a)) === 'loss').length;
+  const avgPct = currentPicks.length > 0
+    ? (currentPicks.reduce((sum, a) => sum + getLatestPct(a), 0) / currentPicks.length)
     : 0;
 
+  // Date for header
   const today = new Date();
   const dateStr = today.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -174,10 +197,15 @@ export default function Dashboard() {
         <div className="subtitle">Last updated: {dateStr} · Auto-scan complete</div>
       </header>
 
+      {/* STATS BAR */}
       <div className="stats-bar">
         <div className="stat-card">
-          <div className="stat-value">{totalAlerts}</div>
-          <div className="stat-label">Total Alerts</div>
+          <div className="stat-value">{totalCurrent}</div>
+          <div className="stat-label">Current Picks</div>
+        </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: '#00e5ff' }}>{newPicks.length}</div>
+          <div className="stat-label">🆕 New Today</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#22c55e' }}>{wins}</div>
@@ -193,19 +221,24 @@ export default function Dashboard() {
           </div>
           <div className="stat-label">Avg Return</div>
         </div>
+        <div className="stat-card">
+          <div className="stat-value" style={{ color: '#7a9bc0' }}>{droppedPicks.length}</div>
+          <div className="stat-label">📦 Dropped</div>
+        </div>
       </div>
 
+      {/* SOURCES */}
       <p className="section-title">📡 Signal Sources</p>
       <div className="sources-row">
         <span className="source-badge src-wsb">🟠 WallStreetBets</span>
-        <span className="source-badge src-poly">🟢 Polymarket</span>
+        <span className="source-badge src-poly">🔵 Polymarket</span>
         <span className="source-badge src-yahoo">🟣 Yahoo Finance</span>
         <span className="source-badge src-google">🟢 Google Finance</span>
         <span className="source-badge src-st">🔴 StockTwits</span>
       </div>
 
-      <p className="section-title">🔥 Active Picks — Performance Scoreboard</p>
-      <div className="filter-bar">
+      {/* FILTER BAR */}
+      <div className="filter-bar" style={{ marginTop: 24 }}>
         {signalTypes.map(type => (
           <button
             key={type}
@@ -217,22 +250,60 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* ═══ NEW PICKS SECTION ═══ */}
+      {filteredNew.length > 0 && (
+        <>
+          <p className="section-title section-new">🆕 New Picks Today — Fresh Signals</p>
+          <p className="section-hint">These stocks just appeared on the radar today. Worth investigating before they move.</p>
+          <div className="cards-grid">
+            {filteredNew.map((alert, idx) => (
+              <AlertCard key={alert.id || idx} alert={alert} index={idx} sectionPrefix="new" />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* ═══ ACTIVE PICKS SECTION ═══ */}
+      <p className="section-title">🔥 Active Picks — Performance Scoreboard</p>
+      <p className="section-hint">These are your current picks still being tracked. The ones to watch and consider investing in.</p>
       <div className="cards-grid">
-        {filtered.map((alert, idx) => (
-          <AlertCard key={alert.id || idx} alert={alert} index={idx} />
-        ))}
+        {filteredActive.length > 0 ? filteredActive.map((alert, idx) => (
+          <AlertCard key={alert.id || idx} alert={alert} index={idx} sectionPrefix="active" />
+        )) : (
+          <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem' }}>No active picks match this filter.</p>
+        )}
       </div>
 
+      {/* ═══ DROPPED PICKS SECTION ═══ */}
+      {droppedPicks.length > 0 && (
+        <div className="dropped-section">
+          <p className="section-title section-dropped" style={{ marginLeft: 0 }}>📦 Dropped Picks — No Longer Recommended</p>
+          <p className="section-hint" style={{ marginLeft: 0 }}>These stocks were previously tracked but the signal has faded. They stay here for your records.</p>
+          <button className="archive-toggle-btn" onClick={() => setShowDropped(!showDropped)}>
+            📦 {showDropped ? 'Hide' : 'Show'} Dropped Picks ({droppedPicks.length})
+          </button>
+          {showDropped && (
+            <div className="cards-grid" style={{ padding: 0 }}>
+              {filteredDropped.map((alert, idx) => (
+                <AlertCard key={alert.id || idx} alert={alert} index={idx} sectionPrefix="dropped" />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══ FULL ARCHIVE TABLE ═══ */}
       <div className="archive-section">
-        <p className="section-title" style={{ marginLeft: 0 }}>📅 Archive — All Historical Picks</p>
+        <p className="section-title" style={{ marginLeft: 0 }}>📅 Full Archive — All Historical Picks</p>
         <button className="archive-toggle-btn" onClick={() => setShowArchive(!showArchive)}>
-          📂 {showArchive ? 'Hide' : 'Show'} Archive
+          📂 {showArchive ? 'Hide' : 'Show'} Archive ({alerts.length} total)
         </button>
         {showArchive && (
           <div className="archive-table-wrap">
             <table>
               <thead>
                 <tr>
+                  <th>Pick Status</th>
                   <th>Date Alerted</th>
                   <th>Ticker</th>
                   <th>Company</th>
@@ -241,18 +312,28 @@ export default function Dashboard() {
                   <th>Price at Alert</th>
                   <th>Latest Price</th>
                   <th>% Change</th>
-                  <th>Status</th>
+                  <th>Performance</th>
                 </tr>
               </thead>
               <tbody>
                 {[...alerts]
-                  .sort((a, b) => b.alert_date.localeCompare(a.alert_date))
+                  .sort((a, b) => {
+                    // Sort: new first, then active, then dropped
+                    const order = { new: 0, active: 1, dropped: 2 };
+                    const oa = order[a.status] ?? 1;
+                    const ob = order[b.status] ?? 1;
+                    if (oa !== ob) return oa - ob;
+                    return b.alert_date.localeCompare(a.alert_date);
+                  })
                   .map((alert, idx) => {
                     const latest = alert.prices[alert.prices.length - 1];
                     const pct = latest?.pct_change || 0;
-                    const status = getStatus(pct);
+                    const perfStatus = getStatus(pct);
+                    const pickStatus = alert.status || 'active';
+                    const pickLabel = pickStatus === 'new' ? '🆕 NEW' : pickStatus === 'dropped' ? '📦 DROPPED' : '🟢 ACTIVE';
                     return (
-                      <tr key={alert.id || idx}>
+                      <tr key={alert.id || idx} className={pickStatus === 'dropped' ? 'row-dropped' : ''}>
+                        <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
                         <td>{alert.alert_date}</td>
                         <td className="tbl-ticker">{alert.ticker}</td>
                         <td style={{ color: '#a0b8d0' }}>{alert.company}</td>
@@ -260,8 +341,8 @@ export default function Dashboard() {
                         <td style={{ maxWidth: 260, color: '#7a9bc0', fontSize: '0.73rem' }}>{alert.alert_reason}</td>
                         <td>${parseFloat(alert.price_at_alert).toFixed(2)}</td>
                         <td>${latest?.price?.toFixed(2) || '—'}</td>
-                        <td className={`tbl-${status}`}>{fmtPct(pct)}</td>
-                        <td className={`tbl-${status}`}>{statusLabel(pct)}</td>
+                        <td className={`tbl-${perfStatus}`}>{fmtPct(pct)}</td>
+                        <td className={`tbl-${perfStatus}`}>{statusLabel(pct)}</td>
                       </tr>
                     );
                   })}
