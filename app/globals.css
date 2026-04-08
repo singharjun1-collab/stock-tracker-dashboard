@@ -243,6 +243,54 @@ body {
 .arrow { color: #4fc3f7; }
 .price-current { font-size: 1.1rem; font-weight: 700; color: #e0e6f0; }
 .pct-change { font-size: 1.05rem; font-weight: 700; }
+
+/* Price Grid - 3-column layout */
+.price-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 10px 0;
+  padding: 10px;
+  background: rgba(10, 20, 35, 0.5);
+  border-radius: 8px;
+}
+.price-grid-item {
+  text-align: center;
+}
+.price-grid-label {
+  font-size: 0.62rem;
+  color: #4a6a85;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+.price-grid-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #c0d0e0;
+}
+.price-grid-sub {
+  font-size: 0.62rem;
+  color: #3a5570;
+  margin-top: 2px;
+}
+
+/* Research Link */
+.research-link {
+  color: #4a6a85;
+  font-size: 0.72rem;
+  text-decoration: none;
+  padding: 3px 8px;
+  border: 1px solid #1e3a5f;
+  border-radius: 6px;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+.research-link:hover {
+  color: #00e5ff;
+  border-color: #00e5ff;
+  background: rgba(0, 229, 255, 0.06);
+}
 .pct-pos { color: #22c55e; }
 .pct-neg { color: #ef4444; }
 .pct-flat { color: #f59e0b; }
