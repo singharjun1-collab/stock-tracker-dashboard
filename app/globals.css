@@ -93,7 +93,7 @@ body {
   margin-bottom: 16px;
 }
 
-/* ── HEADER ── */
+/* ─┈ HEADER ── */
 .header {
   background: linear-gradient(135deg, #0d1b2a 0%, #1a2744 100%);
   border-bottom: 1px solid #1e3a5f;
@@ -108,7 +108,7 @@ body {
   color: #7a9bc0;
 }
 
-/* ── STATS BAR ── */
+/* ─┈ STATS BAR ── */
 .stats-bar {
   display: flex;
   gap: 16px;
@@ -137,7 +137,7 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* ── SECTION LABELS ── */
+/* ─┈ SECTION LABELS ── */
 .section-title {
   font-size: 1.15rem;
   font-weight: 700;
@@ -148,7 +148,7 @@ body {
   letter-spacing: 0.3px;
 }
 
-/* ── FILTER BAR ── */
+/* ─┈ FILTER BAR ─┈ */
 .filter-bar {
   display: flex;
   gap: 8px;
@@ -243,54 +243,6 @@ body {
 .arrow { color: #4fc3f7; }
 .price-current { font-size: 1.1rem; font-weight: 700; color: #e0e6f0; }
 .pct-change { font-size: 1.05rem; font-weight: 700; }
-
-/* Price Grid - 3-column layout */
-.price-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 8px;
-  margin: 10px 0;
-  padding: 10px;
-  background: rgba(10, 20, 35, 0.5);
-  border-radius: 8px;
-}
-.price-grid-item {
-  text-align: center;
-}
-.price-grid-label {
-  font-size: 0.62rem;
-  color: #4a6a85;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin-bottom: 3px;
-}
-.price-grid-value {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #c0d0e0;
-}
-.price-grid-sub {
-  font-size: 0.62rem;
-  color: #3a5570;
-  margin-top: 2px;
-}
-
-/* Research Link */
-.research-link {
-  color: #4a6a85;
-  font-size: 0.72rem;
-  text-decoration: none;
-  padding: 3px 8px;
-  border: 1px solid #1e3a5f;
-  border-radius: 6px;
-  transition: all 0.2s;
-  white-space: nowrap;
-}
-.research-link:hover {
-  color: #00e5ff;
-  border-color: #00e5ff;
-  background: rgba(0, 229, 255, 0.06);
-}
 .pct-pos { color: #22c55e; }
 .pct-neg { color: #ef4444; }
 .pct-flat { color: #f59e0b; }
@@ -320,7 +272,7 @@ body {
   padding-top: 8px;
 }
 
-/* ── SPARKLINE ── */
+/* ─┈ SPARKLINE ── */
 .sparkline-container {
   margin-top: 10px;
   height: 52px;
@@ -328,7 +280,63 @@ body {
 }
 .sparkline-canvas { width: 100% !important; height: 52px !important; }
 
-/* ── ARCHIVE ── */
+/* ─┈ 3-MONTH HISTORIC CHART ── */
+.historic-chart-section {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(10, 14, 26, 0.5);
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+}
+.historic-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.historic-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #7a9bc0;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.historic-change {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: 0.3px;
+}
+.historic-prices-range {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  color: #4a6a85;
+  margin-bottom: 8px;
+}
+.historic-arrow {
+  color: #3a5a78;
+  font-size: 0.65rem;
+}
+.historic-chart-container {
+  height: 80px;
+  position: relative;
+}
+.historic-chart-container canvas {
+  width: 100% !important;
+  height: 80px !important;
+}
+.historic-loading {
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  color: #3a5a78;
+  font-style: italic;
+}
+
+/* ─┈ ARCHIVE ── */
 .archive-section {
   margin: 32px 40px;
 }
@@ -381,7 +389,7 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
   white-space: nowrap;
 }
 
-/* ── NEW PICK GLOW ── */
+/* ─┈ NEW PICK GLOW ── */
 .section-new {
   border-left-color: #00e5ff;
   color: #00e5ff;
@@ -446,7 +454,7 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
   margin: 32px 40px;
 }
 
-/* ── PICK STATUS CHIPS (archive table) ── */
+/* ─┈ PICK STATUS CHIPS (archive table) ── */
 .pick-status-chip {
   display: inline-block;
   padding: 2px 10px;
@@ -460,7 +468,7 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
 .pick-dropped { background: rgba(122,155,192,0.08); color: #7a9bc0; border: 1px solid #3a5a78; }
 .row-dropped td { opacity: 0.6; }
 
-/* ── AI RECOMMENDATION BAR ── */
+/* ─┈ AI RECOMMENDATION BAR ── */
 .rec-bar {
   display: flex;
   align-items: center;
@@ -518,7 +526,7 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
   font-style: italic;
 }
 
-/* ── FOOTER ── */
+/* ─┈ FOOTER ── */
 footer {
   text-align: center;
   font-size: 0.75rem;
@@ -529,7 +537,7 @@ footer {
 }
 footer span { color: #4fc3f7; }
 
-/* ── LOADING ── */
+/* ─┈ LOADING ── */
 .loading-container {
   display: flex;
   flex-direction: column;
