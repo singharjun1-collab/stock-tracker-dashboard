@@ -38,6 +38,161 @@ function recClass(rec) {
   return 'rec-hold';
 }
 
+function HistoricChart({ ticker, canvasId }) {
+  const canvasRef = useRef(null);
+  const [histData, setHistData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/history?ticker=${encodeURIComponent(ticker)}`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => {
+        if (!cancelled) {
+          setHistData(data);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError(true);
+          setLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
+  }, [ticker]);
+
+  useEffect(() => {
+    if (!canvasRef.current || !window.Chart || !histData?.prices?.length) return;
+
+    const ctx = canvasRef.current;
+    const priceValues = histData.prices.map(p => p.price);
+    const labels = histData.prices.map(p => {
+      const d = new Date(p.date);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const isUp = priceValues[priceValues.length - 1] >= priceValues[0];
+
+    // Find min/max for visual range
+    const minPrice = Math.min(...priceValues);
+    const maxPrice = Math.max(...priceValues);
+    const padding = (maxPrice - minPrice) * 0.1;
+
+    const chart = new window.Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: priceValues,
+          borderColor: isUp ? '#22c55e' : '#ef4444',
+          backgroundColor: isUp ? 'rgba(34,197,94,0.06)' : 'rgba(239,68,68,0.06)',
+          borderWidth: 1.5,
+          pointRadius: 0,
+          tension: 0.3,
+          fill: true,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            enabled: true,
+            mode: 'index',
+            intersect: false,
+            backgroundColor: '#0f1d30',
+            borderColor: '#1e3a5f',
+            borderWidth: 1,
+            titleColor: '#7a9bc0',
+            bodyColor: '#e0e6f0',
+            titleFont: { size: 10 },
+            bodyFont: { size: 11, weight: 'bold' },
+            padding: 8,
+            displayColors: false,
+            callbacks: {
+              label: (ctx) => `$${ctx.parsed.y.toFixed(2)}`,
+            },
+          },
+        },
+        scales: {
+          x: {
+            display: true,
+            ticks: {
+              color: '#3a5a78',
+              font: { size: 9 },
+              maxTicksLimit: 5,
+              maxRotation: 0,
+            },
+            grid: { display: false },
+            border: { display: false },
+          },
+          y: {
+            display: true,
+            position: 'right',
+            min: minPrice - padding,
+            max: maxPrice + padding,
+            ticks: {
+              color: '#3a5a78',
+              font: { size: 9 },
+              maxTicksLimit: 4,
+              callback: (val) => '$' + val.toFixed(0),
+            },
+            grid: {
+              color: 'rgba(30,58,95,0.3)',
+              drawTicks: false,
+            },
+            border: { display: false },
+          },
+        },
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+      },
+    });
+
+    return () => chart.destroy();
+  }, [histData]);
+
+  if (error) return null;
+
+  if (loading) {
+    return (
+      <div className="historic-chart-section">
+        <div className="historic-label">📊 3-Month History</div>
+        <div className="historic-loading">Loading chart...</div>
+      </div>
+    );
+  }
+
+  if (!histData?.prices?.length) return null;
+
+  const changeColor = histData.change3mo >= 0 ? '#22c55e' : '#ef4444';
+  const changeSign = histData.change3mo >= 0 ? '+' : '';
+
+  return (
+    <div className="historic-chart-section">
+      <div className="historic-header">
+        <span className="historic-label">📊 3-Month History</span>
+        <span className="historic-change" style={{ color: changeColor }}>
+          {changeSign}{histData.change3mo?.toFixed(1)}%
+        </span>
+      </div>
+      <div className="historic-prices-range">
+        <span>${histData.startPrice?.toFixed(2)}</span>
+        <span className="historic-arrow">→</span>
+        <span>${histData.endPrice?.toFixed(2)}</span>
+      </div>
+      <div className="historic-chart-container">
+        <canvas ref={canvasRef} id={canvasId}></canvas>
+      </div>
+    </div>
+  );
+}
+
 function SparklineChart({ prices, canvasId }) {
   const canvasRef = useRef(null);
 
@@ -90,7 +245,6 @@ function AlertCard({ alert, index, sectionPrefix }) {
   const perfStatus = getStatus(pct);
   const isNew = alert.status === 'new';
   const isDropped = alert.status === 'dropped';
-  const yahooUrl = `https://finance.yahoo.com/quote/${alert.ticker}/`;
 
   return (
     <div className={`card ${perfStatus}${isNew ? ' card-new' : ''}${isDropped ? ' card-dropped' : ''}`}>
@@ -103,33 +257,20 @@ function AlertCard({ alert, index, sectionPrefix }) {
           </div>
           <div className="company">{alert.company}</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <a href={yahooUrl} target="_blank" rel="noopener noreferrer" className="research-link" title="View on Yahoo Finance">🔍 Research</a>
-          <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
-        </div>
+        <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
       </div>
-      <div className="price-grid">
-        <div className="price-grid-item">
-          <div className="price-grid-label">Alert Price</div>
-          <div className="price-grid-value">${parseFloat(alert.price_at_alert).toFixed(2)}</div>
-          <div className="price-grid-sub">{alert.alert_date}</div>
-        </div>
-        <div className="price-grid-item">
-          <div className="price-grid-label">Latest Price</div>
-          <div className="price-grid-value" style={{ color: '#00e5ff' }}>${latest?.price?.toFixed(2) || '—'}</div>
-          <div className="price-grid-sub">{latest?.date || '—'}</div>
-        </div>
-        <div className="price-grid-item">
-          <div className="price-grid-label">Return</div>
-          <div className={`price-grid-value ${pctClass(pct)}`}>{fmtPct(pct)}</div>
-          <div className="price-grid-sub">since alert</div>
-        </div>
+      <div className="price-row">
+        <span className="price-alert">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
+        <span className="arrow">→</span>
+        <span className="price-current">${latest?.price?.toFixed(2) || '—'}</span>
+        <span className={`pct-change ${pctClass(pct)}`}>{fmtPct(pct)}</span>
       </div>
       <div className="meta-row">
         <span className="meta-tag">{alert.signal_type}</span>
         <span style={{ color: '#4a6a85', fontSize: '0.72rem' }}>📅 Alerted {alert.alert_date}</span>
       </div>
       <SparklineChart prices={alert.prices} canvasId={`${sectionPrefix}-spark-${index}`} />
+      <HistoricChart ticker={alert.ticker} canvasId={`${sectionPrefix}-hist-${index}`} />
       {alert.recommendation && (
         <div className={`rec-bar ${recClass(alert.recommendation)}`}>
           <span className="rec-label">{recLabel(alert.recommendation)}</span>
@@ -371,7 +512,7 @@ export default function Dashboard() {
                       <tr key={alert.id || idx} className={pickStatus === 'dropped' ? 'row-dropped' : ''}>
                         <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
                         <td>{alert.alert_date}</td>
-                        <td className="tbl-ticker"><a href={`https://finance.yahoo.com/quote/${alert.ticker}/`} target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff', textDecoration: 'none' }}>{alert.ticker}</a></td>
+                        <td className="tbl-ticker">{alert.ticker}</td>
                         <td style={{ color: '#a0b8d0' }}>{alert.company}</td>
                         <td><span className="signal-chip">{alert.signal_type}</span></td>
                         <td style={{ maxWidth: 260, color: '#7a9bc0', fontSize: '0.73rem' }}>{alert.alert_reason}</td>
