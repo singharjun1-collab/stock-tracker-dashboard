@@ -90,6 +90,7 @@ function AlertCard({ alert, index, sectionPrefix }) {
   const perfStatus = getStatus(pct);
   const isNew = alert.status === 'new';
   const isDropped = alert.status === 'dropped';
+  const yahooUrl = `https://finance.yahoo.com/quote/${alert.ticker}/`;
 
   return (
     <div className={`card ${perfStatus}${isNew ? ' card-new' : ''}${isDropped ? ' card-dropped' : ''}`}>
@@ -102,13 +103,27 @@ function AlertCard({ alert, index, sectionPrefix }) {
           </div>
           <div className="company">{alert.company}</div>
         </div>
-        <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <a href={yahooUrl} target="_blank" rel="noopener noreferrer" className="research-link" title="View on Yahoo Finance">🔍 Research</a>
+          <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
+        </div>
       </div>
-      <div className="price-row">
-        <span className="price-alert">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
-        <span className="arrow">→</span>
-        <span className="price-current">${latest?.price?.toFixed(2) || '—'}</span>
-        <span className={`pct-change ${pctClass(pct)}`}>{fmtPct(pct)}</span>
+      <div className="price-grid">
+        <div className="price-grid-item">
+          <div className="price-grid-label">Alert Price</div>
+          <div className="price-grid-value">${parseFloat(alert.price_at_alert).toFixed(2)}</div>
+          <div className="price-grid-sub">{alert.alert_date}</div>
+        </div>
+        <div className="price-grid-item">
+          <div className="price-grid-label">Latest Price</div>
+          <div className="price-grid-value" style={{ color: '#00e5ff' }}>${latest?.price?.toFixed(2) || '—'}</div>
+          <div className="price-grid-sub">{latest?.date || '—'}</div>
+        </div>
+        <div className="price-grid-item">
+          <div className="price-grid-label">Return</div>
+          <div className={`price-grid-value ${pctClass(pct)}`}>{fmtPct(pct)}</div>
+          <div className="price-grid-sub">since alert</div>
+        </div>
       </div>
       <div className="meta-row">
         <span className="meta-tag">{alert.signal_type}</span>
@@ -356,7 +371,7 @@ export default function Dashboard() {
                       <tr key={alert.id || idx} className={pickStatus === 'dropped' ? 'row-dropped' : ''}>
                         <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
                         <td>{alert.alert_date}</td>
-                        <td className="tbl-ticker">{alert.ticker}</td>
+                        <td className="tbl-ticker"><a href={`https://finance.yahoo.com/quote/${alert.ticker}/`} target="_blank" rel="noopener noreferrer" style={{ color: '#00e5ff', textDecoration: 'none' }}>{alert.ticker}</a></td>
                         <td style={{ color: '#a0b8d0' }}>{alert.company}</td>
                         <td><span className="signal-chip">{alert.signal_type}</span></td>
                         <td style={{ maxWidth: 260, color: '#7a9bc0', fontSize: '0.73rem' }}>{alert.alert_reason}</td>
