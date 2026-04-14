@@ -451,11 +451,16 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
         </div>
       </div>
 
-      {/* SOURCE BADGE */}
+      {/* SOURCE BADGE + MARKET CAP */}
       <div className="card-source-row">
         <span className={`source-badge-sm ${sourceMeta.cls}`}>{sourceMeta.emoji} {sourceMeta.label}</span>
-        {alert.market_cap && (
-          <span className="mcap-badge">${alert.market_cap >= 1000 ? (alert.market_cap / 1000).toFixed(1) + 'T' : alert.market_cap.toFixed(0) + 'B'} cap</span>
+        {alert.market_cap != null && (
+          <span className={`mcap-card-badge ${alert.market_cap >= 200 ? 'mcap-mega' : alert.market_cap >= 10 ? 'mcap-large' : alert.market_cap >= 2 ? 'mcap-mid' : 'mcap-small'}`}>
+            {"\u{1F3E2}"} {alert.market_cap >= 1000 ? '$' + (alert.market_cap / 1000).toFixed(1) + 'T' : '$' + alert.market_cap.toFixed(1) + 'B'} {alert.market_cap >= 200 ? 'Mega' : alert.market_cap >= 10 ? 'Large' : alert.market_cap >= 2 ? 'Mid' : 'Small'} Cap
+          </span>
+        )}
+        {alert.market_cap == null && (
+          <span className="mcap-card-badge mcap-unknown">{"\u{1F3E2}"} Market Cap N/A</span>
         )}
       </div>
 
@@ -700,6 +705,135 @@ function MarketCapSlider({ range, onChange }) {
   );
 }
 
+// ── AI Settings Panel ──
+function AISettingsPanel({ settings, onSave }) {
+  const [localMin, setLocalMin] = useState(settings?.market_cap_range?.min ?? 0);
+  const [localMax, setLocalMax] = useState(settings?.market_cap_range?.max ?? 5000);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    if (settings?.market_cap_range) {
+      setLocalMin(settings.market_cap_range.min ?? 0);
+      setLocalMax(settings.market_cap_range.max ?? 5000);
+    }
+  }, [settings]);
+
+  const presets = [
+    { label: 'All Sizes', min: 0, max: 5000 },
+    { label: 'Small Cap (<$2B)', min: 0, max: 2 },
+    { label: 'Mid Cap ($2\u{2013}$10B)', min: 2, max: 10 },
+    { label: 'Large Cap ($10\u{2013}$200B)', min: 10, max: 200 },
+    { label: 'Mega Cap ($200B+)', min: 200, max: 5000 },
+  ];
+
+  const formatVal = (v) => {
+    if (v >= 1000) return `$${(v / 1000).toFixed(1)}T`;
+    return `$${v}B`;
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaved(false);
+    await onSave('market_cap_range', { min: localMin, max: localMax });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const handlePreset = (min, max) => {
+    setLocalMin(min);
+    setLocalMax(max);
+  };
+
+  const currentRange = settings?.market_cap_range;
+  const isDefault = (!currentRange) || (currentRange.min === 0 && currentRange.max === 5000);
+
+  return (
+    <div className="ai-settings-panel">
+      <div className="ai-settings-header">
+        <h3 className="ai-settings-title">{"\u{2699}\u{FE0F}"} AI Engine Settings</h3>
+        <p className="ai-settings-subtitle">These rules control what the AI recommends. Changes take effect on the next scan.</p>
+      </div>
+
+      <div className="ai-settings-section">
+        <div className="ai-setting-row">
+          <div className="ai-setting-info">
+            <span className="ai-setting-name">{"\u{1F3E2}"} Market Cap Filter</span>
+            <span className="ai-setting-desc">Only recommend stocks within this market cap range. Stocks outside this range will be excluded by the AI.</span>
+            <span className="ai-setting-current">
+              Current: {isDefault ? 'All sizes (no filter)' : `${formatVal(currentRange.min)} \u{2013} ${formatVal(currentRange.max)}`}
+            </span>
+          </div>
+        </div>
+
+        <div className="ai-setting-controls">
+          <div className="ai-mcap-presets">
+            {presets.map(p => (
+              <button
+                key={p.label}
+                className={`ai-mcap-preset ${localMin === p.min && localMax === p.max ? 'active' : ''}`}
+                onClick={() => handlePreset(p.min, p.max)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="ai-mcap-custom">
+            <div className="ai-mcap-input-row">
+              <div className="ai-mcap-input-group">
+                <label className="ai-mcap-label">Min Market Cap</label>
+                <div className="ai-mcap-field">
+                  <span className="ai-mcap-prefix">$</span>
+                  <input
+                    type="number"
+                    className="ai-mcap-input"
+                    value={localMin}
+                    onChange={(e) => setLocalMin(Math.max(0, parseFloat(e.target.value) || 0))}
+                    min="0"
+                    step="1"
+                  />
+                  <span className="ai-mcap-suffix">B</span>
+                </div>
+              </div>
+              <span className="ai-mcap-separator">{"\u{2192}"}</span>
+              <div className="ai-mcap-input-group">
+                <label className="ai-mcap-label">Max Market Cap</label>
+                <div className="ai-mcap-field">
+                  <span className="ai-mcap-prefix">$</span>
+                  <input
+                    type="number"
+                    className="ai-mcap-input"
+                    value={localMax}
+                    onChange={(e) => setLocalMax(Math.max(0, parseFloat(e.target.value) || 0))}
+                    min="0"
+                    step="1"
+                  />
+                  <span className="ai-mcap-suffix">B</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="ai-setting-actions">
+            <button
+              className={`ai-save-btn ${saving ? 'saving' : ''} ${saved ? 'saved' : ''}`}
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : saved ? '\u{2705} Saved!' : '\u{1F4BE} Save Setting'}
+            </button>
+            {!isDefault && (
+              <span className="ai-setting-active-badge">{"\u{1F7E2}"} Active: {formatVal(currentRange.min)} \u{2013} {formatVal(currentRange.max)}</span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Analytics Tab Component ──
 function AnalyticsTab({ alerts }) {
   // Source performance analysis
@@ -849,6 +983,8 @@ export default function Dashboard() {
   const [mcapRange, setMcapRange] = useState([0, 5000]);
   const [showArchive, setShowArchive] = useState(false);
   const [showDistList, setShowDistList] = useState(false);
+  const [showAISettings, setShowAISettings] = useState(false);
+  const [aiSettings, setAISettings] = useState({});
   const [watchlist, setWatchlistState] = useState([]);
   const router = useRouter();
 
@@ -866,6 +1002,12 @@ export default function Dashboard() {
         setLoading(false);
       })
       .catch(() => router.replace('/'));
+
+    // Fetch AI settings
+    fetch('/api/settings')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.settings) setAISettings(data.settings); })
+      .catch(() => {});
   }, [router]);
 
   const handleToggleWatchlist = useCallback((ticker) => {
@@ -890,6 +1032,21 @@ export default function Dashboard() {
     } catch {
       // Revert on error
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, user_rating: a.user_rating } : a));
+    }
+  }, []);
+
+  const handleSaveAISetting = useCallback(async (key, value) => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key, value }),
+      });
+      if (res.ok) {
+        setAISettings(prev => ({ ...prev, [key]: value }));
+      }
+    } catch (err) {
+      console.error('Failed to save AI setting:', err);
     }
   }, []);
 
@@ -1208,6 +1365,14 @@ export default function Dashboard() {
             </table>
           </div>
         )}
+      </div>
+
+      {/* AI ENGINE SETTINGS */}
+      <div className="archive-section">
+        <button className="archive-toggle-btn ai-settings-toggle" onClick={() => setShowAISettings(!showAISettings)}>
+          {"\u{2699}\u{FE0F}"} {showAISettings ? 'Hide' : 'Manage'} AI Engine Settings
+        </button>
+        {showAISettings && <AISettingsPanel settings={aiSettings} onSave={handleSaveAISetting} />}
       </div>
 
       {/* DISTRIBUTION LIST */}
