@@ -29,12 +29,44 @@ export async function GET(request) {
 
     if (pricesError) throw pricesError;
 
-    // Combine alerts with their prices and status
+    // Fetch signal changes
+    const { data: signalChanges, error: scError } = await supabase
+      .from('signal_changes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (scError) console.error('Signal changes error:', scError);
+
+    // Fetch user ratings
+    const { data: ratings, error: ratingsError } = await supabase
+      .from('user_ratings')
+      .select('*');
+
+    if (ratingsError) console.error('Ratings error:', ratingsError);
+
+    // Build ratings lookup
+    const ratingsMap = {};
+    (ratings || []).forEach(r => { ratingsMap[r.alert_id] = r.rating; });
+
+    // Build signal changes lookup (latest change per alert)
+    const changesMap = {};
+    (signalChanges || []).forEach(sc => {
+      if (!changesMap[sc.alert_id]) {
+        changesMap[sc.alert_id] = sc;
+      }
+    });
+
+    // Combine alerts with their prices, signal changes, and ratings
     const combined = alerts.map(alert => ({
       ...alert,
       status: alert.status || 'active',
       recommendation: alert.recommendation || 'HOLD',
       recommendation_reason: alert.recommendation_reason || '',
+      source: alert.source || 'unknown',
+      market_cap: alert.market_cap ? parseFloat(alert.market_cap) : null,
+      forecast_sell_date: alert.forecast_sell_date || null,
+      user_rating: ratingsMap[alert.id] || null,
+      latest_signal_change: changesMap[alert.id] || null,
       prices: prices
         .filter(p => p.alert_id === alert.id)
         .map(p => ({
