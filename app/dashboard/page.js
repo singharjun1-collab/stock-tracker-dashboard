@@ -1185,6 +1185,43 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* TOP GAINERS / BIGGEST LOSERS */}
+      {(() => {
+        const sorted = currentPicks
+          .map(a => ({ ticker: a.ticker, company: a.company, pct: getLatestPct(a) }))
+          .sort((a, b) => b.pct - a.pct);
+        const topGainers = sorted.slice(0, 5);
+        const topLosers = [...sorted].sort((a, b) => a.pct - b.pct).slice(0, 5);
+        return (
+          <div className="movers-row">
+            <div className="movers-card">
+              <h3 className="movers-heading movers-gainers-heading">{"\u{1F4C8}"} Top Gainers</h3>
+              <div className="movers-list">
+                {topGainers.map((s, i) => (
+                  <div key={s.ticker} className="movers-item">
+                    <span className="movers-rank">{i + 1}</span>
+                    <span className="movers-ticker">{s.ticker}</span>
+                    <span className="movers-pct pct-pos">{fmtPct(s.pct)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="movers-card">
+              <h3 className="movers-heading movers-losers-heading">{"\u{1F4C9}"} Biggest Losers</h3>
+              <div className="movers-list">
+                {topLosers.map((s, i) => (
+                  <div key={s.ticker} className="movers-item">
+                    <span className="movers-rank">{i + 1}</span>
+                    <span className="movers-ticker">{s.ticker}</span>
+                    <span className="movers-pct pct-neg">{fmtPct(s.pct)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* SEARCH BAR */}
       <div className="search-bar-container">
         <div className="search-bar">

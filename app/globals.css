@@ -878,3 +878,42 @@ footer span { color: #4fc3f7; }
   color: #4a6a85; background: rgba(30,58,95,0.3);
   border: 1px solid #1e3a5f;
 }
+
+/* ── TOP MOVERS (Gainers / Losers) ── */
+.movers-row {
+  display: flex; gap: 16px; padding: 0 40px; margin: 16px 0 0;
+}
+.movers-card {
+  flex: 1; background: #0f1d30; border: 1px solid #1e3a5f;
+  border-radius: 14px; padding: 20px 24px; min-width: 0;
+}
+.movers-heading {
+  font-size: 1rem; font-weight: 700; margin-bottom: 14px;
+  letter-spacing: 0.3px;
+}
+.movers-gainers-heading { color: #22c55e; }
+.movers-losers-heading { color: #ef4444; }
+.movers-list { display: flex; flex-direction: column; gap: 8px; }
+.movers-item {
+  display: flex; align-items: center; gap: 10px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px; padding: 10px 14px;
+  transition: background 0.2s;
+}
+.movers-item:hover { background: rgba(255,255,255,0.06); }
+.movers-rank {
+  font-size: 0.7rem; font-weight: 700; color: #4a6a85;
+  width: 18px; text-align: center; flex-shrink: 0;
+}
+.movers-ticker {
+  font-size: 0.95rem; font-weight: 700; color: #e0e6f0;
+  flex: 1;
+}
+.movers-pct {
+  font-size: 1rem; font-weight: 800; text-align: right;
+  min-width: 80px;
+}
+
+@media (max-width: 768px) {
+  .movers-row { flex-direction: column; padding: 0 16px; }
+}
