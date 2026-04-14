@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import '../globals.css';
 
-// ââ Helpers ââ
+// ── Helpers ──
 function getStatus(pct) {
   if (pct > 10) return 'win';
   if (pct < -10) return 'loss';
@@ -11,9 +11,9 @@ function getStatus(pct) {
 }
 function statusLabel(pct) {
   const s = getStatus(pct);
-  if (s === 'win') return 'â WIN';
-  if (s === 'loss') return 'â LOSS';
-  return 'â ï¸ NEUTRAL';
+  if (s === 'win') return '\u{2705} WIN';
+  if (s === 'loss') return '\u{274C} LOSS';
+  return '\u{26A0}\u{FE0F} NEUTRAL';
 }
 function pctClass(pct) {
   if (pct > 0) return 'pct-pos';
@@ -24,9 +24,9 @@ function fmtPct(pct) {
   return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
 }
 function recLabel(rec) {
-  if (rec === 'BUY') return 'ð¢ BUY';
-  if (rec === 'SELL') return 'ð´ SELL';
-  return 'ð¡ HOLD';
+  if (rec === 'BUY') return '\u{1F7E2} BUY';
+  if (rec === 'SELL') return '\u{1F534} SELL';
+  return '\u{1F7E1} HOLD';
 }
 function recClass(rec) {
   if (rec === 'BUY') return 'rec-buy';
@@ -34,15 +34,15 @@ function recClass(rec) {
   return 'rec-hold';
 }
 
-// ââ Source helpers ââ
+// ── Source helpers ──
 const SOURCE_META = {
-  wsb: { label: 'WallStreetBets', emoji: 'ð ', cls: 'src-wsb' },
-  reddit: { label: 'Reddit', emoji: 'ð´', cls: 'src-reddit' },
-  polymarket: { label: 'Polymarket', emoji: 'ðµ', cls: 'src-poly' },
-  yahoo: { label: 'Yahoo Finance', emoji: 'ð£', cls: 'src-yahoo' },
-  google: { label: 'Google Finance', emoji: 'ð¢', cls: 'src-google' },
-  stocktwits: { label: 'StockTwits', emoji: 'ð´', cls: 'src-st' },
-  unknown: { label: 'Unknown', emoji: 'âª', cls: 'src-unknown' },
+  wsb: { label: 'WallStreetBets', emoji: '\u{1F7E0}', cls: 'src-wsb' },
+  reddit: { label: 'Reddit', emoji: '\u{1F534}', cls: 'src-reddit' },
+  polymarket: { label: 'Polymarket', emoji: '\u{1F535}', cls: 'src-poly' },
+  yahoo: { label: 'Yahoo Finance', emoji: '\u{1F7E3}', cls: 'src-yahoo' },
+  google: { label: 'Google Finance', emoji: '\u{1F7E2}', cls: 'src-google' },
+  stocktwits: { label: 'StockTwits', emoji: '\u{1F534}', cls: 'src-st' },
+  unknown: { label: 'Unknown', emoji: '\u{26AA}', cls: 'src-unknown' },
 };
 function getSourceMeta(source) {
   if (!source) return SOURCE_META.unknown;
@@ -56,7 +56,7 @@ function getSourceMeta(source) {
   return SOURCE_META[key] || SOURCE_META.unknown;
 }
 
-// ââ Cookie helpers for watchlist ââ
+// ── Cookie helpers for watchlist ──
 function getWatchlist() {
   if (typeof document === 'undefined') return [];
   const match = document.cookie.match(/(?:^|; )stock_watchlist=([^;]*)/);
@@ -75,7 +75,7 @@ function toggleWatchlist(ticker) {
   return list;
 }
 
-// ââ Cookie helpers for market cap filter ââ
+// ── Cookie helpers for market cap filter ──
 function getMarketCapFilter() {
   if (typeof document === 'undefined') return [0, 5000];
   const match = document.cookie.match(/(?:^|; )stock_mcap_filter=([^;]*)/);
@@ -87,7 +87,7 @@ function setMarketCapFilter(range) {
   document.cookie = `stock_mcap_filter=${val}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
-// ââ Reddit link builder ââ
+// ── Reddit link builder ──
 function getRedditLinks(ticker) {
   return [
     { label: 'r/wallstreetbets', url: `https://www.reddit.com/r/wallstreetbets/search/?q=${ticker}&restrict_sr=1&sort=new` },
@@ -98,7 +98,7 @@ function getRedditLinks(ticker) {
   ];
 }
 
-// ââ Analyst Badge Component ââ
+// ── Analyst Badge Component ──
 function AnalystBadge({ ticker }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +123,7 @@ function AnalystBadge({ ticker }) {
   return (
     <div className={`analyst-badge ${colorClass}`}>
       <div className="analyst-header">
-        <span className="analyst-icon">ð</span>
+        <span className="analyst-icon">{"\u{1F4CA}"}</span>
         <span className="analyst-title">Analyst Consensus</span>
       </div>
       <div className="analyst-rating">
@@ -136,7 +136,7 @@ function AnalystBadge({ ticker }) {
         <div className="analyst-target">
           Target: <strong>${data.targetMeanPrice.toFixed(2)}</strong>
           {data.targetLowPrice && data.targetHighPrice && (
-            <span className="analyst-range"> (${data.targetLowPrice.toFixed(2)} â ${data.targetHighPrice.toFixed(2)})</span>
+            <span className="analyst-range"> (${data.targetLowPrice.toFixed(2)} {"\u{2013}"} ${data.targetHighPrice.toFixed(2)})</span>
           )}
         </div>
       )}
@@ -153,7 +153,7 @@ function AnalystBadge({ ticker }) {
   );
 }
 
-// ââ Profit/Loss Calculator Component ââ
+// ── Profit/Loss Calculator Component ──
 function ProfitLossCalc({ priceAtAlert, latestPrice }) {
   const [amount, setAmount] = useState('');
   const [showCalc, setShowCalc] = useState(false);
@@ -170,7 +170,7 @@ function ProfitLossCalc({ priceAtAlert, latestPrice }) {
   return (
     <div className="calc-section">
       <button className="calc-toggle" onClick={() => setShowCalc(!showCalc)}>
-        {showCalc ? 'â¾' : 'â¸'} ð° What-If Calculator
+        {showCalc ? '\u{25BE}' : '\u{25B8}'} {"\u{1F4B0}"} What-If Calculator
       </button>
       {showCalc && (
         <div className="calc-body">
@@ -210,7 +210,7 @@ function ProfitLossCalc({ priceAtAlert, latestPrice }) {
   );
 }
 
-// ââ Reddit Links Component ââ
+// ── Reddit Links Component ──
 function RedditLinks({ ticker }) {
   const [showLinks, setShowLinks] = useState(false);
   const links = getRedditLinks(ticker);
@@ -218,7 +218,7 @@ function RedditLinks({ ticker }) {
   return (
     <div className="reddit-section">
       <button className="reddit-toggle" onClick={() => setShowLinks(!showLinks)}>
-        {showLinks ? 'â¾' : 'â¸'} ð Reddit Discussions
+        {showLinks ? '\u{25BE}' : '\u{25B8}'} {"\u{1F517}"} Reddit Discussions
       </button>
       {showLinks && (
         <div className="reddit-links">
@@ -233,7 +233,7 @@ function RedditLinks({ ticker }) {
   );
 }
 
-// ââ Historic Chart ââ
+// ── Historic Chart ──
 function HistoricChart({ ticker, canvasId }) {
   const canvasRef = useRef(null);
   const [histData, setHistData] = useState(null);
@@ -311,7 +311,7 @@ function HistoricChart({ ticker, canvasId }) {
   if (loading) {
     return (
       <div className="historic-chart-section">
-        <div className="historic-label">ð 3-Month History</div>
+        <div className="historic-label">{"\u{1F4CA}"} 3-Month History</div>
         <div className="historic-loading">Loading chart...</div>
       </div>
     );
@@ -324,14 +324,14 @@ function HistoricChart({ ticker, canvasId }) {
   return (
     <div className="historic-chart-section">
       <div className="historic-header">
-        <span className="historic-label">ð 3-Month History</span>
+        <span className="historic-label">{"\u{1F4CA}"} 3-Month History</span>
         <span className="historic-change" style={{ color: changeColor }}>
           {changeSign}{histData.change3mo?.toFixed(1)}%
         </span>
       </div>
       <div className="historic-prices-range">
         <span>${histData.startPrice?.toFixed(2)}</span>
-        <span className="historic-arrow">â</span>
+        <span className="historic-arrow">{"\u{2192}"}</span>
         <span>${histData.endPrice?.toFixed(2)}</span>
       </div>
       <div className="historic-chart-container">
@@ -341,7 +341,7 @@ function HistoricChart({ ticker, canvasId }) {
   );
 }
 
-// ââ Sparkline ââ
+// ── Sparkline ──
 function SparklineChart({ prices, canvasId }) {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -378,7 +378,7 @@ function SparklineChart({ prices, canvasId }) {
   );
 }
 
-// ââ Rating Buttons Component ââ
+// ── Rating Buttons Component ──
 function RatingButtons({ alertId, currentRating, onRate }) {
   return (
     <div className="rating-buttons">
@@ -387,20 +387,20 @@ function RatingButtons({ alertId, currentRating, onRate }) {
         onClick={() => onRate(alertId, currentRating === 'up' ? null : 'up')}
         title="Good pick"
       >
-        ð
+        {"\u{1F44D}"}
       </button>
       <button
         className={`rating-btn rating-down ${currentRating === 'down' ? 'active' : ''}`}
         onClick={() => onRate(alertId, currentRating === 'down' ? null : 'down')}
         title="Bad pick"
       >
-        ð
+        {"\u{1F44E}"}
       </button>
     </div>
   );
 }
 
-// ââ Alert Card ââ
+// ── Alert Card ──
 function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, onRate }) {
   const latest = alert.prices[alert.prices.length - 1];
   const pct = latest?.pct_change || 0;
@@ -433,8 +433,8 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
         <div>
           <div className="ticker">
             {alert.ticker}
-            {isNew && <span className="new-badge">ð NEW</span>}
-            {isDropped && <span className="dropped-badge">ð¦ DROPPED</span>}
+            {isNew && <span className="new-badge">{"\u{1F195}"} NEW</span>}
+            {isDropped && <span className="dropped-badge">{"\u{1F4E6}"} DROPPED</span>}
           </div>
           <div className="company">{alert.company}</div>
         </div>
@@ -445,7 +445,7 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
             onClick={() => onToggleWatchlist(alert.ticker)}
             title={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}
           >
-            {isWatched ? 'â' : 'â'}
+            {isWatched ? '\u{2605}' : '\u{2606}'}
           </button>
           <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
         </div>
@@ -462,11 +462,11 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
       {/* ALERT DATE & PRICE BANNER */}
       <div className="alert-date-banner">
         <div className="alert-date-item">
-          <span className="alert-date-label">ð ALERTED</span>
+          <span className="alert-date-label">{"\u{1F4C5}"} ALERTED</span>
           <span className="alert-date-value">{alertDateFormatted}</span>
         </div>
         <div className="alert-date-item">
-          <span className="alert-date-label">ðµ PRICE AT ALERT</span>
+          <span className="alert-date-label">{"\u{1F4B5}"} PRICE AT ALERT</span>
           <span className="alert-date-value alert-price-highlight">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
         </div>
       </div>
@@ -474,7 +474,7 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
       {/* FORECAST SELL DATE */}
       {forecastDate && (
         <div className={`forecast-banner ${daysUntilForecast <= 3 ? 'forecast-soon' : daysUntilForecast <= 0 ? 'forecast-passed' : ''}`}>
-          <span className="forecast-label">ð¯ FORECAST SELL</span>
+          <span className="forecast-label">{"\u{1F3AF}"} FORECAST SELL</span>
           <span className="forecast-value">{forecastDate}</span>
           {daysUntilForecast > 0 && <span className="forecast-days">{daysUntilForecast}d away</span>}
           {daysUntilForecast <= 0 && <span className="forecast-days forecast-overdue">Overdue</span>}
@@ -483,8 +483,8 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
 
       <div className="price-row">
         <span className="price-alert">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
-        <span className="arrow">â</span>
-        <span className="price-current">${latest?.price?.toFixed(2) || 'â'}</span>
+        <span className="arrow">{"\u{2192}"}</span>
+        <span className="price-current">${latest?.price?.toFixed(2) || '\u{2014}'}</span>
         <span className={`pct-change ${pctClass(pct)}`}>{fmtPct(pct)}</span>
       </div>
 
@@ -509,11 +509,11 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
       {/* SIGNAL CHANGE INFO */}
       {alert.latest_signal_change && (
         <div className="signal-change-info">
-          <span className="sc-label">ð¢ Signal Changed:</span>
+          <span className="sc-label">{"\u{1F4E2}"} Signal Changed:</span>
           <span className={`rec-chip ${recClass(alert.latest_signal_change.old_recommendation)}`}>
             {alert.latest_signal_change.old_recommendation}
           </span>
-          <span className="sc-arrow">â</span>
+          <span className="sc-arrow">{"\u{2192}"}</span>
           <span className={`rec-chip ${recClass(alert.latest_signal_change.new_recommendation)}`}>
             {alert.latest_signal_change.new_recommendation}
           </span>
@@ -528,14 +528,14 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
 
       <div className="research-row">
         <a href={`https://finance.yahoo.com/quote/${alert.ticker}`} target="_blank" rel="noopener noreferrer" className="research-link">
-          Yahoo Finance â
+          Yahoo Finance {"\u{2192}"}
         </a>
       </div>
     </div>
   );
 }
 
-// ââ Distribution List Manager ââ
+// ── Distribution List Manager ──
 function DistributionListManager() {
   const [members, setMembers] = useState([]);
   const [newEmail, setNewEmail] = useState('');
@@ -580,7 +580,7 @@ function DistributionListManager() {
 
   return (
     <div className="dist-list-section">
-      <p className="section-title">ð§ Signal Change Alert List</p>
+      <p className="section-title">{"\u{1F4E7}"} Signal Change Alert List</p>
       <p className="section-hint" style={{ marginLeft: 0 }}>When a stock changes from BUY to SELL (or vice versa), everyone on this list gets notified.</p>
 
       <div className="dist-list-form">
@@ -600,7 +600,7 @@ function DistributionListManager() {
                 <span className="dist-member-email">{m.email}</span>
                 {m.name && <span className="dist-member-name">{m.name}</span>}
               </div>
-              <button onClick={() => removeMember(m.id)} className="dist-remove-btn">â</button>
+              <button onClick={() => removeMember(m.id)} className="dist-remove-btn">{"\u{2715}"}</button>
             </div>
           ))}
           {members.length === 0 && (
@@ -612,7 +612,7 @@ function DistributionListManager() {
   );
 }
 
-// ââ Market Cap Slider Component ââ
+// ── Market Cap Slider Component ──
 function MarketCapSlider({ range, onChange }) {
   const [localMin, setLocalMin] = useState(range[0]);
   const [localMax, setLocalMax] = useState(range[1]);
@@ -648,7 +648,7 @@ function MarketCapSlider({ range, onChange }) {
   return (
     <div className="mcap-filter-wrapper">
       <button className={`mcap-filter-toggle ${isFiltered ? 'active' : ''}`} onClick={() => setIsOpen(!isOpen)}>
-        ð¢ Market Cap {isFiltered ? `(${formatVal(range[0])} â ${formatVal(range[1])})` : '(All)'}
+        {"\u{1F3E2}"} Market Cap {isFiltered ? `(${formatVal(range[0])} \u{2013} ${formatVal(range[1])})` : '(All)'}
       </button>
       {isOpen && (
         <div className="mcap-filter-dropdown">
@@ -678,7 +678,7 @@ function MarketCapSlider({ range, onChange }) {
                 />
                 <span className="mcap-unit">B</span>
               </div>
-              <span className="mcap-dash">â</span>
+              <span className="mcap-dash">{"\u{2013}"}</span>
               <div className="mcap-input-group">
                 <span className="mcap-input-label">Max</span>
                 <input
@@ -700,7 +700,7 @@ function MarketCapSlider({ range, onChange }) {
   );
 }
 
-// ââ Analytics Tab Component ââ
+// ── Analytics Tab Component ──
 function AnalyticsTab({ alerts }) {
   // Source performance analysis
   const sourceStats = useMemo(() => {
@@ -745,7 +745,7 @@ function AnalyticsTab({ alerts }) {
     <div className="analytics-content">
       {/* Source Performance */}
       <div className="analytics-section">
-        <h3 className="analytics-heading">ð¡ Source Performance</h3>
+        <h3 className="analytics-heading">{"\u{1F4E1}"} Source Performance</h3>
         <p className="analytics-subtitle">Which signal sources are giving the best picks</p>
         <div className="source-stats-grid">
           {sortedSources.map(([name, stats]) => (
@@ -775,8 +775,8 @@ function AnalyticsTab({ alerts }) {
               </div>
               {(stats.thumbsUp > 0 || stats.thumbsDown > 0) && (
                 <div className="source-ratings-row">
-                  <span className="source-rating-item">ð {stats.thumbsUp}</span>
-                  <span className="source-rating-item">ð {stats.thumbsDown}</span>
+                  <span className="source-rating-item">{"\u{1F44D}"} {stats.thumbsUp}</span>
+                  <span className="source-rating-item">{"\u{1F44E}"} {stats.thumbsDown}</span>
                 </div>
               )}
             </div>
@@ -786,26 +786,26 @@ function AnalyticsTab({ alerts }) {
 
       {/* Your Ratings Summary */}
       <div className="analytics-section">
-        <h3 className="analytics-heading">â­ Your Ratings Summary</h3>
+        <h3 className="analytics-heading">{"\u{2B50}"} Your Ratings Summary</h3>
         <p className="analytics-subtitle">Track your assessment of pick quality for fine-tuning</p>
         <div className="ratings-summary-grid">
           <div className="rating-summary-card">
             <div className="rating-summary-value">{ratingStats.thumbsUp}</div>
-            <div className="rating-summary-label">ð Good Picks</div>
+            <div className="rating-summary-label">{"\u{1F44D}"} Good Picks</div>
           </div>
           <div className="rating-summary-card">
             <div className="rating-summary-value">{ratingStats.thumbsDown}</div>
-            <div className="rating-summary-label">ð Bad Picks</div>
+            <div className="rating-summary-label">{"\u{1F44E}"} Bad Picks</div>
           </div>
           <div className="rating-summary-card">
             <div className="rating-summary-value">{ratingStats.unrated}</div>
-            <div className="rating-summary-label">â³ Unrated</div>
+            <div className="rating-summary-label">{"\u{23F3}"} Unrated</div>
           </div>
           <div className="rating-summary-card">
             <div className="rating-summary-value">
-              {ratingStats.total > 0 ? ((ratingStats.thumbsUp / ratingStats.total) * 100).toFixed(0) + '%' : 'â'}
+              {ratingStats.total > 0 ? ((ratingStats.thumbsUp / ratingStats.total) * 100).toFixed(0) + '%' : '\u{2014}'}
             </div>
-            <div className="rating-summary-label">â Approval Rate</div>
+            <div className="rating-summary-label">{"\u{2705}"} Approval Rate</div>
           </div>
         </div>
 
@@ -813,7 +813,7 @@ function AnalyticsTab({ alerts }) {
         <div className="rated-picks-list">
           <h4 className="rated-picks-title">Recently Rated Picks</h4>
           {alerts.filter(a => a.user_rating).length === 0 ? (
-            <p className="no-ratings-msg">No picks rated yet. Use ðð on any stock card to rate picks.</p>
+            <p className="no-ratings-msg">No picks rated yet. Use {"\u{1F44D}"}{"\u{1F44E}"} on any stock card to rate picks.</p>
           ) : (
             <div className="rated-picks-scroll">
               {alerts.filter(a => a.user_rating).map(a => {
@@ -824,7 +824,7 @@ function AnalyticsTab({ alerts }) {
                     <span className="rated-pick-ticker">{a.ticker}</span>
                     <span className="rated-pick-company">{a.company}</span>
                     <span className={`rated-pick-pct ${pctClass(pct)}`}>{fmtPct(pct)}</span>
-                    <span className="rated-pick-rating">{a.user_rating === 'up' ? 'ð' : 'ð'}</span>
+                    <span className="rated-pick-rating">{a.user_rating === 'up' ? '\u{1F44D}' : '\u{1F44E}'}</span>
                     <span className={`source-badge-sm ${getSourceMeta(a.source).cls}`}>{getSourceMeta(a.source).emoji} {getSourceMeta(a.source).label}</span>
                   </div>
                 );
@@ -837,9 +837,9 @@ function AnalyticsTab({ alerts }) {
   );
 }
 
-// ââââââââââââââââââââââââââââââââââââââ
-// âââ MAIN DASHBOARD âââ
-// ââââââââââââââââââââââââââââââââââââââ
+// ══════════════════════════════════════
+// ═══ MAIN DASHBOARD ═══
+// ══════════════════════════════════════
 export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -960,11 +960,11 @@ export default function Dashboard() {
 
   // Tab definitions
   const tabs = [
-    { id: 'new', label: 'ð New', count: newPicks.length },
-    { id: 'active', label: 'ð¥ Active', count: activePicks.length },
-    { id: 'dropped', label: 'ð¦ Dropped', count: droppedPicks.length },
-    { id: 'watchlist', label: 'â­ Watchlist', count: watchlistPicks.length },
-    { id: 'analytics', label: 'ð Analytics', count: null },
+    { id: 'new', label: '\u{1F195} New', count: newPicks.length },
+    { id: 'active', label: '\u{1F525} Active', count: activePicks.length },
+    { id: 'dropped', label: '\u{1F4E6} Dropped', count: droppedPicks.length },
+    { id: 'watchlist', label: '\u{2B50} Watchlist', count: watchlistPicks.length },
+    { id: 'analytics', label: '\u{1F4CA} Analytics', count: null },
   ];
 
   // Current tab data
@@ -990,8 +990,8 @@ export default function Dashboard() {
   return (
     <>
       <header className="header">
-        <h1>ð Social Stock <span>Intelligence Monitor</span></h1>
-        <div className="subtitle">Last updated: {dateStr} Â· Auto-scan complete</div>
+        <h1>{"\u{1F4C8}"} Social Stock <span>Intelligence Monitor</span></h1>
+        <div className="subtitle">Last updated: {dateStr} {"\u{B7}"} Auto-scan complete</div>
       </header>
 
       {/* STATS BAR */}
@@ -1002,15 +1002,15 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#00e5ff' }}>{newPicks.length}</div>
-          <div className="stat-label">ð New Today</div>
+          <div className="stat-label">{"\u{1F195}"} New Today</div>
         </div>
         <div className="stat-card stat-buy-glow">
           <div className="stat-value" style={{ color: '#22c55e' }}>{buys}</div>
-          <div className="stat-label">ð¢ AI Says BUY</div>
+          <div className="stat-label">{"\u{1F7E2}"} AI Says BUY</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#ef4444' }}>{sells}</div>
-          <div className="stat-label">ð´ AI Says SELL</div>
+          <div className="stat-label">{"\u{1F534}"} AI Says SELL</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: avgPct >= 0 ? '#22c55e' : '#ef4444' }}>
@@ -1020,18 +1020,18 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#fbbf24' }}>{watchlist.length}</div>
-          <div className="stat-label">â­ Watchlist</div>
+          <div className="stat-label">{"\u{2B50}"} Watchlist</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#7a9bc0' }}>{droppedPicks.length}</div>
-          <div className="stat-label">ð¦ Dropped</div>
+          <div className="stat-label">{"\u{1F4E6}"} Dropped</div>
         </div>
       </div>
 
       {/* SEARCH BAR */}
       <div className="search-bar-container">
         <div className="search-bar">
-          <span className="search-icon">ð</span>
+          <span className="search-icon">{"\u{1F50D}"}</span>
           <input
             type="text"
             className="search-input"
@@ -1040,7 +1040,7 @@ export default function Dashboard() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
-            <button className="search-clear" onClick={() => setSearchQuery('')}>â</button>
+            <button className="search-clear" onClick={() => setSearchQuery('')}>{"\u{2715}"}</button>
           )}
         </div>
         <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
@@ -1113,16 +1113,16 @@ export default function Dashboard() {
 
       {/* FULL ARCHIVE TABLE */}
       <div className="archive-section">
-        <p className="section-title" style={{ marginLeft: 0 }}>ð Full Archive â All Historical Picks</p>
+        <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4C5}"} Full Archive {"\u{2014}"} All Historical Picks</p>
         <button className="archive-toggle-btn" onClick={() => setShowArchive(!showArchive)}>
-          ð {showArchive ? 'Hide' : 'Show'} Archive ({alerts.length} total)
+          {"\u{1F4C2}"} {showArchive ? 'Hide' : 'Show'} Archive ({alerts.length} total)
         </button>
         {showArchive && (
           <div className="archive-table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>â­</th>
+                  <th>{"\u{2B50}"}</th>
                   <th>Rating</th>
                   <th>Pick Status</th>
                   <th>Date Alerted</th>
@@ -1153,7 +1153,7 @@ export default function Dashboard() {
                     const pct = latest?.pct_change || 0;
                     const perfStatus = getStatus(pct);
                     const pickStatus = alert.status || 'active';
-                    const pickLabel = pickStatus === 'new' ? 'ð NEW' : pickStatus === 'dropped' ? 'ð¦ DROPPED' : 'ð¢ ACTIVE';
+                    const pickLabel = pickStatus === 'new' ? '\u{1F195} NEW' : pickStatus === 'dropped' ? '\u{1F4E6} DROPPED' : '\u{1F7E2} ACTIVE';
                     const isWatched = watchlist.includes(alert.ticker);
                     const srcMeta = getSourceMeta(alert.source);
                     const signalChange = alert.latest_signal_change;
@@ -1164,12 +1164,12 @@ export default function Dashboard() {
                             className={`watchlist-btn-sm ${isWatched ? 'watched' : ''}`}
                             onClick={() => handleToggleWatchlist(alert.ticker)}
                           >
-                            {isWatched ? 'â' : 'â'}
+                            {isWatched ? '\u{2605}' : '\u{2606}'}
                           </button>
                         </td>
                         <td>
                           <span className="tbl-rating">
-                            {alert.user_rating === 'up' ? 'ð' : alert.user_rating === 'down' ? 'ð' : 'â'}
+                            {alert.user_rating === 'up' ? '\u{1F44D}' : alert.user_rating === 'down' ? '\u{1F44E}' : '\u{2014}'}
                           </span>
                         </td>
                         <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
@@ -1179,26 +1179,26 @@ export default function Dashboard() {
                         <td><span className={`source-badge-sm ${srcMeta.cls}`}>{srcMeta.emoji} {srcMeta.label}</span></td>
                         <td><span className="signal-chip">{alert.signal_type}</span></td>
                         <td className="tbl-alert-price">${parseFloat(alert.price_at_alert).toFixed(2)}</td>
-                        <td>${latest?.price?.toFixed(2) || 'â'}</td>
+                        <td>${latest?.price?.toFixed(2) || '\u{2014}'}</td>
                         <td className={`tbl-${perfStatus}`}>{fmtPct(pct)}</td>
                         <td><span className={`rec-chip ${recClass(alert.recommendation || 'HOLD')}`}>{recLabel(alert.recommendation || 'HOLD')}</span></td>
                         <td>
                           {signalChange ? (
                             <span className="tbl-signal-change">
-                              {signalChange.old_recommendation} â {signalChange.new_recommendation}
+                              {signalChange.old_recommendation} {"\u{2192}"} {signalChange.new_recommendation}
                               <br />
                               <span className="tbl-sc-date">
                                 {new Date(signalChange.change_date || signalChange.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                               </span>
                             </span>
-                          ) : 'â'}
+                          ) : '\u{2014}'}
                         </td>
                         <td>
                           {alert.forecast_sell_date ? (
                             <span className="tbl-forecast">
                               {new Date(alert.forecast_sell_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                             </span>
-                          ) : 'â'}
+                          ) : '\u{2014}'}
                         </td>
                         <td className={`tbl-${perfStatus}`}>{statusLabel(pct)}</td>
                       </tr>
@@ -1213,14 +1213,14 @@ export default function Dashboard() {
       {/* DISTRIBUTION LIST */}
       <div className="archive-section">
         <button className="archive-toggle-btn" onClick={() => setShowDistList(!showDistList)}>
-          ð§ {showDistList ? 'Hide' : 'Manage'} Signal Change Alert List
+          {"\u{1F4E7}"} {showDistList ? 'Hide' : 'Manage'} Signal Change Alert List
         </button>
         {showDistList && <DistributionListManager />}
       </div>
 
       <footer>
-        â¡ Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB Â· Reddit Â· Polymarket Â· Yahoo Finance Â· Google Finance Â· StockTwits</span>
-        <div className="disclaimer">â ï¸ AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
+        {"\u{26A1}"} Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB {"\u{B7}"} Reddit {"\u{B7}"} Polymarket {"\u{B7}"} Yahoo Finance {"\u{B7}"} Google Finance {"\u{B7}"} StockTwits</span>
+        <div className="disclaimer">{"\u{26A0}"}{"\u{FE0F}"} AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
       </footer>
     </>
   );
