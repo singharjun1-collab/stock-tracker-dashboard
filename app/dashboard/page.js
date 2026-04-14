@@ -547,13 +547,18 @@ function DistributionListManager() {
   const [newName, setNewName] = useState('');
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const router = useRouter();
 
   useEffect(() => {
-    fetch('/api/distribution-list')
-      .then(res => res.json())
-      .then(data => { setMembers(data.members || []); setLoading(false); })
+    fetch('/api/distribution-list', { credentials: 'same-origin' })
+      .then(res => {
+        if (res.status === 401) { router.replace('/'); return null; }
+        if (!res.ok) throw new Error();
+        return res.json();
+      })
+      .then(data => { if (data) setMembers(data.members || []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [router]);
 
   const addMember = async () => {
     if (!newEmail) return;
@@ -562,8 +567,10 @@ function DistributionListManager() {
       const res = await fetch('/api/distribution-list', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({ email: newEmail, name: newName }),
       });
+      if (res.status === 401) { router.replace('/'); return; }
       if (res.status === 409) { setMessage('Email already exists'); return; }
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -578,7 +585,8 @@ function DistributionListManager() {
 
   const removeMember = async (id) => {
     try {
-      await fetch(`/api/distribution-list?id=${id}`, { method: 'DELETE' });
+      const res = await fetch(`/api/distribution-list?id=${id}`, { method: 'DELETE', credentials: 'same-origin' });
+      if (res.status === 401) { router.replace('/'); return; }
       setMembers(members.filter(m => m.id !== id));
     } catch { /* silently fail */ }
   };
