@@ -1,9 +1,9 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import '../globals.css';
 
-// ── Helpers ──
+// ââ Helpers ââ
 function getStatus(pct) {
   if (pct > 10) return 'win';
   if (pct < -10) return 'loss';
@@ -11,9 +11,9 @@ function getStatus(pct) {
 }
 function statusLabel(pct) {
   const s = getStatus(pct);
-  if (s === 'win') return '✅ WIN';
-  if (s === 'loss') return '❌ LOSS';
-  return '⚠️ NEUTRAL';
+  if (s === 'win') return 'â WIN';
+  if (s === 'loss') return 'â LOSS';
+  return 'â ï¸ NEUTRAL';
 }
 function pctClass(pct) {
   if (pct > 0) return 'pct-pos';
@@ -24,9 +24,9 @@ function fmtPct(pct) {
   return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
 }
 function recLabel(rec) {
-  if (rec === 'BUY') return '🟢 BUY';
-  if (rec === 'SELL') return '🔴 SELL';
-  return '🟡 HOLD';
+  if (rec === 'BUY') return 'ð¢ BUY';
+  if (rec === 'SELL') return 'ð´ SELL';
+  return 'ð¡ HOLD';
 }
 function recClass(rec) {
   if (rec === 'BUY') return 'rec-buy';
@@ -34,7 +34,29 @@ function recClass(rec) {
   return 'rec-hold';
 }
 
-// ── Cookie helpers for watchlist ──
+// ââ Source helpers ââ
+const SOURCE_META = {
+  wsb: { label: 'WallStreetBets', emoji: 'ð ', cls: 'src-wsb' },
+  reddit: { label: 'Reddit', emoji: 'ð´', cls: 'src-reddit' },
+  polymarket: { label: 'Polymarket', emoji: 'ðµ', cls: 'src-poly' },
+  yahoo: { label: 'Yahoo Finance', emoji: 'ð£', cls: 'src-yahoo' },
+  google: { label: 'Google Finance', emoji: 'ð¢', cls: 'src-google' },
+  stocktwits: { label: 'StockTwits', emoji: 'ð´', cls: 'src-st' },
+  unknown: { label: 'Unknown', emoji: 'âª', cls: 'src-unknown' },
+};
+function getSourceMeta(source) {
+  if (!source) return SOURCE_META.unknown;
+  const key = source.toLowerCase().replace(/\s+/g, '');
+  if (key.includes('wsb') || key.includes('wallstreetbets')) return SOURCE_META.wsb;
+  if (key.includes('reddit')) return SOURCE_META.reddit;
+  if (key.includes('poly')) return SOURCE_META.polymarket;
+  if (key.includes('yahoo')) return SOURCE_META.yahoo;
+  if (key.includes('google')) return SOURCE_META.google;
+  if (key.includes('stocktwit')) return SOURCE_META.stocktwits;
+  return SOURCE_META[key] || SOURCE_META.unknown;
+}
+
+// ââ Cookie helpers for watchlist ââ
 function getWatchlist() {
   if (typeof document === 'undefined') return [];
   const match = document.cookie.match(/(?:^|; )stock_watchlist=([^;]*)/);
@@ -53,7 +75,19 @@ function toggleWatchlist(ticker) {
   return list;
 }
 
-// ── Reddit link builder ──
+// ââ Cookie helpers for market cap filter ââ
+function getMarketCapFilter() {
+  if (typeof document === 'undefined') return [0, 5000];
+  const match = document.cookie.match(/(?:^|; )stock_mcap_filter=([^;]*)/);
+  if (!match) return [0, 5000];
+  try { return JSON.parse(decodeURIComponent(match[1])); } catch { return [0, 5000]; }
+}
+function setMarketCapFilter(range) {
+  const val = encodeURIComponent(JSON.stringify(range));
+  document.cookie = `stock_mcap_filter=${val}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
+
+// ââ Reddit link builder ââ
 function getRedditLinks(ticker) {
   return [
     { label: 'r/wallstreetbets', url: `https://www.reddit.com/r/wallstreetbets/search/?q=${ticker}&restrict_sr=1&sort=new` },
@@ -64,7 +98,7 @@ function getRedditLinks(ticker) {
   ];
 }
 
-// ── Analyst Badge Component ──
+// ââ Analyst Badge Component ââ
 function AnalystBadge({ ticker }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -89,7 +123,7 @@ function AnalystBadge({ ticker }) {
   return (
     <div className={`analyst-badge ${colorClass}`}>
       <div className="analyst-header">
-        <span className="analyst-icon">📊</span>
+        <span className="analyst-icon">ð</span>
         <span className="analyst-title">Analyst Consensus</span>
       </div>
       <div className="analyst-rating">
@@ -102,7 +136,7 @@ function AnalystBadge({ ticker }) {
         <div className="analyst-target">
           Target: <strong>${data.targetMeanPrice.toFixed(2)}</strong>
           {data.targetLowPrice && data.targetHighPrice && (
-            <span className="analyst-range"> (${data.targetLowPrice.toFixed(2)} – ${data.targetHighPrice.toFixed(2)})</span>
+            <span className="analyst-range"> (${data.targetLowPrice.toFixed(2)} â ${data.targetHighPrice.toFixed(2)})</span>
           )}
         </div>
       )}
@@ -119,7 +153,7 @@ function AnalystBadge({ ticker }) {
   );
 }
 
-// ── Profit/Loss Calculator Component ──
+// ââ Profit/Loss Calculator Component ââ
 function ProfitLossCalc({ priceAtAlert, latestPrice }) {
   const [amount, setAmount] = useState('');
   const [showCalc, setShowCalc] = useState(false);
@@ -136,7 +170,7 @@ function ProfitLossCalc({ priceAtAlert, latestPrice }) {
   return (
     <div className="calc-section">
       <button className="calc-toggle" onClick={() => setShowCalc(!showCalc)}>
-        {showCalc ? '▾' : '▸'} 💰 What-If Calculator
+        {showCalc ? 'â¾' : 'â¸'} ð° What-If Calculator
       </button>
       {showCalc && (
         <div className="calc-body">
@@ -176,7 +210,7 @@ function ProfitLossCalc({ priceAtAlert, latestPrice }) {
   );
 }
 
-// ── Reddit Links Component ──
+// ââ Reddit Links Component ââ
 function RedditLinks({ ticker }) {
   const [showLinks, setShowLinks] = useState(false);
   const links = getRedditLinks(ticker);
@@ -184,7 +218,7 @@ function RedditLinks({ ticker }) {
   return (
     <div className="reddit-section">
       <button className="reddit-toggle" onClick={() => setShowLinks(!showLinks)}>
-        {showLinks ? '▾' : '▸'} 🔗 Reddit Discussions
+        {showLinks ? 'â¾' : 'â¸'} ð Reddit Discussions
       </button>
       {showLinks && (
         <div className="reddit-links">
@@ -199,7 +233,7 @@ function RedditLinks({ ticker }) {
   );
 }
 
-// ── Historic Chart ──
+// ââ Historic Chart ââ
 function HistoricChart({ ticker, canvasId }) {
   const canvasRef = useRef(null);
   const [histData, setHistData] = useState(null);
@@ -277,7 +311,7 @@ function HistoricChart({ ticker, canvasId }) {
   if (loading) {
     return (
       <div className="historic-chart-section">
-        <div className="historic-label">📊 3-Month History</div>
+        <div className="historic-label">ð 3-Month History</div>
         <div className="historic-loading">Loading chart...</div>
       </div>
     );
@@ -290,14 +324,14 @@ function HistoricChart({ ticker, canvasId }) {
   return (
     <div className="historic-chart-section">
       <div className="historic-header">
-        <span className="historic-label">📊 3-Month History</span>
+        <span className="historic-label">ð 3-Month History</span>
         <span className="historic-change" style={{ color: changeColor }}>
           {changeSign}{histData.change3mo?.toFixed(1)}%
         </span>
       </div>
       <div className="historic-prices-range">
         <span>${histData.startPrice?.toFixed(2)}</span>
-        <span className="historic-arrow">→</span>
+        <span className="historic-arrow">â</span>
         <span>${histData.endPrice?.toFixed(2)}</span>
       </div>
       <div className="historic-chart-container">
@@ -307,7 +341,7 @@ function HistoricChart({ ticker, canvasId }) {
   );
 }
 
-// ── Sparkline ──
+// ââ Sparkline ââ
 function SparklineChart({ prices, canvasId }) {
   const canvasRef = useRef(null);
   useEffect(() => {
@@ -344,20 +378,54 @@ function SparklineChart({ prices, canvasId }) {
   );
 }
 
-// ── Alert Card (updated with all new features) ──
-function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist }) {
+// ââ Rating Buttons Component ââ
+function RatingButtons({ alertId, currentRating, onRate }) {
+  return (
+    <div className="rating-buttons">
+      <button
+        className={`rating-btn rating-up ${currentRating === 'up' ? 'active' : ''}`}
+        onClick={() => onRate(alertId, currentRating === 'up' ? null : 'up')}
+        title="Good pick"
+      >
+        ð
+      </button>
+      <button
+        className={`rating-btn rating-down ${currentRating === 'down' ? 'active' : ''}`}
+        onClick={() => onRate(alertId, currentRating === 'down' ? null : 'down')}
+        title="Bad pick"
+      >
+        ð
+      </button>
+    </div>
+  );
+}
+
+// ââ Alert Card ââ
+function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, onRate }) {
   const latest = alert.prices[alert.prices.length - 1];
   const pct = latest?.pct_change || 0;
   const perfStatus = getStatus(pct);
   const isNew = alert.status === 'new';
   const isDropped = alert.status === 'dropped';
   const isWatched = watchlist.includes(alert.ticker);
+  const sourceMeta = getSourceMeta(alert.source);
 
-  // Format the alert date nicely
   const alertDateObj = new Date(alert.alert_date + 'T00:00:00');
   const alertDateFormatted = alertDateObj.toLocaleDateString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
   });
+
+  // Forecast sell date
+  const forecastDate = alert.forecast_sell_date
+    ? new Date(alert.forecast_sell_date + 'T00:00:00').toLocaleDateString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric'
+      })
+    : null;
+
+  // Days until forecast
+  const daysUntilForecast = alert.forecast_sell_date
+    ? Math.ceil((new Date(alert.forecast_sell_date) - new Date()) / (1000 * 60 * 60 * 24))
+    : null;
 
   return (
     <div className={`card ${perfStatus}${isNew ? ' card-new' : ''}${isDropped ? ' card-dropped' : ''}${isWatched ? ' card-watched' : ''}`}>
@@ -365,39 +433,58 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist }
         <div>
           <div className="ticker">
             {alert.ticker}
-            {isNew && <span className="new-badge">🆕 NEW</span>}
-            {isDropped && <span className="dropped-badge">📦 DROPPED</span>}
+            {isNew && <span className="new-badge">ð NEW</span>}
+            {isDropped && <span className="dropped-badge">ð¦ DROPPED</span>}
           </div>
           <div className="company">{alert.company}</div>
         </div>
         <div className="card-top-right">
+          <RatingButtons alertId={alert.id} currentRating={alert.user_rating} onRate={onRate} />
           <button
             className={`watchlist-btn ${isWatched ? 'watched' : ''}`}
             onClick={() => onToggleWatchlist(alert.ticker)}
             title={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}
           >
-            {isWatched ? '★' : '☆'}
+            {isWatched ? 'â' : 'â'}
           </button>
           <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
         </div>
       </div>
 
-      {/* ═══ PROMINENT ALERT DATE & PRICE ═══ */}
+      {/* SOURCE BADGE */}
+      <div className="card-source-row">
+        <span className={`source-badge-sm ${sourceMeta.cls}`}>{sourceMeta.emoji} {sourceMeta.label}</span>
+        {alert.market_cap && (
+          <span className="mcap-badge">${alert.market_cap >= 1000 ? (alert.market_cap / 1000).toFixed(1) + 'T' : alert.market_cap.toFixed(0) + 'B'} cap</span>
+        )}
+      </div>
+
+      {/* ALERT DATE & PRICE BANNER */}
       <div className="alert-date-banner">
         <div className="alert-date-item">
-          <span className="alert-date-label">📅 ALERTED</span>
+          <span className="alert-date-label">ð ALERTED</span>
           <span className="alert-date-value">{alertDateFormatted}</span>
         </div>
         <div className="alert-date-item">
-          <span className="alert-date-label">💵 PRICE AT ALERT</span>
+          <span className="alert-date-label">ðµ PRICE AT ALERT</span>
           <span className="alert-date-value alert-price-highlight">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
         </div>
       </div>
 
+      {/* FORECAST SELL DATE */}
+      {forecastDate && (
+        <div className={`forecast-banner ${daysUntilForecast <= 3 ? 'forecast-soon' : daysUntilForecast <= 0 ? 'forecast-passed' : ''}`}>
+          <span className="forecast-label">ð¯ FORECAST SELL</span>
+          <span className="forecast-value">{forecastDate}</span>
+          {daysUntilForecast > 0 && <span className="forecast-days">{daysUntilForecast}d away</span>}
+          {daysUntilForecast <= 0 && <span className="forecast-days forecast-overdue">Overdue</span>}
+        </div>
+      )}
+
       <div className="price-row">
         <span className="price-alert">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
-        <span className="arrow">→</span>
-        <span className="price-current">${latest?.price?.toFixed(2) || '—'}</span>
+        <span className="arrow">â</span>
+        <span className="price-current">${latest?.price?.toFixed(2) || 'â'}</span>
         <span className={`pct-change ${pctClass(pct)}`}>{fmtPct(pct)}</span>
       </div>
 
@@ -415,28 +502,40 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist }
         </div>
       )}
 
-      {/* ═══ ANALYST CONSENSUS ═══ */}
       <AnalystBadge ticker={alert.ticker} />
 
       <div className="alert-reason">{alert.alert_reason}</div>
 
-      {/* ═══ PROFIT/LOSS CALCULATOR ═══ */}
-      <ProfitLossCalc priceAtAlert={alert.price_at_alert} latestPrice={latest?.price} />
+      {/* SIGNAL CHANGE INFO */}
+      {alert.latest_signal_change && (
+        <div className="signal-change-info">
+          <span className="sc-label">ð¢ Signal Changed:</span>
+          <span className={`rec-chip ${recClass(alert.latest_signal_change.old_recommendation)}`}>
+            {alert.latest_signal_change.old_recommendation}
+          </span>
+          <span className="sc-arrow">â</span>
+          <span className={`rec-chip ${recClass(alert.latest_signal_change.new_recommendation)}`}>
+            {alert.latest_signal_change.new_recommendation}
+          </span>
+          <span className="sc-date">
+            {new Date(alert.latest_signal_change.change_date || alert.latest_signal_change.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        </div>
+      )}
 
-      {/* ═══ REDDIT DISCUSSIONS ═══ */}
+      <ProfitLossCalc priceAtAlert={alert.price_at_alert} latestPrice={latest?.price} />
       <RedditLinks ticker={alert.ticker} />
 
-      {/* ═══ RESEARCH LINK ═══ */}
       <div className="research-row">
         <a href={`https://finance.yahoo.com/quote/${alert.ticker}`} target="_blank" rel="noopener noreferrer" className="research-link">
-          Yahoo Finance →
+          Yahoo Finance â
         </a>
       </div>
     </div>
   );
 }
 
-// ── Distribution List Manager ──
+// ââ Distribution List Manager ââ
 function DistributionListManager() {
   const [members, setMembers] = useState([]);
   const [newEmail, setNewEmail] = useState('');
@@ -481,24 +580,12 @@ function DistributionListManager() {
 
   return (
     <div className="dist-list-section">
-      <p className="section-title">📧 Signal Change Alert List</p>
+      <p className="section-title">ð§ Signal Change Alert List</p>
       <p className="section-hint" style={{ marginLeft: 0 }}>When a stock changes from BUY to SELL (or vice versa), everyone on this list gets notified.</p>
 
       <div className="dist-list-form">
-        <input
-          type="email"
-          placeholder="Email address"
-          value={newEmail}
-          onChange={(e) => setNewEmail(e.target.value)}
-          className="dist-input"
-        />
-        <input
-          type="text"
-          placeholder="Name (optional)"
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          className="dist-input dist-input-name"
-        />
+        <input type="email" placeholder="Email address" value={newEmail} onChange={(e) => setNewEmail(e.target.value)} className="dist-input" />
+        <input type="text" placeholder="Name (optional)" value={newName} onChange={(e) => setNewName(e.target.value)} className="dist-input dist-input-name" />
         <button onClick={addMember} className="dist-add-btn">+ Add</button>
       </div>
       {message && <div className="dist-message">{message}</div>}
@@ -513,7 +600,7 @@ function DistributionListManager() {
                 <span className="dist-member-email">{m.email}</span>
                 {m.name && <span className="dist-member-name">{m.name}</span>}
               </div>
-              <button onClick={() => removeMember(m.id)} className="dist-remove-btn">✕</button>
+              <button onClick={() => removeMember(m.id)} className="dist-remove-btn">â</button>
             </div>
           ))}
           {members.length === 0 && (
@@ -525,23 +612,249 @@ function DistributionListManager() {
   );
 }
 
-// ══════════════════════════════════════
-// ═══ MAIN DASHBOARD ═══
-// ══════════════════════════════════════
+// ââ Market Cap Slider Component ââ
+function MarketCapSlider({ range, onChange }) {
+  const [localMin, setLocalMin] = useState(range[0]);
+  const [localMax, setLocalMax] = useState(range[1]);
+  const [isOpen, setIsOpen] = useState(false);
+
+  const presets = [
+    { label: 'All', min: 0, max: 5000 },
+    { label: 'Small <$2B', min: 0, max: 2 },
+    { label: 'Mid $2-10B', min: 2, max: 10 },
+    { label: 'Large $10-200B', min: 10, max: 200 },
+    { label: 'Mega $200B+', min: 200, max: 5000 },
+  ];
+
+  const handleApply = () => {
+    onChange([localMin, localMax]);
+    setMarketCapFilter([localMin, localMax]);
+  };
+
+  const handlePreset = (min, max) => {
+    setLocalMin(min);
+    setLocalMax(max);
+    onChange([min, max]);
+    setMarketCapFilter([min, max]);
+  };
+
+  const formatVal = (v) => {
+    if (v >= 1000) return `$${(v / 1000).toFixed(1)}T`;
+    return `$${v}B`;
+  };
+
+  const isFiltered = range[0] > 0 || range[1] < 5000;
+
+  return (
+    <div className="mcap-filter-wrapper">
+      <button className={`mcap-filter-toggle ${isFiltered ? 'active' : ''}`} onClick={() => setIsOpen(!isOpen)}>
+        ð¢ Market Cap {isFiltered ? `(${formatVal(range[0])} â ${formatVal(range[1])})` : '(All)'}
+      </button>
+      {isOpen && (
+        <div className="mcap-filter-dropdown">
+          <div className="mcap-presets">
+            {presets.map(p => (
+              <button
+                key={p.label}
+                className={`mcap-preset-btn ${localMin === p.min && localMax === p.max ? 'active' : ''}`}
+                onClick={() => handlePreset(p.min, p.max)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="mcap-custom">
+            <label className="mcap-label">Custom Range</label>
+            <div className="mcap-slider-row">
+              <div className="mcap-input-group">
+                <span className="mcap-input-label">Min</span>
+                <input
+                  type="number"
+                  className="mcap-input"
+                  value={localMin}
+                  onChange={(e) => setLocalMin(Math.max(0, parseFloat(e.target.value) || 0))}
+                  min="0"
+                  step="1"
+                />
+                <span className="mcap-unit">B</span>
+              </div>
+              <span className="mcap-dash">â</span>
+              <div className="mcap-input-group">
+                <span className="mcap-input-label">Max</span>
+                <input
+                  type="number"
+                  className="mcap-input"
+                  value={localMax}
+                  onChange={(e) => setLocalMax(Math.max(0, parseFloat(e.target.value) || 0))}
+                  min="0"
+                  step="1"
+                />
+                <span className="mcap-unit">B</span>
+              </div>
+              <button className="mcap-apply-btn" onClick={handleApply}>Apply</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ââ Analytics Tab Component ââ
+function AnalyticsTab({ alerts }) {
+  // Source performance analysis
+  const sourceStats = useMemo(() => {
+    const stats = {};
+    alerts.forEach(a => {
+      const src = getSourceMeta(a.source);
+      const key = src.label;
+      if (!stats[key]) stats[key] = { total: 0, wins: 0, losses: 0, neutral: 0, avgPct: 0, totalPct: 0, thumbsUp: 0, thumbsDown: 0, emoji: src.emoji, cls: src.cls };
+      stats[key].total++;
+      const latest = a.prices[a.prices.length - 1];
+      const pct = latest?.pct_change || 0;
+      stats[key].totalPct += pct;
+      const s = getStatus(pct);
+      if (s === 'win') stats[key].wins++;
+      else if (s === 'loss') stats[key].losses++;
+      else stats[key].neutral++;
+      if (a.user_rating === 'up') stats[key].thumbsUp++;
+      if (a.user_rating === 'down') stats[key].thumbsDown++;
+    });
+    Object.keys(stats).forEach(k => {
+      stats[k].avgPct = stats[k].total > 0 ? stats[k].totalPct / stats[k].total : 0;
+      stats[k].winRate = stats[k].total > 0 ? (stats[k].wins / stats[k].total * 100) : 0;
+    });
+    return stats;
+  }, [alerts]);
+
+  // Rating summary
+  const ratingStats = useMemo(() => {
+    const rated = alerts.filter(a => a.user_rating);
+    return {
+      total: rated.length,
+      thumbsUp: rated.filter(a => a.user_rating === 'up').length,
+      thumbsDown: rated.filter(a => a.user_rating === 'down').length,
+      unrated: alerts.length - rated.length,
+    };
+  }, [alerts]);
+
+  // Best and worst performing sources
+  const sortedSources = Object.entries(sourceStats).sort((a, b) => b[1].winRate - a[1].winRate);
+
+  return (
+    <div className="analytics-content">
+      {/* Source Performance */}
+      <div className="analytics-section">
+        <h3 className="analytics-heading">ð¡ Source Performance</h3>
+        <p className="analytics-subtitle">Which signal sources are giving the best picks</p>
+        <div className="source-stats-grid">
+          {sortedSources.map(([name, stats]) => (
+            <div key={name} className="source-stat-card">
+              <div className="source-stat-header">
+                <span className={`source-badge-sm ${stats.cls}`}>{stats.emoji} {name}</span>
+                <span className="source-stat-count">{stats.total} picks</span>
+              </div>
+              <div className="source-stat-metrics">
+                <div className="source-metric">
+                  <span className="source-metric-value" style={{ color: '#22c55e' }}>{stats.winRate.toFixed(0)}%</span>
+                  <span className="source-metric-label">Win Rate</span>
+                </div>
+                <div className="source-metric">
+                  <span className={`source-metric-value ${stats.avgPct >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmtPct(stats.avgPct)}</span>
+                  <span className="source-metric-label">Avg Return</span>
+                </div>
+                <div className="source-metric">
+                  <span className="source-metric-value">{stats.wins}/{stats.losses}/{stats.neutral}</span>
+                  <span className="source-metric-label">W / L / N</span>
+                </div>
+              </div>
+              <div className="source-stat-bar">
+                <div className="bar-win" style={{ width: `${stats.total > 0 ? (stats.wins / stats.total * 100) : 0}%` }}></div>
+                <div className="bar-neutral" style={{ width: `${stats.total > 0 ? (stats.neutral / stats.total * 100) : 0}%` }}></div>
+                <div className="bar-loss" style={{ width: `${stats.total > 0 ? (stats.losses / stats.total * 100) : 0}%` }}></div>
+              </div>
+              {(stats.thumbsUp > 0 || stats.thumbsDown > 0) && (
+                <div className="source-ratings-row">
+                  <span className="source-rating-item">ð {stats.thumbsUp}</span>
+                  <span className="source-rating-item">ð {stats.thumbsDown}</span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Your Ratings Summary */}
+      <div className="analytics-section">
+        <h3 className="analytics-heading">â­ Your Ratings Summary</h3>
+        <p className="analytics-subtitle">Track your assessment of pick quality for fine-tuning</p>
+        <div className="ratings-summary-grid">
+          <div className="rating-summary-card">
+            <div className="rating-summary-value">{ratingStats.thumbsUp}</div>
+            <div className="rating-summary-label">ð Good Picks</div>
+          </div>
+          <div className="rating-summary-card">
+            <div className="rating-summary-value">{ratingStats.thumbsDown}</div>
+            <div className="rating-summary-label">ð Bad Picks</div>
+          </div>
+          <div className="rating-summary-card">
+            <div className="rating-summary-value">{ratingStats.unrated}</div>
+            <div className="rating-summary-label">â³ Unrated</div>
+          </div>
+          <div className="rating-summary-card">
+            <div className="rating-summary-value">
+              {ratingStats.total > 0 ? ((ratingStats.thumbsUp / ratingStats.total) * 100).toFixed(0) + '%' : 'â'}
+            </div>
+            <div className="rating-summary-label">â Approval Rate</div>
+          </div>
+        </div>
+
+        {/* Rated picks list */}
+        <div className="rated-picks-list">
+          <h4 className="rated-picks-title">Recently Rated Picks</h4>
+          {alerts.filter(a => a.user_rating).length === 0 ? (
+            <p className="no-ratings-msg">No picks rated yet. Use ðð on any stock card to rate picks.</p>
+          ) : (
+            <div className="rated-picks-scroll">
+              {alerts.filter(a => a.user_rating).map(a => {
+                const latest = a.prices[a.prices.length - 1];
+                const pct = latest?.pct_change || 0;
+                return (
+                  <div key={a.id} className="rated-pick-row">
+                    <span className="rated-pick-ticker">{a.ticker}</span>
+                    <span className="rated-pick-company">{a.company}</span>
+                    <span className={`rated-pick-pct ${pctClass(pct)}`}>{fmtPct(pct)}</span>
+                    <span className="rated-pick-rating">{a.user_rating === 'up' ? 'ð' : 'ð'}</span>
+                    <span className={`source-badge-sm ${getSourceMeta(a.source).cls}`}>{getSourceMeta(a.source).emoji} {getSourceMeta(a.source).label}</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ââââââââââââââââââââââââââââââââââââââ
+// âââ MAIN DASHBOARD âââ
+// ââââââââââââââââââââââââââââââââââââââ
 export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  const [activeTab, setActiveTab] = useState('active');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [mcapRange, setMcapRange] = useState([0, 5000]);
   const [showArchive, setShowArchive] = useState(false);
-  const [showDropped, setShowDropped] = useState(false);
-  const [showWatchlistOnly, setShowWatchlistOnly] = useState(false);
   const [showDistList, setShowDistList] = useState(false);
   const [watchlist, setWatchlistState] = useState([]);
   const router = useRouter();
 
   useEffect(() => {
-    // Load watchlist from cookies
     setWatchlistState(getWatchlist());
+    setMcapRange(getMarketCapFilter());
 
     fetch('/api/alerts')
       .then(res => {
@@ -560,6 +873,26 @@ export default function Dashboard() {
     setWatchlistState([...newList]);
   }, []);
 
+  const handleRate = useCallback(async (alertId, rating) => {
+    // Optimistic update
+    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, user_rating: rating } : a));
+
+    try {
+      if (rating === null) {
+        await fetch(`/api/ratings?alert_id=${alertId}`, { method: 'DELETE' });
+      } else {
+        await fetch('/api/ratings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ alert_id: alertId, rating }),
+        });
+      }
+    } catch {
+      // Revert on error
+      setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, user_rating: a.user_rating } : a));
+    }
+  }, []);
+
   const getLatestPct = useCallback((alert) => {
     const latest = alert.prices[alert.prices.length - 1];
     return latest?.pct_change || 0;
@@ -574,30 +907,49 @@ export default function Dashboard() {
     return pb - pa;
   });
 
-  const newPicks = sortByPerf(alerts.filter(a => a.status === 'new'));
-  const activePicks = sortByPerf(alerts.filter(a => a.status === 'active'));
-  const droppedPicks = sortByPerf(alerts.filter(a => a.status === 'dropped'));
+  // Apply all filters: search + signal type + market cap
+  const applyAllFilters = useCallback((list) => {
+    let filtered = list;
 
-  const applyFilter = (list) => {
-    let filtered = filter === 'ALL' ? list : list.filter(a => a.signal_type === filter);
-    if (showWatchlistOnly) filtered = filtered.filter(a => watchlist.includes(a.ticker));
+    // Signal type filter
+    if (filter !== 'ALL') filtered = filtered.filter(a => a.signal_type === filter);
+
+    // Search filter
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      filtered = filtered.filter(a =>
+        a.ticker.toLowerCase().includes(q) ||
+        a.company.toLowerCase().includes(q)
+      );
+    }
+
+    // Market cap filter
+    if (mcapRange[0] > 0 || mcapRange[1] < 5000) {
+      filtered = filtered.filter(a => {
+        if (a.market_cap === null || a.market_cap === undefined) return true; // Show stocks without market cap data
+        return a.market_cap >= mcapRange[0] && a.market_cap <= mcapRange[1];
+      });
+    }
+
     return filtered;
-  };
+  }, [filter, searchQuery, mcapRange]);
 
-  const filteredNew = applyFilter(newPicks);
-  const filteredActive = applyFilter(activePicks);
-  const filteredDropped = applyFilter(droppedPicks);
+  const newPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'new')), [alerts]);
+  const activePicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'active')), [alerts]);
+  const droppedPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'dropped')), [alerts]);
+  const watchlistPicks = useMemo(() => sortByPerf(alerts.filter(a => watchlist.includes(a.ticker))), [alerts, watchlist]);
 
-  // Watchlist picks from all sections
-  const watchlistPicks = sortByPerf(alerts.filter(a => watchlist.includes(a.ticker)));
+  const filteredNew = useMemo(() => applyAllFilters(newPicks), [newPicks, applyAllFilters]);
+  const filteredActive = useMemo(() => applyAllFilters(activePicks), [activePicks, applyAllFilters]);
+  const filteredDropped = useMemo(() => applyAllFilters(droppedPicks), [droppedPicks, applyAllFilters]);
+  const filteredWatchlist = useMemo(() => applyAllFilters(watchlistPicks), [watchlistPicks, applyAllFilters]);
 
-  const signalTypes = ['ALL', ...new Set(alerts.map(a => a.signal_type))];
+  const signalTypes = useMemo(() => ['ALL', ...new Set(alerts.map(a => a.signal_type))], [alerts]);
 
   const currentPicks = [...newPicks, ...activePicks];
   const totalCurrent = currentPicks.length;
   const buys = currentPicks.filter(a => a.recommendation === 'BUY').length;
   const sells = currentPicks.filter(a => a.recommendation === 'SELL').length;
-  const wins = currentPicks.filter(a => getStatus(getLatestPct(a)) === 'win').length;
   const avgPct = currentPicks.length > 0
     ? (currentPicks.reduce((sum, a) => sum + getLatestPct(a), 0) / currentPicks.length) : 0;
 
@@ -605,6 +957,26 @@ export default function Dashboard() {
   const dateStr = today.toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
+
+  // Tab definitions
+  const tabs = [
+    { id: 'new', label: 'ð New', count: newPicks.length },
+    { id: 'active', label: 'ð¥ Active', count: activePicks.length },
+    { id: 'dropped', label: 'ð¦ Dropped', count: droppedPicks.length },
+    { id: 'watchlist', label: 'â­ Watchlist', count: watchlistPicks.length },
+    { id: 'analytics', label: 'ð Analytics', count: null },
+  ];
+
+  // Current tab data
+  const getTabData = () => {
+    switch (activeTab) {
+      case 'new': return filteredNew;
+      case 'active': return filteredActive;
+      case 'dropped': return filteredDropped;
+      case 'watchlist': return filteredWatchlist;
+      default: return filteredActive;
+    }
+  };
 
   if (loading) {
     return (
@@ -618,8 +990,8 @@ export default function Dashboard() {
   return (
     <>
       <header className="header">
-        <h1>📈 Social Stock <span>Intelligence Monitor</span></h1>
-        <div className="subtitle">Last updated: {dateStr} · Auto-scan complete</div>
+        <h1>ð Social Stock <span>Intelligence Monitor</span></h1>
+        <div className="subtitle">Last updated: {dateStr} Â· Auto-scan complete</div>
       </header>
 
       {/* STATS BAR */}
@@ -630,15 +1002,15 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#00e5ff' }}>{newPicks.length}</div>
-          <div className="stat-label">🆕 New Today</div>
+          <div className="stat-label">ð New Today</div>
         </div>
         <div className="stat-card stat-buy-glow">
           <div className="stat-value" style={{ color: '#22c55e' }}>{buys}</div>
-          <div className="stat-label">🟢 AI Says BUY</div>
+          <div className="stat-label">ð¢ AI Says BUY</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#ef4444' }}>{sells}</div>
-          <div className="stat-label">🔴 AI Says SELL</div>
+          <div className="stat-label">ð´ AI Says SELL</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: avgPct >= 0 ? '#22c55e' : '#ef4444' }}>
@@ -648,121 +1020,122 @@ export default function Dashboard() {
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#fbbf24' }}>{watchlist.length}</div>
-          <div className="stat-label">⭐ Watchlist</div>
+          <div className="stat-label">â­ Watchlist</div>
         </div>
         <div className="stat-card">
           <div className="stat-value" style={{ color: '#7a9bc0' }}>{droppedPicks.length}</div>
-          <div className="stat-label">📦 Dropped</div>
+          <div className="stat-label">ð¦ Dropped</div>
         </div>
       </div>
 
-      {/* SOURCES */}
-      <p className="section-title">📡 Signal Sources</p>
-      <div className="sources-row">
-        <span className="source-badge src-wsb">🟠 WallStreetBets</span>
-        <span className="source-badge src-reddit">🔴 Reddit (r/stocks, r/investing, r/options, r/StockMarket)</span>
-        <span className="source-badge src-poly">🔵 Polymarket</span>
-        <span className="source-badge src-yahoo">🟣 Yahoo Finance</span>
-        <span className="source-badge src-google">🟢 Google Finance</span>
-        <span className="source-badge src-st">🔴 StockTwits</span>
-      </div>
-
-      {/* FILTER BAR */}
-      <div className="filter-bar" style={{ marginTop: 24 }}>
-        {signalTypes.map(type => (
-          <button
-            key={type}
-            className={`filter-btn ${filter === type ? 'active' : ''}`}
-            onClick={() => setFilter(type)}
-          >
-            {type}
-          </button>
-        ))}
-        <button
-          className={`filter-btn watchlist-filter ${showWatchlistOnly ? 'active' : ''}`}
-          onClick={() => setShowWatchlistOnly(!showWatchlistOnly)}
-        >
-          ⭐ Watchlist Only
-        </button>
-      </div>
-
-      {/* ═══ WATCHLIST SECTION ═══ */}
-      {watchlistPicks.length > 0 && !showWatchlistOnly && (
-        <>
-          <p className="section-title section-watchlist">⭐ Your Watchlist</p>
-          <p className="section-hint">Stocks you&apos;re personally tracking. Click the star on any card to add/remove.</p>
-          <div className="cards-grid">
-            {watchlistPicks.map((alert, idx) => (
-              <AlertCard key={alert.id || idx} alert={alert} index={idx} sectionPrefix="watch" watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ═══ NEW PICKS SECTION ═══ */}
-      {filteredNew.length > 0 && (
-        <>
-          <p className="section-title section-new">🆕 New Picks Today — Fresh Signals</p>
-          <p className="section-hint">These stocks just appeared on the radar today. Worth investigating before they move.</p>
-          <div className="cards-grid">
-            {filteredNew.map((alert, idx) => (
-              <AlertCard key={alert.id || idx} alert={alert} index={idx} sectionPrefix="new" watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* ═══ ACTIVE PICKS SECTION ═══ */}
-      <p className="section-title">🔥 Active Picks — Performance Scoreboard</p>
-      <p className="section-hint">These are your current picks still being tracked. The ones to watch and consider investing in.</p>
-      <div className="cards-grid">
-        {filteredActive.length > 0 ? filteredActive.map((alert, idx) => (
-          <AlertCard key={alert.id || idx} alert={alert} index={idx} sectionPrefix="active" watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
-        )) : (
-          <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem' }}>No active picks match this filter.</p>
-        )}
-      </div>
-
-      {/* ═══ DROPPED PICKS SECTION ═══ */}
-      {droppedPicks.length > 0 && (
-        <div className="dropped-section">
-          <p className="section-title section-dropped" style={{ marginLeft: 0 }}>📦 Dropped Picks — No Longer Recommended</p>
-          <p className="section-hint" style={{ marginLeft: 0 }}>These stocks were previously tracked but the signal has faded.</p>
-          <button className="archive-toggle-btn" onClick={() => setShowDropped(!showDropped)}>
-            📦 {showDropped ? 'Hide' : 'Show'} Dropped Picks ({droppedPicks.length})
-          </button>
-          {showDropped && (
-            <div className="cards-grid" style={{ padding: 0 }}>
-              {filteredDropped.map((alert, idx) => (
-                <AlertCard key={alert.id || idx} alert={alert} index={idx} sectionPrefix="dropped" watchlist={watchlist} onToggleWatchlist={handleToggleWatchlist} />
-              ))}
-            </div>
+      {/* SEARCH BAR */}
+      <div className="search-bar-container">
+        <div className="search-bar">
+          <span className="search-icon">ð</span>
+          <input
+            type="text"
+            className="search-input"
+            placeholder="Search by ticker or company name..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+          {searchQuery && (
+            <button className="search-clear" onClick={() => setSearchQuery('')}>â</button>
           )}
         </div>
+        <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
+      </div>
+
+      {/* TABS */}
+      <div className="tabs-container">
+        <div className="tabs-row">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${tab.id === 'new' && newPicks.length > 0 ? 'tab-glow' : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
+              {tab.count !== null && <span className="tab-count">{tab.count}</span>}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* FILTER BAR (signal type) - shown on all tabs except analytics */}
+      {activeTab !== 'analytics' && (
+        <div className="filter-bar">
+          {signalTypes.map(type => (
+            <button
+              key={type}
+              className={`filter-btn ${filter === type ? 'active' : ''}`}
+              onClick={() => setFilter(type)}
+            >
+              {type}
+            </button>
+          ))}
+        </div>
       )}
 
-      {/* ═══ FULL ARCHIVE TABLE ═══ */}
+      {/* TAB CONTENT */}
+      {activeTab === 'analytics' ? (
+        <AnalyticsTab alerts={alerts} />
+      ) : (
+        <>
+          {/* Tab description */}
+          <p className="section-hint" style={{ marginLeft: '40px', marginTop: '8px' }}>
+            {activeTab === 'new' && 'Fresh signals detected today. Worth investigating before they move.'}
+            {activeTab === 'active' && 'Current picks being tracked. Sorted by performance.'}
+            {activeTab === 'dropped' && 'Previously tracked stocks where the signal has faded.'}
+            {activeTab === 'watchlist' && 'Stocks you\'re personally tracking. Click the star on any card to add/remove.'}
+          </p>
+
+          {/* Cards grid */}
+          <div className="cards-grid">
+            {getTabData().length > 0 ? getTabData().map((alert, idx) => (
+              <AlertCard
+                key={alert.id || idx}
+                alert={alert}
+                index={idx}
+                sectionPrefix={activeTab}
+                watchlist={watchlist}
+                onToggleWatchlist={handleToggleWatchlist}
+                onRate={handleRate}
+              />
+            )) : (
+              <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem' }}>
+                {searchQuery ? `No results for "${searchQuery}" in this tab.` : 'No picks match current filters.'}
+              </p>
+            )}
+          </div>
+        </>
+      )}
+
+      {/* FULL ARCHIVE TABLE */}
       <div className="archive-section">
-        <p className="section-title" style={{ marginLeft: 0 }}>📅 Full Archive — All Historical Picks</p>
+        <p className="section-title" style={{ marginLeft: 0 }}>ð Full Archive â All Historical Picks</p>
         <button className="archive-toggle-btn" onClick={() => setShowArchive(!showArchive)}>
-          📂 {showArchive ? 'Hide' : 'Show'} Archive ({alerts.length} total)
+          ð {showArchive ? 'Hide' : 'Show'} Archive ({alerts.length} total)
         </button>
         {showArchive && (
           <div className="archive-table-wrap">
             <table>
               <thead>
                 <tr>
-                  <th>⭐</th>
+                  <th>â­</th>
+                  <th>Rating</th>
                   <th>Pick Status</th>
                   <th>Date Alerted</th>
                   <th>Ticker</th>
                   <th>Company</th>
+                  <th>Source</th>
                   <th>Signal Type</th>
-                  <th>Alert Reason</th>
                   <th>Price at Alert</th>
                   <th>Latest Price</th>
                   <th>% Change</th>
                   <th>AI Rec</th>
+                  <th>Signal Changed</th>
+                  <th>Forecast Sell</th>
                   <th>Performance</th>
                 </tr>
               </thead>
@@ -780,8 +1153,10 @@ export default function Dashboard() {
                     const pct = latest?.pct_change || 0;
                     const perfStatus = getStatus(pct);
                     const pickStatus = alert.status || 'active';
-                    const pickLabel = pickStatus === 'new' ? '🆕 NEW' : pickStatus === 'dropped' ? '📦 DROPPED' : '🟢 ACTIVE';
+                    const pickLabel = pickStatus === 'new' ? 'ð NEW' : pickStatus === 'dropped' ? 'ð¦ DROPPED' : 'ð¢ ACTIVE';
                     const isWatched = watchlist.includes(alert.ticker);
+                    const srcMeta = getSourceMeta(alert.source);
+                    const signalChange = alert.latest_signal_change;
                     return (
                       <tr key={alert.id || idx} className={pickStatus === 'dropped' ? 'row-dropped' : ''}>
                         <td>
@@ -789,19 +1164,42 @@ export default function Dashboard() {
                             className={`watchlist-btn-sm ${isWatched ? 'watched' : ''}`}
                             onClick={() => handleToggleWatchlist(alert.ticker)}
                           >
-                            {isWatched ? '★' : '☆'}
+                            {isWatched ? 'â' : 'â'}
                           </button>
+                        </td>
+                        <td>
+                          <span className="tbl-rating">
+                            {alert.user_rating === 'up' ? 'ð' : alert.user_rating === 'down' ? 'ð' : 'â'}
+                          </span>
                         </td>
                         <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
                         <td className="tbl-alert-date">{alert.alert_date}</td>
                         <td className="tbl-ticker">{alert.ticker}</td>
                         <td style={{ color: '#a0b8d0' }}>{alert.company}</td>
+                        <td><span className={`source-badge-sm ${srcMeta.cls}`}>{srcMeta.emoji} {srcMeta.label}</span></td>
                         <td><span className="signal-chip">{alert.signal_type}</span></td>
-                        <td style={{ maxWidth: 260, color: '#7a9bc0', fontSize: '0.73rem' }}>{alert.alert_reason}</td>
                         <td className="tbl-alert-price">${parseFloat(alert.price_at_alert).toFixed(2)}</td>
-                        <td>${latest?.price?.toFixed(2) || '—'}</td>
+                        <td>${latest?.price?.toFixed(2) || 'â'}</td>
                         <td className={`tbl-${perfStatus}`}>{fmtPct(pct)}</td>
                         <td><span className={`rec-chip ${recClass(alert.recommendation || 'HOLD')}`}>{recLabel(alert.recommendation || 'HOLD')}</span></td>
+                        <td>
+                          {signalChange ? (
+                            <span className="tbl-signal-change">
+                              {signalChange.old_recommendation} â {signalChange.new_recommendation}
+                              <br />
+                              <span className="tbl-sc-date">
+                                {new Date(signalChange.change_date || signalChange.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            </span>
+                          ) : 'â'}
+                        </td>
+                        <td>
+                          {alert.forecast_sell_date ? (
+                            <span className="tbl-forecast">
+                              {new Date(alert.forecast_sell_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            </span>
+                          ) : 'â'}
+                        </td>
                         <td className={`tbl-${perfStatus}`}>{statusLabel(pct)}</td>
                       </tr>
                     );
@@ -812,17 +1210,17 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* ═══ DISTRIBUTION LIST ═══ */}
+      {/* DISTRIBUTION LIST */}
       <div className="archive-section">
         <button className="archive-toggle-btn" onClick={() => setShowDistList(!showDistList)}>
-          📧 {showDistList ? 'Hide' : 'Manage'} Signal Change Alert List
+          ð§ {showDistList ? 'Hide' : 'Manage'} Signal Change Alert List
         </button>
         {showDistList && <DistributionListManager />}
       </div>
 
       <footer>
-        ⚡ Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB · Reddit · Polymarket · Yahoo Finance · Google Finance · StockTwits</span>
-        <div className="disclaimer">⚠️ AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
+        â¡ Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB Â· Reddit Â· Polymarket Â· Yahoo Finance Â· Google Finance Â· StockTwits</span>
+        <div className="disclaimer">â ï¸ AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
       </footer>
     </>
   );
