@@ -1,68 +1,75 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseServerClient, getCurrentProfile } from '@/app/lib/supabase/server';
 import { buildActivityIndex, computeSignalStrength } from '../../lib/signalStrength';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-export async function GET(request) {
-  // Check auth cookie
-  const authCookie = request.cookies.get('stock_auth');
-  if (!authCookie || authCookie.value !== 'authenticated') {
+export async function GET() {
+  // Require Google-auth'd, approved user
+  const profile = await getCurrentProfile();
+  if (!profile) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  if (profile.status !== 'approved') {
+    return NextResponse.json({ error: 'Pending approval' }, { status: 403 });
+  }
+
+  const supabase = createSupabaseServerClient();
 
   try {
-    // Fetch all alerts with their prices
+    // Fetch ONLY this user's alerts. RLS on stock_alerts enforces this
+    // too, but we filter explicitly for clarity/safety.
     const { data: alerts, error: alertsError } = await supabase
       .from('stock_alerts')
       .select('*')
+      .eq('user_id', profile.id)
       .order('alert_date', { ascending: false });
 
     if (alertsError) throw alertsError;
 
-    const { data: prices, error: pricesError } = await supabase
-      .from('stock_prices')
-      .select('*')
-      .order('price_date', { ascending: true });
+    const alertIds = (alerts || []).map(a => a.id);
 
-    if (pricesError) throw pricesError;
+    // Prices for just this user's alerts
+    let prices = [];
+    if (alertIds.length > 0) {
+      const { data: priceRows, error: pricesError } = await supabase
+        .from('stock_prices')
+        .select('*')
+        .in('alert_id', alertIds)
+        .order('price_date', { ascending: true });
+      if (pricesError) throw pricesError;
+      prices = priceRows || [];
+    }
 
-    // Fetch signal changes
-    const { data: signalChanges, error: scError } = await supabase
-      .from('signal_changes')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // Signal changes for just this user's alerts
+    let signalChanges = [];
+    if (alertIds.length > 0) {
+      const { data: scRows, error: scError } = await supabase
+        .from('signal_changes')
+        .select('*')
+        .in('alert_id', alertIds)
+        .order('created_at', { ascending: false });
+      if (scError) console.error('Signal changes error:', scError);
+      signalChanges = scRows || [];
+    }
 
-    if (scError) console.error('Signal changes error:', scError);
-
-    // Fetch user ratings
+    // Ratings (already user-scoped by user_ratings table design)
     const { data: ratings, error: ratingsError } = await supabase
       .from('user_ratings')
-      .select('*');
+      .select('*')
+      .eq('user_id', profile.id);
 
     if (ratingsError) console.error('Ratings error:', ratingsError);
 
-    // Build ratings lookup
     const ratingsMap = {};
     (ratings || []).forEach(r => { ratingsMap[r.alert_id] = r.rating; });
 
-    // Build signal changes lookup (latest change per alert)
     const changesMap = {};
-    (signalChanges || []).forEach(sc => {
-      if (!changesMap[sc.alert_id]) {
-        changesMap[sc.alert_id] = sc;
-      }
+    signalChanges.forEach(sc => {
+      if (!changesMap[sc.alert_id]) changesMap[sc.alert_id] = sc;
     });
 
-    // Build activity index across ALL alerts so each ticker knows how many
-    // distinct sources and total mentions it has (used by signal-strength scorer).
-    const activityIndex = buildActivityIndex(alerts || [], signalChanges || []);
+    const activityIndex = buildActivityIndex(alerts || [], signalChanges);
 
-    // Combine alerts with their prices, signal changes, and ratings
-    const combined = alerts.map(alert => {
+    const combined = (alerts || []).map(alert => {
       const enriched = {
         ...alert,
         status: alert.status || 'active',
@@ -82,9 +89,6 @@ export async function GET(request) {
           })),
       };
 
-      // Signal strength (0-100) + sub-scores. Uses persisted value if the
-      // scanner already wrote one, otherwise computes it on the fly from
-      // sources, mention volume, velocity, and sentiment.
       const computed = computeSignalStrength(enriched, activityIndex);
       enriched.signal_strength = alert.signal_strength != null
         ? Math.round(parseFloat(alert.signal_strength))

@@ -802,6 +802,55 @@ function MarketCapSlider({ range, onChange }) {
   );
 }
 
+// ── Active AI Filter Banner ──
+// Shows on the home page whenever an AI filter is set to a non-default value,
+// so the user can see at a glance that results are being filtered.
+function ActiveAIFilterBanner({ settings, onClear, onOpenSettings }) {
+  const activeFilters = [];
+
+  const mcap = settings?.market_cap_range;
+  const mcapIsDefault = !mcap || (mcap.min === 0 && mcap.max === 5000);
+  if (!mcapIsDefault) {
+    const fmt = (v) => (v >= 1000 ? `$${(v / 1000).toFixed(1)}T` : `$${v}B`);
+    activeFilters.push({
+      key: 'market_cap_range',
+      label: 'Market Cap',
+      value: `${fmt(mcap.min)} \u2013 ${fmt(mcap.max)}`,
+      defaultValue: { min: 0, max: 5000 },
+    });
+  }
+
+  if (activeFilters.length === 0) return null;
+
+  return (
+    <div className="ai-filter-banner">
+      <span className="ai-filter-banner-icon">{"\u{1F3AF}"}</span>
+      <span className="ai-filter-banner-label">AI filter active:</span>
+      {activeFilters.map((f) => (
+        <span key={f.key} className="ai-filter-banner-chip">
+          <span className="ai-filter-banner-chip-name">{f.label}:</span>
+          <span className="ai-filter-banner-chip-value">{f.value}</span>
+          <button
+            type="button"
+            className="ai-filter-banner-clear"
+            title={`Clear ${f.label} filter`}
+            onClick={() => onClear(f.key, f.defaultValue)}
+          >
+            {"\u00D7"}
+          </button>
+        </span>
+      ))}
+      <button
+        type="button"
+        className="ai-filter-banner-edit"
+        onClick={onOpenSettings}
+      >
+        Edit
+      </button>
+    </div>
+  );
+}
+
 // ── AI Settings Panel ──
 function AISettingsPanel({ settings, onSave }) {
   const [localMin, setLocalMin] = useState(settings?.market_cap_range?.min ?? 0);
@@ -3023,6 +3072,13 @@ export default function Dashboard() {
           ))}
         </div>
       )}
+
+      {/* ACTIVE AI FILTER BANNER - shows when a non-default AI filter is applied */}
+      <ActiveAIFilterBanner
+        settings={aiSettings}
+        onClear={handleSaveAISetting}
+        onOpenSettings={() => setShowAISettings(true)}
+      />
 
       {/* TAB CONTENT */}
       {activeTab === 'analytics' ? (

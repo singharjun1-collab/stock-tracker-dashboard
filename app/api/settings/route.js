@@ -1,22 +1,22 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseServerClient, getCurrentProfile } from '@/app/lib/supabase/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-// GET all AI settings
-export async function GET(request) {
-  const authCookie = request.cookies.get('stock_auth');
-  if (!authCookie || authCookie.value !== 'authenticated') {
+// GET the current user's AI settings
+export async function GET() {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (profile.status !== 'approved') {
+    return NextResponse.json({ error: 'Not approved' }, { status: 403 });
   }
 
   try {
+    const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from('ai_settings')
-      .select('*');
+      .select('*')
+      .eq('user_id', profile.id);
 
     if (error) throw error;
 
@@ -32,11 +32,14 @@ export async function GET(request) {
   }
 }
 
-// POST to update a setting
+// POST to update a setting for the current user
 export async function POST(request) {
-  const authCookie = request.cookies.get('stock_auth');
-  if (!authCookie || authCookie.value !== 'authenticated') {
+  const profile = await getCurrentProfile();
+  if (!profile) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+  if (profile.status !== 'approved') {
+    return NextResponse.json({ error: 'Not approved' }, { status: 403 });
   }
 
   try {
@@ -46,11 +49,17 @@ export async function POST(request) {
       return NextResponse.json({ error: 'Missing key or value' }, { status: 400 });
     }
 
+    const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from('ai_settings')
       .upsert(
-        { setting_key: key, setting_value: value, updated_at: new Date().toISOString() },
-        { onConflict: 'setting_key' }
+        {
+          user_id: profile.id,
+          setting_key: key,
+          setting_value: value,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,setting_key' }
       )
       .select();
 
