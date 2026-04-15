@@ -441,7 +441,7 @@ function RatingButtons({ alertId, currentRating, onRate }) {
 }
 
 // ── Alert Card ──
-function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, onRate }) {
+function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, onRate, openPosition, onOpenBuyModal, onOpenSellModal }) {
   const latest = alert.prices[alert.prices.length - 1];
   const pct = latest?.pct_change || 0;
   const perfStatus = getStatus(pct);
@@ -575,6 +575,46 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
           <span className="sc-date">
             {new Date(alert.latest_signal_change.change_date || alert.latest_signal_change.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
+        </div>
+      )}
+
+      {/* PAPER TRADE CONTROLS (only when card is on Watchlist) */}
+      {sectionPrefix === 'watchlist' && onOpenBuyModal && (
+        <div className="paper-trade-row">
+          {openPosition ? (() => {
+            const invested = parseFloat(openPosition.entry_amount);
+            const shares = parseFloat(openPosition.shares);
+            const currentPrice = latest?.price ?? parseFloat(openPosition.entry_price);
+            const currentValue = currentPrice * shares;
+            const pnl = currentValue - invested;
+            const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+            return (
+              <>
+                <div className="paper-trade-holding">
+                  <div className="pth-top">
+                    <span className="pth-label">{"\u{1F4BC}"} PAPER POSITION</span>
+                    <span className={`pth-pnl ${pnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+                      {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
+                    </span>
+                  </div>
+                  <div className="pth-bot">
+                    <span>{shares.toFixed(4)} sh @ ${parseFloat(openPosition.entry_price).toFixed(2)} = ${invested.toFixed(2)}</span>
+                    <span>Now: ${currentValue.toFixed(2)}</span>
+                  </div>
+                </div>
+                <button className="paper-trade-btn paper-trade-sell" onClick={() => onOpenSellModal(openPosition, currentPrice)}>
+                  {"\u{1F4B0}"} Paper Sell
+                </button>
+              </>
+            );
+          })() : (
+            <button
+              className="paper-trade-btn paper-trade-buy"
+              onClick={() => onOpenBuyModal(alert, latest?.price ?? parseFloat(alert.price_at_alert))}
+            >
+              {"\u{1F4C8}"} Paper Buy
+            </button>
+          )}
         </div>
       )}
 
@@ -1114,6 +1154,424 @@ function AnalyticsTab({ alerts }) {
 // ══════════════════════════════════════
 // ═══ MAIN DASHBOARD ═══
 // ══════════════════════════════════════
+// ── Paper Trade Buy Modal ──
+function BuyTradeModal({ alert, currentPrice, onClose, onConfirm }) {
+  const [amount, setAmount] = useState('500');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const amountNum = parseFloat(amount) || 0;
+  const shares = currentPrice > 0 ? amountNum / currentPrice : 0;
+
+  const handleConfirm = async () => {
+    if (amountNum <= 0) {
+      setError('Enter a dollar amount greater than 0');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await onConfirm({ amount: amountNum, notes });
+    } catch (e) {
+      setError(e.message || 'Failed to save trade');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="pt-modal-backdrop" onClick={onClose}>
+      <div className="pt-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="pt-modal-header">
+          <h3>{"\u{1F4B0}"} Paper Buy <span className="pt-modal-ticker">{alert.ticker}</span></h3>
+          <button className="pt-modal-close" onClick={onClose}>{"\u{2715}"}</button>
+        </div>
+        <div className="pt-modal-body">
+          <div className="pt-modal-row">
+            <span className="pt-modal-label">Company</span>
+            <span className="pt-modal-value">{alert.company}</span>
+          </div>
+          <div className="pt-modal-row">
+            <span className="pt-modal-label">Current price</span>
+            <span className="pt-modal-value pt-price">${currentPrice.toFixed(2)}</span>
+          </div>
+          <div className="pt-modal-row">
+            <span className="pt-modal-label">AI rec</span>
+            <span className={`rec-chip ${recClass(alert.recommendation || 'HOLD')}`}>{recLabel(alert.recommendation || 'HOLD')}</span>
+          </div>
+
+          <div className="pt-modal-input-group">
+            <label>Amount to invest ($)</label>
+            <div className="pt-amount-input-wrap">
+              <span className="pt-amount-prefix">$</span>
+              <input
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                min="1"
+                step="any"
+                autoFocus
+              />
+            </div>
+            <div className="pt-amount-presets">
+              {[100, 500, 1000, 5000].map(v => (
+                <button key={v} type="button" onClick={() => setAmount(String(v))}>${v}</button>
+              ))}
+            </div>
+          </div>
+
+          <div className="pt-modal-summary">
+            <div className="pt-summary-row">
+              <span>Shares (fractional)</span>
+              <span>{shares.toFixed(4)}</span>
+            </div>
+            <div className="pt-summary-row">
+              <span>Position cost</span>
+              <span className="pt-price">${amountNum.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="pt-modal-input-group">
+            <label>Notes (optional)</label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Why are you buying? e.g. 'Strong signal + momentum setup'"
+              rows={2}
+            />
+          </div>
+
+          {error && <div className="pt-modal-error">{error}</div>}
+        </div>
+        <div className="pt-modal-footer">
+          <button className="pt-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="pt-btn-primary" onClick={handleConfirm} disabled={saving || amountNum <= 0}>
+            {saving ? 'Saving...' : `\u{1F4C8} Buy $${amountNum.toFixed(2)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Paper Trade Sell Modal ──
+function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
+  const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(2) : '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const priceNum = parseFloat(price) || 0;
+  const exitAmount = priceNum * parseFloat(trade.shares);
+  const pnl = exitAmount - parseFloat(trade.entry_amount);
+  const pnlPct = trade.entry_amount > 0 ? (pnl / parseFloat(trade.entry_amount)) * 100 : 0;
+
+  const handleConfirm = async () => {
+    if (priceNum <= 0) {
+      setError('Enter a sell price greater than 0');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await onConfirm({ price: priceNum });
+    } catch (e) {
+      setError(e.message || 'Failed to close trade');
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="pt-modal-backdrop" onClick={onClose}>
+      <div className="pt-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="pt-modal-header">
+          <h3>{"\u{1F4B8}"} Paper Sell <span className="pt-modal-ticker">{trade.ticker}</span></h3>
+          <button className="pt-modal-close" onClick={onClose}>{"\u{2715}"}</button>
+        </div>
+        <div className="pt-modal-body">
+          <div className="pt-modal-row">
+            <span className="pt-modal-label">Bought</span>
+            <span className="pt-modal-value">{parseFloat(trade.shares).toFixed(4)} sh @ ${parseFloat(trade.entry_price).toFixed(2)}</span>
+          </div>
+          <div className="pt-modal-row">
+            <span className="pt-modal-label">Invested</span>
+            <span className="pt-modal-value pt-price">${parseFloat(trade.entry_amount).toFixed(2)}</span>
+          </div>
+          <div className="pt-modal-row">
+            <span className="pt-modal-label">Current market price</span>
+            <span className="pt-modal-value pt-price">${currentPrice.toFixed(2)}</span>
+          </div>
+
+          <div className="pt-modal-input-group">
+            <label>Sell price ($)</label>
+            <div className="pt-amount-input-wrap">
+              <span className="pt-amount-prefix">$</span>
+              <input
+                type="number"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                min="0.01"
+                step="0.01"
+                autoFocus
+              />
+            </div>
+            <button type="button" className="pt-use-market" onClick={() => setPrice(currentPrice.toFixed(2))}>
+              Use current market price
+            </button>
+          </div>
+
+          <div className="pt-modal-summary">
+            <div className="pt-summary-row">
+              <span>Proceeds</span>
+              <span className="pt-price">${exitAmount.toFixed(2)}</span>
+            </div>
+            <div className="pt-summary-row">
+              <span>Profit / Loss</span>
+              <span className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
+                {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
+              </span>
+            </div>
+          </div>
+
+          {error && <div className="pt-modal-error">{error}</div>}
+        </div>
+        <div className="pt-modal-footer">
+          <button className="pt-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
+          <button className="pt-btn-primary" onClick={handleConfirm} disabled={saving || priceNum <= 0}>
+            {saving ? 'Closing...' : `\u{1F4B0} Sell @ $${priceNum.toFixed(2)}`}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Portfolio Tab ──
+function PortfolioTab({ trades, alerts, onSell, onDelete, onBuyFromWatchlist }) {
+  const getLatest = (ticker) => {
+    const alert = alerts.find(a => a.ticker === ticker);
+    if (!alert) return null;
+    const last = alert.prices[alert.prices.length - 1];
+    return last?.price ?? parseFloat(alert.price_at_alert);
+  };
+
+  const openTrades = trades.filter(t => t.status === 'open');
+  const closedTrades = trades.filter(t => t.status === 'closed');
+
+  // Summary: realized + unrealized
+  const realizedPnl = closedTrades.reduce((sum, t) =>
+    sum + (parseFloat(t.exit_amount) - parseFloat(t.entry_amount)), 0);
+  const unrealizedPnl = openTrades.reduce((sum, t) => {
+    const latest = getLatest(t.ticker);
+    if (latest == null) return sum;
+    return sum + (latest * parseFloat(t.shares) - parseFloat(t.entry_amount));
+  }, 0);
+  const totalInvested = trades.reduce((s, t) => s + parseFloat(t.entry_amount), 0);
+  const currentOpenValue = openTrades.reduce((s, t) => {
+    const latest = getLatest(t.ticker);
+    return s + (latest != null ? latest * parseFloat(t.shares) : parseFloat(t.entry_amount));
+  }, 0);
+  const totalPnl = realizedPnl + unrealizedPnl;
+  const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
+
+  const wins = closedTrades.filter(t => parseFloat(t.exit_amount) > parseFloat(t.entry_amount)).length;
+  const winRate = closedTrades.length > 0 ? (wins / closedTrades.length) * 100 : 0;
+
+  // AI accuracy breakdown: P/L by recommendation at entry
+  const byRec = { BUY: [], HOLD: [], SELL: [] };
+  trades.forEach(t => {
+    const rec = t.ai_recommendation_at_entry || 'HOLD';
+    const latest = t.status === 'closed' ? parseFloat(t.exit_price) : getLatest(t.ticker);
+    if (latest == null) return;
+    const pnlPct = ((latest - parseFloat(t.entry_price)) / parseFloat(t.entry_price)) * 100;
+    if (byRec[rec]) byRec[rec].push(pnlPct);
+  });
+  const avgOf = (arr) => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : null;
+
+  const daysHeld = (t) => {
+    const start = new Date(t.entry_date);
+    const end = t.status === 'closed' ? new Date(t.exit_date) : new Date();
+    return Math.max(0, Math.floor((end - start) / 86400000));
+  };
+  const fmt$ = (v) => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
+  const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+  return (
+    <div className="portfolio-tab">
+      {/* Summary */}
+      <div className="pt-summary-grid">
+        <div className="pt-stat">
+          <div className="pt-stat-label">Total Invested</div>
+          <div className="pt-stat-value">${totalInvested.toFixed(2)}</div>
+        </div>
+        <div className="pt-stat">
+          <div className="pt-stat-label">Current Value (Open)</div>
+          <div className="pt-stat-value">${currentOpenValue.toFixed(2)}</div>
+        </div>
+        <div className="pt-stat">
+          <div className="pt-stat-label">Realized P/L</div>
+          <div className={`pt-stat-value ${realizedPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmt$(realizedPnl)}</div>
+        </div>
+        <div className="pt-stat">
+          <div className="pt-stat-label">Unrealized P/L</div>
+          <div className={`pt-stat-value ${unrealizedPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmt$(unrealizedPnl)}</div>
+        </div>
+        <div className="pt-stat pt-stat-hero">
+          <div className="pt-stat-label">Total P/L</div>
+          <div className={`pt-stat-value pt-stat-hero-value ${totalPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+            {fmt$(totalPnl)} <span className="pt-stat-pct">({totalPnl >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%)</span>
+          </div>
+        </div>
+        <div className="pt-stat">
+          <div className="pt-stat-label">Win Rate {"("}{closedTrades.length} closed{")"}</div>
+          <div className="pt-stat-value">{closedTrades.length > 0 ? winRate.toFixed(0) + '%' : '\u{2014}'}</div>
+        </div>
+      </div>
+
+      {/* AI Accuracy */}
+      <div className="pt-ai-accuracy">
+        <h3>{"\u{1F3AF}"} AI Accuracy &mdash; Avg P/L by Recommendation at Entry</h3>
+        <div className="pt-ai-grid">
+          {['BUY', 'HOLD', 'SELL'].map(rec => {
+            const avg = avgOf(byRec[rec]);
+            const count = byRec[rec].length;
+            return (
+              <div key={rec} className={`pt-ai-card ${recClass(rec)}`}>
+                <div className="pt-ai-rec">{recLabel(rec)}</div>
+                <div className={`pt-ai-avg ${avg == null ? '' : avg >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+                  {avg == null ? '\u{2014}' : `${avg >= 0 ? '+' : ''}${avg.toFixed(2)}%`}
+                </div>
+                <div className="pt-ai-count">{count} trade{count === 1 ? '' : 's'}</div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="pt-ai-hint">
+          If BUY picks consistently outperform HOLD/SELL, the AI recommendations are adding value.
+        </p>
+      </div>
+
+      {/* Open Positions */}
+      <div className="pt-section">
+        <h3>{"\u{1F4C8}"} Open Positions <span className="pt-count-badge">{openTrades.length}</span></h3>
+        {openTrades.length === 0 ? (
+          <p className="pt-empty">
+            No open positions yet. Go to your {"\u{2B50}"} Watchlist tab and click "Paper Buy" on any card to simulate a trade.
+          </p>
+        ) : (
+          <div className="pt-table-wrap">
+            <table className="pt-table">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Entry Date</th>
+                  <th>Days Held</th>
+                  <th>Entry Price</th>
+                  <th>Current Price</th>
+                  <th>Shares</th>
+                  <th>Invested</th>
+                  <th>Current Value</th>
+                  <th>P/L</th>
+                  <th>AI Rec @ Entry</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {openTrades.map(t => {
+                  const latest = getLatest(t.ticker);
+                  const invested = parseFloat(t.entry_amount);
+                  const current = latest != null ? latest * parseFloat(t.shares) : invested;
+                  const pnl = current - invested;
+                  const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+                  const rec = t.ai_recommendation_at_entry || 'HOLD';
+                  return (
+                    <tr key={t.id}>
+                      <td className="pt-table-ticker">{t.ticker}</td>
+                      <td>{fmtDate(t.entry_date)}</td>
+                      <td>{daysHeld(t)}d</td>
+                      <td>${parseFloat(t.entry_price).toFixed(2)}</td>
+                      <td>{latest != null ? '$' + latest.toFixed(2) : '\u{2014}'}</td>
+                      <td>{parseFloat(t.shares).toFixed(4)}</td>
+                      <td>${invested.toFixed(2)}</td>
+                      <td>${current.toFixed(2)}</td>
+                      <td className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
+                        {fmt$(pnl)} <br />
+                        <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
+                      </td>
+                      <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
+                      <td>
+                        <button className="pt-sell-btn" onClick={() => onSell(t, latest != null ? latest : parseFloat(t.entry_price))}>
+                          {"\u{1F4B0}"} Sell
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Closed Positions */}
+      <div className="pt-section">
+        <h3>{"\u{1F4CB}"} Closed Trades <span className="pt-count-badge">{closedTrades.length}</span></h3>
+        {closedTrades.length === 0 ? (
+          <p className="pt-empty">No closed trades yet.</p>
+        ) : (
+          <div className="pt-table-wrap">
+            <table className="pt-table">
+              <thead>
+                <tr>
+                  <th>Ticker</th>
+                  <th>Entry {"\u{2192}"} Exit</th>
+                  <th>Days Held</th>
+                  <th>Entry</th>
+                  <th>Exit</th>
+                  <th>Invested</th>
+                  <th>Proceeds</th>
+                  <th>P/L</th>
+                  <th>AI Rec @ Entry</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {closedTrades.map(t => {
+                  const invested = parseFloat(t.entry_amount);
+                  const proceeds = parseFloat(t.exit_amount);
+                  const pnl = proceeds - invested;
+                  const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+                  const rec = t.ai_recommendation_at_entry || 'HOLD';
+                  return (
+                    <tr key={t.id}>
+                      <td className="pt-table-ticker">{t.ticker}</td>
+                      <td>{fmtDate(t.entry_date)} {"\u{2192}"} {fmtDate(t.exit_date)}</td>
+                      <td>{daysHeld(t)}d</td>
+                      <td>${parseFloat(t.entry_price).toFixed(2)}</td>
+                      <td>${parseFloat(t.exit_price).toFixed(2)}</td>
+                      <td>${invested.toFixed(2)}</td>
+                      <td>${proceeds.toFixed(2)}</td>
+                      <td className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
+                        {fmt$(pnl)} <br />
+                        <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
+                      </td>
+                      <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
+                      <td>
+                        <button className="pt-delete-btn" onClick={() => { if (confirm('Delete this closed trade permanently?')) onDelete(t.id); }}>
+                          {"\u{1F5D1}"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Lightweight inline SVG sparkline (no Chart.js) for table rows ──
 function MiniSparkline({ prices, width = 90, height = 28 }) {
   const [hoverIdx, setHoverIdx] = useState(null);
@@ -1463,6 +1921,9 @@ export default function Dashboard() {
   const [showAISettings, setShowAISettings] = useState(false);
   const [aiSettings, setAISettings] = useState({});
   const [watchlist, setWatchlistState] = useState([]);
+  const [paperTrades, setPaperTrades] = useState([]);
+  const [buyModalState, setBuyModalState] = useState(null);   // { alert, currentPrice }
+  const [sellModalState, setSellModalState] = useState(null); // { trade, currentPrice }
   const router = useRouter();
 
   useEffect(() => {
@@ -1479,6 +1940,12 @@ export default function Dashboard() {
         setLoading(false);
       })
       .catch(() => router.replace('/'));
+
+    // Fetch paper trades
+    fetch('/api/paper-trades')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data?.trades) setPaperTrades(data.trades); })
+      .catch(() => {});
 
     // Fetch AI settings
     fetch('/api/settings')
@@ -1510,6 +1977,62 @@ export default function Dashboard() {
       // Revert on error
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, user_rating: a.user_rating } : a));
     }
+  }, []);
+
+  // ── Paper-trading handlers ──
+  const openTradeFor = useCallback((ticker) => {
+    return paperTrades.find(t => t.ticker === ticker && t.status === 'open');
+  }, [paperTrades]);
+
+  const handleOpenBuyModal = useCallback((alert, currentPrice) => {
+    setBuyModalState({ alert, currentPrice });
+  }, []);
+
+  const handleOpenSellModal = useCallback((trade, currentPrice) => {
+    setSellModalState({ trade, currentPrice });
+  }, []);
+
+  const handleConfirmBuy = useCallback(async ({ amount, notes }) => {
+    const { alert, currentPrice } = buyModalState;
+    const res = await fetch('/api/paper-trades', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ticker: alert.ticker,
+        company: alert.company,
+        alert_id: alert.id,
+        entry_price: currentPrice,
+        entry_amount: amount,
+        ai_recommendation_at_entry: alert.recommendation || 'HOLD',
+        signal_strength_at_entry: alert.signal_strength ?? null,
+        signal_type_at_entry: alert.signal_type || null,
+        notes,
+      }),
+    });
+    if (!res.ok) throw new Error('Server rejected the trade');
+    const data = await res.json();
+    if (data?.trade) setPaperTrades(prev => [data.trade, ...prev]);
+    setBuyModalState(null);
+  }, [buyModalState]);
+
+  const handleConfirmSell = useCallback(async ({ price }) => {
+    const { trade } = sellModalState;
+    const res = await fetch('/api/paper-trades', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: trade.id, exit_price: price }),
+    });
+    if (!res.ok) throw new Error('Server rejected the sell');
+    const data = await res.json();
+    if (data?.trade) {
+      setPaperTrades(prev => prev.map(t => t.id === data.trade.id ? data.trade : t));
+    }
+    setSellModalState(null);
+  }, [sellModalState]);
+
+  const handleDeleteTrade = useCallback(async (id) => {
+    const res = await fetch(`/api/paper-trades?id=${id}`, { method: 'DELETE' });
+    if (res.ok) setPaperTrades(prev => prev.filter(t => t.id !== id));
   }, []);
 
   const handleJumpToCard = useCallback((alert) => {
@@ -1618,6 +2141,7 @@ export default function Dashboard() {
     { id: 'active', label: '\u{1F525} Active', count: activePicks.length },
     { id: 'dropped', label: '\u{1F4E6} Dropped', count: droppedPicks.length },
     { id: 'watchlist', label: '\u{2B50} Watchlist', count: watchlistPicks.length },
+    { id: 'portfolio', label: '\u{1F4BC} Portfolio', count: paperTrades.filter(t => t.status === 'open').length || null },
     { id: 'analytics', label: '\u{1F4CA} Analytics', count: null },
   ];
 
@@ -1817,6 +2341,13 @@ export default function Dashboard() {
       {/* TAB CONTENT */}
       {activeTab === 'analytics' ? (
         <AnalyticsTab alerts={alerts} />
+      ) : activeTab === 'portfolio' ? (
+        <PortfolioTab
+          trades={paperTrades}
+          alerts={alerts}
+          onSell={handleOpenSellModal}
+          onDelete={handleDeleteTrade}
+        />
       ) : (
         <>
           {/* Tab description */}
@@ -1824,7 +2355,7 @@ export default function Dashboard() {
             {activeTab === 'new' && 'Fresh signals detected today. Worth investigating before they move.'}
             {activeTab === 'active' && 'Current picks being tracked. Sorted by performance.'}
             {activeTab === 'dropped' && 'Previously tracked stocks where the signal has faded.'}
-            {activeTab === 'watchlist' && 'Stocks you\'re personally tracking. Click the star on any card to add/remove.'}
+            {activeTab === 'watchlist' && 'Stocks you\'re personally tracking. Click the star on any card to add/remove. Use Paper Buy to simulate trades.'}
           </p>
 
           {/* Cards grid */}
@@ -1838,6 +2369,9 @@ export default function Dashboard() {
                 watchlist={watchlist}
                 onToggleWatchlist={handleToggleWatchlist}
                 onRate={handleRate}
+                openPosition={openTradeFor(alert.ticker)}
+                onOpenBuyModal={handleOpenBuyModal}
+                onOpenSellModal={handleOpenSellModal}
               />
             )) : (
               <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem' }}>
@@ -1846,6 +2380,24 @@ export default function Dashboard() {
             )}
           </div>
         </>
+      )}
+
+      {/* PAPER TRADE MODALS */}
+      {buyModalState && (
+        <BuyTradeModal
+          alert={buyModalState.alert}
+          currentPrice={buyModalState.currentPrice}
+          onClose={() => setBuyModalState(null)}
+          onConfirm={handleConfirmBuy}
+        />
+      )}
+      {sellModalState && (
+        <SellTradeModal
+          trade={sellModalState.trade}
+          currentPrice={sellModalState.currentPrice}
+          onClose={() => setSellModalState(null)}
+          onConfirm={handleConfirmSell}
+        />
       )}
 
       {/* FULL ARCHIVE TABLE */}
