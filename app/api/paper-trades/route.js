@@ -1,53 +1,39 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createSupabaseServerClient, getCurrentProfile } from '@/app/lib/supabase/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-);
-
-function checkAuth(request) {
-  const authCookie = request.cookies.get('stock_auth');
-  return authCookie && authCookie.value === 'authenticated';
+async function requireApproved() {
+  const profile = await getCurrentProfile();
+  if (!profile) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) };
+  if (profile.status !== 'approved') {
+    return { error: NextResponse.json({ error: 'Pending approval' }, { status: 403 }) };
+  }
+  return { profile };
 }
 
-// GET all paper trades
-export async function GET(request) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('paper_trades')
-      .select('*')
-      .order('entry_date', { ascending: false });
-    if (error) throw error;
-    return NextResponse.json({ trades: data });
-  } catch (error) {
-    console.error('Error fetching paper trades:', error);
-    return NextResponse.json({ error: 'Failed to fetch trades' }, { status: 500 });
-  }
+// GET current user's paper trades
+export async function GET() {
+  const { error, profile } = await requireApproved();
+  if (error) return error;
+  const supabase = createSupabaseServerClient();
+  const { data, error: dbErr } = await supabase
+    .from('paper_trades')
+    .select('*')
+    .eq('user_id', profile.id)
+    .order('entry_date', { ascending: false });
+  if (dbErr) return NextResponse.json({ error: 'Failed to fetch trades' }, { status: 500 });
+  return NextResponse.json({ trades: data });
 }
 
-// POST - create a new paper trade (buy)
+// POST — create a new paper trade (buy)
 export async function POST(request) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { error, profile } = await requireApproved();
+  if (error) return error;
 
   try {
     const body = await request.json();
     const {
-      ticker,
-      company,
-      alert_id,
-      entry_price,
-      entry_amount,
-      ai_recommendation_at_entry,
-      signal_strength_at_entry,
-      signal_type_at_entry,
-      notes,
+      ticker, company, alert_id, entry_price, entry_amount,
+      ai_recommendation_at_entry, signal_strength_at_entry, signal_type_at_entry, notes,
     } = body;
 
     if (!ticker || !entry_price || !entry_amount) {
@@ -60,9 +46,11 @@ export async function POST(request) {
     }
     const shares = amount / price;
 
-    const { data, error } = await supabase
+    const supabase = createSupabaseServerClient();
+    const { data, error: dbErr } = await supabase
       .from('paper_trades')
       .insert({
+        user_id: profile.id,
         ticker: ticker.toUpperCase(),
         company: company || null,
         alert_id: alert_id || null,
@@ -77,42 +65,39 @@ export async function POST(request) {
       .select()
       .single();
 
-    if (error) throw error;
+    if (dbErr) throw dbErr;
     return NextResponse.json({ trade: data });
-  } catch (error) {
-    console.error('Error creating paper trade:', error);
+  } catch (e) {
+    console.error('Error creating paper trade:', e);
     return NextResponse.json({ error: 'Failed to create trade' }, { status: 500 });
   }
 }
 
-// PATCH - close (sell) or update a paper trade
+// PATCH — close (sell) or update a paper trade
 export async function PATCH(request) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { error, profile } = await requireApproved();
+  if (error) return error;
 
   try {
     const body = await request.json();
     const { id, exit_price, notes } = body;
+    if (!id) return NextResponse.json({ error: 'Missing trade id' }, { status: 400 });
 
-    if (!id) {
-      return NextResponse.json({ error: 'Missing trade id' }, { status: 400 });
-    }
-
+    const supabase = createSupabaseServerClient();
     const update = { updated_at: new Date().toISOString() };
 
     if (exit_price !== undefined && exit_price !== null) {
       const price = parseFloat(exit_price);
-      if (price <= 0) {
-        return NextResponse.json({ error: 'Exit price must be positive' }, { status: 400 });
-      }
-      // Fetch the trade to compute exit_amount
+      if (price <= 0) return NextResponse.json({ error: 'Exit price must be positive' }, { status: 400 });
       const { data: existing, error: fetchErr } = await supabase
         .from('paper_trades')
-        .select('shares, status')
+        .select('shares, status, user_id')
         .eq('id', id)
         .single();
       if (fetchErr) throw fetchErr;
+      if (existing.user_id !== profile.id && !profile.is_admin) {
+        return NextResponse.json({ error: 'Not your trade' }, { status: 403 });
+      }
       if (existing.status === 'closed') {
         return NextResponse.json({ error: 'Trade already closed' }, { status: 400 });
       }
@@ -124,43 +109,42 @@ export async function PATCH(request) {
 
     if (notes !== undefined) update.notes = notes;
 
-    const { data, error } = await supabase
+    const { data, error: dbErr } = await supabase
       .from('paper_trades')
       .update(update)
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (dbErr) throw dbErr;
     return NextResponse.json({ trade: data });
-  } catch (error) {
-    console.error('Error updating paper trade:', error);
+  } catch (e) {
+    console.error('Error updating paper trade:', e);
     return NextResponse.json({ error: 'Failed to update trade' }, { status: 500 });
   }
 }
 
-// DELETE - remove a trade entirely
+// DELETE — remove a trade
 export async function DELETE(request) {
-  if (!checkAuth(request)) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  const { error, profile } = await requireApproved();
+  if (error) return error;
 
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
-    if (!id) {
-      return NextResponse.json({ error: 'Missing id' }, { status: 400 });
-    }
+    if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
-    const { error } = await supabase
+    const supabase = createSupabaseServerClient();
+    const { error: dbErr } = await supabase
       .from('paper_trades')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', profile.id);
 
-    if (error) throw error;
+    if (dbErr) throw dbErr;
     return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error deleting paper trade:', error);
+  } catch (e) {
+    console.error('Error deleting paper trade:', e);
     return NextResponse.json({ error: 'Failed to delete trade' }, { status: 500 });
   }
 }

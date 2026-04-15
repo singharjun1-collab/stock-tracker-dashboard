@@ -1909,6 +1909,293 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
   );
 }
 
+// ---------- LEADERBOARD TAB ----------
+function LeaderboardTab({ alerts, currentUserId }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [userTrades, setUserTrades] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/leaderboard')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { setData(d); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedUserId) { setUserTrades(null); return; }
+    fetch(`/api/leaderboard?userId=${selectedUserId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setUserTrades(d?.trades || []));
+  }, [selectedUserId]);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#7a9bc0' }}>Loading community portfolios…</div>;
+  if (!data?.leaderboard?.length) return <div style={{ padding: 40, textAlign: 'center', color: '#7a9bc0' }}>No approved users yet.</div>;
+
+  // Get current price for a trade (from live alerts)
+  const getPrice = (ticker) => {
+    const a = alerts.find(x => x.ticker === ticker);
+    if (!a) return null;
+    const hist = a.price_history || [];
+    return hist.length ? parseFloat(hist[hist.length - 1].price) : parseFloat(a.price_at_alert);
+  };
+
+  // Compute unrealized PL for each user using current prices
+  const rows = data.leaderboard.map(s => {
+    // Stored realized PL is accurate for closed; we approximate unrealized via current prices per-user only when drilled in
+    return {
+      ...s,
+      totalPL: s.realizedPL, // open positions not known at summary level; shown in drill-in
+    };
+  }).sort((a, b) => (b.totalPL || 0) - (a.totalPL || 0));
+
+  const selectedSummary = selectedUserId ? rows.find(r => r.profile.id === selectedUserId) : null;
+
+  return (
+    <div className="leaderboard-tab">
+      {!selectedUserId && (
+        <>
+          <p className="section-hint" style={{ marginLeft: 0, marginTop: 0 }}>
+            See how everyone's picks are doing. Click any user to view their full portfolio.
+          </p>
+          <div className="lb-grid">
+            {rows.map((r, i) => (
+              <button
+                key={r.profile.id}
+                className={`lb-card ${r.profile.id === currentUserId ? 'lb-card-you' : ''}`}
+                onClick={() => setSelectedUserId(r.profile.id)}
+              >
+                <div className="lb-rank">#{i + 1}</div>
+                {r.profile.avatar_url ? (
+                  <img src={r.profile.avatar_url} alt="" className="lb-avatar" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="lb-avatar lb-avatar-fallback">
+                    {(r.profile.display_name || r.profile.email || '?').charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <div className="lb-name">
+                  {r.profile.display_name || r.profile.email.split('@')[0]}
+                  {r.profile.id === currentUserId && <span className="lb-you-badge">You</span>}
+                  {r.profile.is_admin && <span className="lb-admin-badge">Admin</span>}
+                </div>
+                <div className={`lb-pl ${r.realizedPL >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+                  {r.realizedPL >= 0 ? '+' : ''}${r.realizedPL.toFixed(2)}
+                </div>
+                <div className="lb-stats-row">
+                  <span>{r.closedCount} closed</span>
+                  <span>{r.openCount} open</span>
+                  {r.winRate !== null && <span>{(r.winRate * 100).toFixed(0)}% win</span>}
+                </div>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {selectedUserId && selectedSummary && (
+        <div className="lb-detail">
+          <button className="lb-back-btn" onClick={() => setSelectedUserId(null)}>&larr; Back to leaderboard</button>
+          <div className="lb-detail-header">
+            {selectedSummary.profile.avatar_url ? (
+              <img src={selectedSummary.profile.avatar_url} alt="" className="lb-avatar-lg" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="lb-avatar-lg lb-avatar-fallback">
+                {(selectedSummary.profile.display_name || selectedSummary.profile.email || '?').charAt(0).toUpperCase()}
+              </span>
+            )}
+            <div>
+              <div className="lb-detail-name">
+                {selectedSummary.profile.display_name || selectedSummary.profile.email.split('@')[0]}
+                {selectedSummary.profile.is_admin && <span className="lb-admin-badge">Admin</span>}
+              </div>
+              <div className="lb-detail-sub">{selectedSummary.closedCount} closed trades {"\u{B7}"} {selectedSummary.openCount} open</div>
+            </div>
+          </div>
+
+          {!userTrades && <div style={{ padding: 20, textAlign: 'center', color: '#7a9bc0' }}>Loading trades…</div>}
+
+          {userTrades && (() => {
+            const open = userTrades.filter(t => t.status === 'open');
+            const closed = userTrades.filter(t => t.status === 'closed');
+            return (
+              <>
+                {open.length > 0 && (
+                  <div className="pt-table-wrap">
+                    <h3 style={{ margin: '16px 0 8px' }}>Open positions ({open.length})</h3>
+                    <table className="pt-table">
+                      <thead><tr><th>Ticker</th><th>Entered</th><th>Entry $</th><th>Current</th><th>P/L</th></tr></thead>
+                      <tbody>
+                        {open.map(t => {
+                          const cur = getPrice(t.ticker);
+                          const curVal = cur ? cur * parseFloat(t.shares) : null;
+                          const pl = curVal ? curVal - parseFloat(t.entry_amount) : null;
+                          return (
+                            <tr key={t.id}>
+                              <td><strong>{t.ticker}</strong></td>
+                              <td>{new Date(t.entry_date).toLocaleDateString()}</td>
+                              <td>${parseFloat(t.entry_amount).toFixed(2)}</td>
+                              <td>{curVal ? `$${curVal.toFixed(2)}` : '—'}</td>
+                              <td className={pl === null ? '' : pl >= 0 ? 'pct-pos' : 'pct-neg'}>
+                                {pl === null ? '—' : `${pl >= 0 ? '+' : ''}$${pl.toFixed(2)}`}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {closed.length > 0 && (
+                  <div className="pt-table-wrap">
+                    <h3 style={{ margin: '16px 0 8px' }}>Closed trades ({closed.length})</h3>
+                    <table className="pt-table">
+                      <thead><tr><th>Ticker</th><th>Entered</th><th>Exited</th><th>Entry $</th><th>Exit $</th><th>P/L</th></tr></thead>
+                      <tbody>
+                        {closed.map(t => {
+                          const pl = (parseFloat(t.exit_amount) || 0) - (parseFloat(t.entry_amount) || 0);
+                          return (
+                            <tr key={t.id}>
+                              <td><strong>{t.ticker}</strong></td>
+                              <td>{new Date(t.entry_date).toLocaleDateString()}</td>
+                              <td>{new Date(t.exit_date).toLocaleDateString()}</td>
+                              <td>${parseFloat(t.entry_amount).toFixed(2)}</td>
+                              <td>${parseFloat(t.exit_amount).toFixed(2)}</td>
+                              <td className={pl >= 0 ? 'pct-pos' : 'pct-neg'}>
+                                {pl >= 0 ? '+' : ''}${pl.toFixed(2)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+                {open.length === 0 && closed.length === 0 && (
+                  <p style={{ textAlign: 'center', color: '#7a9bc0', marginTop: 20 }}>No trades yet.</p>
+                )}
+              </>
+            );
+          })()}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------- ADMIN USERS TAB ----------
+function UsersAdminTab({ currentUserId }) {
+  const [users, setUsers] = useState(null);
+  const [busyId, setBusyId] = useState(null);
+
+  const load = () => {
+    fetch('/api/admin/users')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setUsers(d?.users || []));
+  };
+  useEffect(() => { load(); }, []);
+
+  const updateUser = async (id, payload) => {
+    setBusyId(id);
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, ...payload }),
+      });
+      if (res.ok) load();
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  if (!users) return <div style={{ padding: 40, textAlign: 'center', color: '#7a9bc0' }}>Loading users…</div>;
+
+  const pending = users.filter(u => u.status === 'pending');
+  const approved = users.filter(u => u.status === 'approved');
+  const disabled = users.filter(u => u.status === 'disabled');
+
+  const renderRow = (u) => (
+    <tr key={u.id}>
+      <td>
+        <div className="admin-user-cell">
+          {u.avatar_url ? (
+            <img src={u.avatar_url} alt="" className="admin-avatar" referrerPolicy="no-referrer" />
+          ) : (
+            <span className="admin-avatar admin-avatar-fallback">{(u.display_name || u.email).charAt(0).toUpperCase()}</span>
+          )}
+          <div>
+            <div className="admin-name">
+              {u.display_name || '—'} {u.is_admin && <span className="lb-admin-badge">Admin</span>}
+            </div>
+            <div className="admin-email">{u.email}</div>
+          </div>
+        </div>
+      </td>
+      <td>
+        <span className={`admin-status admin-status-${u.status}`}>{u.status}</span>
+      </td>
+      <td>{new Date(u.created_at).toLocaleDateString()}</td>
+      <td>
+        <div className="admin-actions">
+          {u.status !== 'approved' && (
+            <button className="admin-btn admin-btn-approve" disabled={busyId === u.id}
+              onClick={() => updateUser(u.id, { status: 'approved' })}>Approve</button>
+          )}
+          {u.status !== 'disabled' && u.id !== currentUserId && (
+            <button className="admin-btn admin-btn-disable" disabled={busyId === u.id}
+              onClick={() => updateUser(u.id, { status: 'disabled' })}>Disable</button>
+          )}
+          {u.status === 'disabled' && (
+            <button className="admin-btn admin-btn-approve" disabled={busyId === u.id}
+              onClick={() => updateUser(u.id, { status: 'approved' })}>Re-enable</button>
+          )}
+          {u.id !== currentUserId && (
+            <button className="admin-btn admin-btn-secondary" disabled={busyId === u.id}
+              onClick={() => updateUser(u.id, { is_admin: !u.is_admin })}>
+              {u.is_admin ? 'Remove Admin' : 'Make Admin'}
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+
+  return (
+    <div className="admin-users-tab">
+      <p className="section-hint" style={{ marginLeft: 0, marginTop: 0 }}>
+        Approve new signups, disable access, or promote others to admin. You are the initial admin.
+      </p>
+
+      {pending.length > 0 && (
+        <>
+          <h3 className="admin-section-title">{"\u{23F3}"} Pending approval ({pending.length})</h3>
+          <div className="pt-table-wrap"><table className="pt-table admin-table">
+            <thead><tr><th>User</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody>{pending.map(renderRow)}</tbody>
+          </table></div>
+        </>
+      )}
+
+      <h3 className="admin-section-title">{"\u{2705}"} Approved ({approved.length})</h3>
+      <div className="pt-table-wrap"><table className="pt-table admin-table">
+        <thead><tr><th>User</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        <tbody>{approved.map(renderRow)}</tbody>
+      </table></div>
+
+      {disabled.length > 0 && (
+        <>
+          <h3 className="admin-section-title">{"\u{1F6AB}"} Disabled ({disabled.length})</h3>
+          <div className="pt-table-wrap"><table className="pt-table admin-table">
+            <thead><tr><th>User</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            <tbody>{disabled.map(renderRow)}</tbody>
+          </table></div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1924,11 +2211,29 @@ export default function Dashboard() {
   const [paperTrades, setPaperTrades] = useState([]);
   const [buyModalState, setBuyModalState] = useState(null);   // { alert, currentPrice }
   const [sellModalState, setSellModalState] = useState(null); // { trade, currentPrice }
+  const [profile, setProfile] = useState(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput] = useState('');
   const router = useRouter();
 
   useEffect(() => {
     setWatchlistState(getWatchlist());
     setMcapRange(getMarketCapFilter());
+
+    // Load the logged-in user's profile (Google-auth). If none, send to /
+    fetch('/api/profile')
+      .then(res => {
+        if (res.status === 401) { router.replace('/'); return null; }
+        return res.json();
+      })
+      .then(data => {
+        if (data?.profile) {
+          if (data.profile.status !== 'approved') { router.replace('/pending'); return; }
+          setProfile(data.profile);
+        }
+      })
+      .catch(() => {});
 
     fetch('/api/alerts')
       .then(res => {
@@ -1958,6 +2263,36 @@ export default function Dashboard() {
     const newList = toggleWatchlist(ticker);
     setWatchlistState([...newList]);
   }, []);
+
+  const handleSignOut = useCallback(async () => {
+    try {
+      const { createSupabaseBrowserClient } = await import('../lib/supabase/browser');
+      const supabase = createSupabaseBrowserClient();
+      await supabase.auth.signOut();
+      // Also clear the legacy cookie
+      document.cookie = 'stock_auth=; Path=/; Max-Age=0; SameSite=Lax';
+      router.replace('/');
+    } catch {
+      router.replace('/');
+    }
+  }, [router]);
+
+  const handleSaveDisplayName = useCallback(async () => {
+    const newName = nameInput.trim();
+    if (newName.length < 2) return;
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ display_name: newName }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setProfile(data.profile);
+        setEditingName(false);
+      }
+    } catch {}
+  }, [nameInput]);
 
   const handleRate = useCallback(async (alertId, rating) => {
     // Optimistic update
@@ -2142,7 +2477,9 @@ export default function Dashboard() {
     { id: 'dropped', label: '\u{1F4E6} Dropped', count: droppedPicks.length },
     { id: 'watchlist', label: '\u{2B50} Watchlist', count: watchlistPicks.length },
     { id: 'portfolio', label: '\u{1F4BC} Portfolio', count: paperTrades.filter(t => t.status === 'open').length || null },
+    { id: 'leaderboard', label: '\u{1F3C6} Leaderboard', count: null },
     { id: 'analytics', label: '\u{1F4CA} Analytics', count: null },
+    ...(profile?.is_admin ? [{ id: 'users', label: '\u{1F464} Users', count: null }] : []),
   ];
 
   // Current tab data
@@ -2207,6 +2544,58 @@ export default function Dashboard() {
           >
             {"\u{1F4E7}"} <span className="header-tool-label">Alert List</span>
           </button>
+
+          {/* Profile menu (avatar + name + sign out) */}
+          {profile && (
+            <div className="profile-menu-wrap">
+              <button
+                className="profile-menu-btn"
+                onClick={() => { setProfileMenuOpen(v => !v); setNameInput(profile.display_name || ''); setEditingName(false); }}
+                title="Account"
+              >
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} alt="" className="profile-menu-avatar" referrerPolicy="no-referrer" />
+                ) : (
+                  <span className="profile-menu-avatar profile-menu-avatar-fallback">
+                    {(profile.display_name || profile.email || '?').charAt(0).toUpperCase()}
+                  </span>
+                )}
+                <span className="profile-menu-name">{profile.display_name || profile.email}</span>
+                {profile.is_admin && <span className="profile-menu-admin-badge">ADMIN</span>}
+              </button>
+
+              {profileMenuOpen && (
+                <div className="profile-menu-dropdown" onClick={e => e.stopPropagation()}>
+                  <div className="profile-menu-header">
+                    {profile.avatar_url && <img src={profile.avatar_url} alt="" className="profile-menu-avatar-lg" referrerPolicy="no-referrer" />}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div className="profile-menu-email">{profile.email}</div>
+                      {editingName ? (
+                        <div className="profile-menu-name-edit">
+                          <input
+                            type="text"
+                            value={nameInput}
+                            onChange={e => setNameInput(e.target.value)}
+                            maxLength={40}
+                            placeholder="Display name"
+                            autoFocus
+                          />
+                          <button onClick={handleSaveDisplayName}>Save</button>
+                          <button onClick={() => setEditingName(false)}>Cancel</button>
+                        </div>
+                      ) : (
+                        <div className="profile-menu-name-row">
+                          <span>{profile.display_name || 'No name set'}</span>
+                          <button className="profile-menu-edit-btn" onClick={() => setEditingName(true)}>Edit</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <button className="profile-menu-signout" onClick={handleSignOut}>Sign out</button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
@@ -2348,6 +2737,10 @@ export default function Dashboard() {
           onSell={handleOpenSellModal}
           onDelete={handleDeleteTrade}
         />
+      ) : activeTab === 'leaderboard' ? (
+        <LeaderboardTab alerts={alerts} currentUserId={profile?.id} />
+      ) : activeTab === 'users' && profile?.is_admin ? (
+        <UsersAdminTab currentUserId={profile.id} />
       ) : (
         <>
           {/* Tab description */}
