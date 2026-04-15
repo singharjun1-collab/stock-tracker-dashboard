@@ -547,7 +547,6 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
         <span className="meta-tag">{alert.signal_type}</span>
       </div>
 
-      <SparklineChart prices={alert.prices} canvasId={`${sectionPrefix}-spark-${index}`} />
       <HistoricChart ticker={alert.ticker} canvasId={`${sectionPrefix}-hist-${index}`} />
 
       {alert.recommendation && (
