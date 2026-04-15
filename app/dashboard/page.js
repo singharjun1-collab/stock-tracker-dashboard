@@ -1576,8 +1576,46 @@ export default function Dashboard() {
   return (
     <>
       <header className="header">
-        <h1>{"\u{1F4C8}"} Social Stock <span>Intelligence Monitor</span></h1>
-        <div className="subtitle">Last updated: {dateStr} {"\u{B7}"} Auto-scan complete</div>
+        <div className="header-main">
+          <h1>{"\u{1F4C8}"} Social Stock <span>Intelligence Monitor</span></h1>
+          <div className="subtitle">Last updated: {dateStr} {"\u{B7}"} Auto-scan complete</div>
+        </div>
+        <div className="header-tools">
+          <button
+            className={`header-tool-btn ${showArchive ? 'active' : ''}`}
+            onClick={() => {
+              const next = !showArchive;
+              setShowArchive(next);
+              if (next) setTimeout(() => document.getElementById('archive-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+            }}
+            title="Show full archive of all historical picks"
+          >
+            {"\u{1F4C2}"} <span className="header-tool-label">Archive</span>
+            <span className="header-tool-badge">{alerts.length}</span>
+          </button>
+          <button
+            className={`header-tool-btn ${showAISettings ? 'active' : ''}`}
+            onClick={() => {
+              const next = !showAISettings;
+              setShowAISettings(next);
+              if (next) setTimeout(() => document.getElementById('ai-settings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+            }}
+            title="Manage AI engine settings"
+          >
+            {"\u{2699}\u{FE0F}"} <span className="header-tool-label">AI Settings</span>
+          </button>
+          <button
+            className={`header-tool-btn ${showDistList ? 'active' : ''}`}
+            onClick={() => {
+              const next = !showDistList;
+              setShowDistList(next);
+              if (next) setTimeout(() => document.getElementById('dist-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+            }}
+            title="Manage signal change email alerts"
+          >
+            {"\u{1F4E7}"} <span className="header-tool-label">Alert List</span>
+          </button>
+        </div>
       </header>
 
       {/* QUICK SCAN TABLE (sortable, top-of-dashboard at-a-glance view) */}
@@ -1743,11 +1781,10 @@ export default function Dashboard() {
       )}
 
       {/* FULL ARCHIVE TABLE */}
-      <div className="archive-section">
-        <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4C5}"} Full Archive {"\u{2014}"} All Historical Picks</p>
-        <button className="archive-toggle-btn" onClick={() => setShowArchive(!showArchive)}>
-          {"\u{1F4C2}"} {showArchive ? 'Hide' : 'Show'} Archive ({alerts.length} total)
-        </button>
+      <div className="archive-section" id="archive-section">
+        {showArchive && (
+          <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4C5}"} Full Archive {"\u{2014}"} All Historical Picks ({alerts.length} total) <button className="section-close-btn" onClick={() => setShowArchive(false)}>{"\u{2715}"} Close</button></p>
+        )}
         {showArchive && (
           <div className="archive-table-wrap">
             <table>
@@ -1842,19 +1879,23 @@ export default function Dashboard() {
       </div>
 
       {/* AI ENGINE SETTINGS */}
-      <div className="archive-section">
-        <button className="archive-toggle-btn ai-settings-toggle" onClick={() => setShowAISettings(!showAISettings)}>
-          {"\u{2699}\u{FE0F}"} {showAISettings ? 'Hide' : 'Manage'} AI Engine Settings
-        </button>
-        {showAISettings && <AISettingsPanel settings={aiSettings} onSave={handleSaveAISetting} />}
+      <div className="archive-section" id="ai-settings-section">
+        {showAISettings && (
+          <>
+            <p className="section-title" style={{ marginLeft: 0 }}>{"\u{2699}\u{FE0F}"} AI Engine Settings <button className="section-close-btn" onClick={() => setShowAISettings(false)}>{"\u{2715}"} Close</button></p>
+            <AISettingsPanel settings={aiSettings} onSave={handleSaveAISetting} />
+          </>
+        )}
       </div>
 
       {/* DISTRIBUTION LIST */}
-      <div className="archive-section">
-        <button className="archive-toggle-btn" onClick={() => setShowDistList(!showDistList)}>
-          {"\u{1F4E7}"} {showDistList ? 'Hide' : 'Manage'} Signal Change Alert List
-        </button>
-        {showDistList && <DistributionListManager />}
+      <div className="archive-section" id="dist-list-section">
+        {showDistList && (
+          <>
+            <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4E7}"} Signal Change Alert List <button className="section-close-btn" onClick={() => setShowDistList(false)}>{"\u{2715}"} Close</button></p>
+            <DistributionListManager />
+          </>
+        )}
       </div>
 
       <footer>

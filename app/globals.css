@@ -52,11 +52,87 @@ body {
 .header {
   background: linear-gradient(135deg, #0d1b2a 0%, #1a2744 100%);
   border-bottom: 1px solid #1e3a5f;
-  padding: 28px 40px; text-align: center;
+  padding: 24px 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
 }
-.header h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.5px; }
+.header-main { flex: 1; text-align: left; min-width: 260px; }
+.header h1 { font-size: 2.1rem; font-weight: 700; letter-spacing: -0.5px; margin: 0; }
 .header h1 span { color: #4fc3f7; }
 .header .subtitle { margin-top: 6px; font-size: 0.85rem; color: #7a9bc0; }
+
+.header-tools {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.header-tool-btn {
+  background: rgba(15, 29, 48, 0.85);
+  border: 1px solid rgba(79, 195, 247, 0.3);
+  color: #4fc3f7;
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.header-tool-btn:hover {
+  background: rgba(79, 195, 247, 0.12);
+  border-color: rgba(79, 195, 247, 0.6);
+  color: #e6f3ff;
+  transform: translateY(-1px);
+}
+.header-tool-btn.active {
+  background: rgba(79, 195, 247, 0.18);
+  border-color: #4fc3f7;
+  color: #e6f3ff;
+  box-shadow: 0 0 12px rgba(79, 195, 247, 0.25);
+}
+.header-tool-badge {
+  background: rgba(79, 195, 247, 0.2);
+  color: #a0c0dc;
+  font-size: 0.7rem;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+.header-tool-btn.active .header-tool-badge {
+  background: rgba(255, 255, 255, 0.15);
+  color: #e6f3ff;
+}
+
+.section-close-btn {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  color: #ef4444;
+  padding: 4px 10px;
+  margin-left: 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+}
+.section-close-btn:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .header { padding: 18px 16px; }
+  .header h1 { font-size: 1.5rem; }
+  .header-tool-label { display: none; }
+  .header-tool-btn { padding: 8px 10px; }
+}
 
 /* ── STATS BAR ── */
 .stats-bar { display: flex; gap: 16px; padding: 20px 40px; flex-wrap: wrap; }
