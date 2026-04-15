@@ -2,6 +2,46 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import '../globals.css';
+import { SIGNAL_WEIGHTS, SIGNAL_BUCKETS, bucketFor } from '../lib/signalStrength';
+
+// ── Signal Strength Bars (wifi-style) ──
+function SignalBars({ score, subScores, sourceCount, mentionCount }) {
+  const s = Math.max(0, Math.min(100, Math.round(score || 0)));
+  const bucket = bucketFor(s);
+  const cls =
+    bucket.bars === 4 ? 'ss-very-strong' :
+    bucket.bars === 3 ? 'ss-strong' :
+    bucket.bars === 2 ? 'ss-moderate' : 'ss-weak';
+
+  return (
+    <div
+      className={`signal-bars-wrap ${cls}`}
+      style={{ '--signal-color': bucket.color }}
+      title={`Signal strength: ${bucket.label} (${s}/100)`}
+    >
+      <span className="signal-bars">
+        {[1, 2, 3, 4].map(n => (
+          <span key={n} className={`bar b${n}${n <= bucket.bars ? ' on' : ''}`} />
+        ))}
+      </span>
+      <span className="signal-bars-label">{bucket.label}</span>
+      <span className="signal-bars-score">{s}/100</span>
+      <div className="signal-bars-tooltip">
+        <div className="tt-title">{"\u{1F4F6}"} {bucket.label} — {s}/100</div>
+        <div className="tt-row"><span>Unique sources</span><span>{sourceCount ?? '\u{2014}'}</span></div>
+        <div className="tt-row"><span>Total mentions</span><span>{mentionCount ?? '\u{2014}'}</span></div>
+        {subScores && (
+          <>
+            <div className="tt-row"><span>Source score (30%)</span><span>{subScores.source}/100</span></div>
+            <div className="tt-row"><span>Mention score (25%)</span><span>{subScores.mention}/100</span></div>
+            <div className="tt-row"><span>Velocity score (25%)</span><span>{subScores.velocity}/100</span></div>
+            <div className="tt-row"><span>Sentiment score (20%)</span><span>{subScores.sentiment}/100</span></div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ── Helpers ──
 function getStatus(pct) {
@@ -464,6 +504,16 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
         )}
       </div>
 
+      {/* SIGNAL STRENGTH */}
+      <div className="card-source-row" style={{ marginTop: '4px' }}>
+        <SignalBars
+          score={alert.signal_strength}
+          subScores={alert.signal_sub_scores}
+          sourceCount={alert.signal_source_count}
+          mentionCount={alert.signal_mention_count}
+        />
+      </div>
+
       {/* ALERT DATE & PRICE BANNER */}
       <div className="alert-date-banner">
         <div className="alert-date-item">
@@ -838,6 +888,88 @@ function AISettingsPanel({ settings, onSave }) {
           </div>
         </div>
       </div>
+
+      {/* ── Signal Strength reference table ── */}
+      <div className="ai-settings-section">
+        <div className="ai-setting-row">
+          <div className="ai-setting-info">
+            <span className="ai-setting-name">{"\u{1F4F6}"} Signal Strength &mdash; How It&apos;s Calculated</span>
+            <span className="ai-setting-desc">
+              Every pick gets a 0&ndash;100 score that blends four ingredients.
+              Picks are sorted strongest-first on the dashboard. This table is
+              reference-only; scoring logic lives in <code>app/lib/signalStrength.js</code>.
+            </span>
+          </div>
+        </div>
+
+        <div style={{ padding: '0 16px 16px' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', marginBottom: 6 }}>
+            Weight mix (totals 100%)
+          </div>
+          <table className="sigweights-table">
+            <thead>
+              <tr><th>Ingredient</th><th>Weight</th><th>What it measures</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Unique sources</td>
+                <td>{Math.round(SIGNAL_WEIGHTS.source_count * 100)}%</td>
+                <td>Distinct platforms mentioning the ticker (Reddit, WSB, StockTwits, Yahoo, Polymarket, analyst reports)</td>
+              </tr>
+              <tr>
+                <td>Mention volume</td>
+                <td>{Math.round(SIGNAL_WEIGHTS.mention_count * 100)}%</td>
+                <td>Total alerts + signal-change events for this ticker across the scan window</td>
+              </tr>
+              <tr>
+                <td>Velocity</td>
+                <td>{Math.round(SIGNAL_WEIGHTS.velocity * 100)}%</td>
+                <td>How fast the move is accelerating &mdash; latest day&apos;s % change vs. prior days&apos; average</td>
+              </tr>
+              <tr>
+                <td>Sentiment + analyst</td>
+                <td>{Math.round(SIGNAL_WEIGHTS.sentiment * 100)}%</td>
+                <td>AI recommendation (Buy/Hold/Sell) blended with Yahoo analyst consensus when available</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'rgba(255,255,255,0.8)', margin: '18px 0 6px' }}>
+            Score buckets
+          </div>
+          <table className="sigweights-table">
+            <thead>
+              <tr><th>Bars</th><th>Label</th><th>Score range</th></tr>
+            </thead>
+            <tbody>
+              {SIGNAL_BUCKETS.slice().reverse().map(b => (
+                <tr key={b.label}>
+                  <td>
+                    <span className="signal-bars" style={{ '--signal-color': b.color }}>
+                      {[1,2,3,4].map(n => (
+                        <span key={n} className={`bar b${n}${n <= b.bars ? ' on' : ''}`} style={{ background: n <= b.bars ? b.color : undefined, boxShadow: n <= b.bars ? `0 0 6px ${b.color}` : undefined }} />
+                      ))}
+                    </span>
+                  </td>
+                  <td>
+                    <span className="sigweights-bucket-cell">
+                      <span className="sigweights-bucket-dot" style={{ background: b.color }}></span>
+                      {b.label}
+                    </span>
+                  </td>
+                  <td>{b.min}&ndash;{b.max}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          <div style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', marginTop: 10, lineHeight: 1.5 }}>
+            {"\u{1F4A1}"} The dashboard computes signal strength live from Supabase data on every page load,
+            so the last 7 days of picks are already scored &mdash; no backfill needed.
+            Hover any signal-strength badge on a pick card to see its sub-scores.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1063,7 +1195,11 @@ export default function Dashboard() {
     return latest?.pct_change || 0;
   }, []);
 
+  // Sort picks STRONGEST-FIRST by signal_strength, then performance as a tiebreaker.
   const sortByPerf = (list) => [...list].sort((a, b) => {
+    const ssa = a.signal_strength ?? 0;
+    const ssb = b.signal_strength ?? 0;
+    if (ssb !== ssa) return ssb - ssa;
     const pa = getLatestPct(a);
     const pb = getLatestPct(b);
     const sa = getStatus(pa) === 'win' ? 0 : getStatus(pa) === 'neutral' ? 1 : 2;

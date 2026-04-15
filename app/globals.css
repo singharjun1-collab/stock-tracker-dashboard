@@ -917,3 +917,119 @@ footer span { color: #4fc3f7; }
 @media (max-width: 768px) {
   .movers-row { flex-direction: column; padding: 0 16px; }
 }
+
+/* ────────────────────────────────────
+   SIGNAL STRENGTH BARS (wifi-style)
+   ──────────────────────────────────── */
+.signal-bars-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  cursor: help;
+  position: relative;
+}
+.signal-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 16px;
+}
+.signal-bars .bar {
+  width: 4px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 1px;
+  transition: background 0.2s;
+}
+.signal-bars .bar.b1 { height: 4px; }
+.signal-bars .bar.b2 { height: 8px; }
+.signal-bars .bar.b3 { height: 12px; }
+.signal-bars .bar.b4 { height: 16px; }
+.signal-bars .bar.on  { background: var(--signal-color, #00e676); box-shadow: 0 0 6px var(--signal-color, #00e676); }
+.signal-bars-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--signal-color, #00e676);
+  text-transform: uppercase;
+}
+.signal-bars-score {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.5);
+  font-weight: 600;
+  margin-left: 2px;
+}
+.signal-bars-wrap.ss-very-strong { border-color: rgba(0,230,118,0.4); }
+.signal-bars-wrap.ss-very-strong .signal-bars-label { animation: ss-pulse 1.8s ease-in-out infinite; }
+@keyframes ss-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+/* Tooltip */
+.signal-bars-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  padding: 10px 12px;
+  background: #1a1f2e;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.5);
+  font-size: 0.75rem;
+  color: #e4e7ed;
+  z-index: 50;
+  display: none;
+  pointer-events: none;
+}
+.signal-bars-wrap:hover .signal-bars-tooltip { display: block; }
+.signal-bars-tooltip .tt-title {
+  font-weight: 800;
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+  color: var(--signal-color, #00e676);
+}
+.signal-bars-tooltip .tt-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 2px 0;
+}
+.signal-bars-tooltip .tt-row span:first-child { color: rgba(255,255,255,0.6); }
+.signal-bars-tooltip .tt-row span:last-child { font-weight: 700; }
+
+/* Signal Strength reference table in settings */
+.sigweights-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 0.85rem;
+}
+.sigweights-table th,
+.sigweights-table td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.sigweights-table th {
+  background: rgba(255,255,255,0.03);
+  font-weight: 700;
+  color: rgba(255,255,255,0.7);
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  letter-spacing: 0.5px;
+}
+.sigweights-table tr:last-child td { border-bottom: none; }
+.sigweights-bucket-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+.sigweights-bucket-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-block;
+}
