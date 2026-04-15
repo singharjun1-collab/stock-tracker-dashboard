@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient, getCurrentProfile } from '@/app/lib/supabase/server';
+import { sendApprovedEmail } from '@/app/lib/email';
+
+// Force Node.js runtime so nodemailer (which uses `net`/`tls`) works.
+export const runtime = 'nodejs';
 
 async function requireAdmin() {
   const profile = await getCurrentProfile();
@@ -48,6 +52,14 @@ export async function PATCH(request) {
     }
 
     const supabase = createSupabaseServerClient();
+
+    // Grab the prior state so we know if this is a transition into "approved".
+    const { data: prior } = await supabase
+      .from('profiles')
+      .select('status, email, display_name, approved_email_sent_at')
+      .eq('id', id)
+      .single();
+
     const { data, error: dbErr } = await supabase
       .from('profiles')
       .update(update)
@@ -55,6 +67,30 @@ export async function PATCH(request) {
       .select()
       .single();
     if (dbErr) throw dbErr;
+
+    // If we just approved someone who wasn't approved before (and we haven't
+    // already emailed them), send the "you're in" email.
+    const justApproved =
+      status === 'approved' &&
+      prior?.status !== 'approved' &&
+      !prior?.approved_email_sent_at;
+
+    if (justApproved) {
+      try {
+        await sendApprovedEmail({
+          userEmail: prior?.email || data?.email,
+          userName: prior?.display_name || data?.display_name,
+        });
+        await supabase
+          .from('profiles')
+          .update({ approved_email_sent_at: new Date().toISOString() })
+          .eq('id', id);
+      } catch (emailErr) {
+        // Don't fail the API call if the email hiccups.
+        console.error('[admin/users] approval email failed:', emailErr);
+      }
+    }
+
     return NextResponse.json({ user: data });
   } catch (e) {
     console.error('Admin update error:', e);

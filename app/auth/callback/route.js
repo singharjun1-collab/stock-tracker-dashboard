@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { sendNewSignupAlert } from '@/app/lib/email';
+
+// Force Node.js runtime so nodemailer (which uses `net`/`tls`) works.
+export const runtime = 'nodejs';
 
 // Handles the OAuth redirect after Google sign-in.
 // Uses the canonical @supabase/ssr request/response cookie pattern so the
@@ -57,9 +61,28 @@ export async function GET(request) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('status, is_admin')
+    .select('status, is_admin, signup_notified_at, display_name, email')
     .eq('id', user.id)
     .single();
+
+  // Fire off a one-time "new signup" email to the admin.
+  // `signup_notified_at` is null until we've sent the alert, so we never
+  // spam the admin if the user signs in multiple times while still pending.
+  if (profile && profile.status === 'pending' && !profile.signup_notified_at) {
+    try {
+      await sendNewSignupAlert({
+        userEmail: profile.email || user.email,
+        userName: profile.display_name || user.user_metadata?.full_name,
+      });
+      await supabase
+        .from('profiles')
+        .update({ signup_notified_at: new Date().toISOString() })
+        .eq('id', user.id);
+    } catch (e) {
+      // Don't block sign-in if the alert fails.
+      console.error('[auth/callback] signup alert failed:', e);
+    }
+  }
 
   // Update the redirect location based on approval status, but keep all
   // cookies that were set on `response` above.
