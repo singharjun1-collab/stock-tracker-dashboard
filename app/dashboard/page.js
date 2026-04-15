@@ -2067,7 +2067,7 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
     { key: 'company',          label: 'Company' },
     { key: 'status',           label: 'Status' },
     { key: 'alert_date',       label: 'Date' },
-    { key: 'days_held',        label: 'Days Held' },
+    { key: 'days_held',        label: 'Days Since Alert' },
     { key: 'source',           label: 'Source' },
     { key: 'signal_type',      label: 'Signal Type' },
     { key: 'signal_strength',  label: 'Signal Strength' },
