@@ -1,15 +1,37 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
 import { createSupabaseServerClient, getCurrentProfile } from '@/app/lib/supabase/server';
 
 // GET the current user's profile (used by dashboard to render avatar + display name)
 export async function GET(request) {
-  // Diagnostic logging (kept lightweight) — helps verify the fix in production logs
-  try {
-    const names = cookies().getAll().map(c => c.name);
-    console.log('[profile] cookies seen:', names.filter(n => n.startsWith('sb-') || n === 'stock_auth').join(','));
-  } catch {}
+  const url = new URL(request.url);
+  const debug = url.searchParams.get('debug') === '1';
+
+  if (debug) {
+    // Detailed diagnostic — returns server view of cookies + auth state
+    const allCookies = cookies().getAll();
+    const supabase = createSupabaseServerClient();
+    const { data: userData, error: userErr } = await supabase.auth.getUser();
+    const { data: sessData, error: sessErr } = await supabase.auth.getSession();
+    return NextResponse.json({
+      cookieCount: allCookies.length,
+      cookieNames: allCookies.map(c => c.name),
+      sbCookieValueSample: allCookies
+        .filter(c => c.name.startsWith('sb-'))
+        .map(c => ({ name: c.name, len: c.value.length, prefix: c.value.slice(0, 20) })),
+      hasUser: !!userData?.user,
+      userEmail: userData?.user?.email || null,
+      userErr: userErr?.message || null,
+      hasSession: !!sessData?.session,
+      sessErr: sessErr?.message || null,
+      env: {
+        hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+        urlPrefix: (process.env.NEXT_PUBLIC_SUPABASE_URL || '').slice(0, 40),
+        keyLen: (process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '').length,
+      },
+    });
+  }
 
   const profile = await getCurrentProfile();
   if (!profile) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
