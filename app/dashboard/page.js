@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import '../globals.css';
 import { SIGNAL_WEIGHTS, SIGNAL_BUCKETS, bucketFor } from '../lib/signalStrength';
@@ -1256,6 +1256,8 @@ function BuyTradeModal({ alert, currentPrice, onClose, onConfirm }) {
 // ── Paper Trade Sell Modal ──
 function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
   const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(2) : '');
+  const [verdict, setVerdict] = useState('');
+  const [reviewNotes, setReviewNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -1272,12 +1274,23 @@ function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
     setSaving(true);
     setError('');
     try {
-      await onConfirm({ price: priceNum });
+      await onConfirm({
+        price: priceNum,
+        ai_review_verdict: verdict || null,
+        ai_review_notes: reviewNotes.trim() || null,
+      });
     } catch (e) {
       setError(e.message || 'Failed to close trade');
       setSaving(false);
     }
   };
+
+  const verdictOptions = [
+    { value: 'right', label: '\u2705 Right', hint: 'AI nailed the call' },
+    { value: 'partial', label: '\u{1F7E1} Partial', hint: 'Partly right' },
+    { value: 'wrong', label: '\u274C Wrong', hint: 'AI was off' },
+    { value: 'unclear', label: '\u2754 Unclear', hint: 'Hard to say' },
+  ];
 
   return (
     <div className="pt-modal-backdrop" onClick={onClose}>
@@ -1331,6 +1344,46 @@ function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
             </div>
           </div>
 
+          {/* Post-trade AI review — feedback loop */}
+          <div className="pt-review-block">
+            <div className="pt-review-title">
+              {"\u{1F3AF}"} Post-trade review
+              <span className="pt-review-optional">optional</span>
+            </div>
+            <div className="pt-review-sub">
+              Looking back, was the AI recommendation at entry right?
+              {trade.ai_recommendation_at_entry && (
+                <> AI said <strong>{recLabel(trade.ai_recommendation_at_entry)}</strong>
+                {trade.signal_strength_at_entry != null && (
+                  <> &middot; strength <strong>{Math.round(parseFloat(trade.signal_strength_at_entry))}/100</strong></>
+                )}.</>
+              )}
+            </div>
+            <div className="pt-review-chips">
+              {verdictOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`pt-review-chip ${verdict === opt.value ? 'selected' : ''}`}
+                  onClick={() => setVerdict(verdict === opt.value ? '' : opt.value)}
+                  title={opt.hint}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <label className="pt-review-notes-label">
+              Lesson / what happened <span className="pt-review-optional">optional</span>
+            </label>
+            <textarea
+              className="pt-review-notes"
+              value={reviewNotes}
+              onChange={(e) => setReviewNotes(e.target.value)}
+              placeholder="What did we learn? e.g. 'social surge faded without volume follow-through — wait for confirmation'"
+              rows={3}
+            />
+          </div>
+
           {error && <div className="pt-modal-error">{error}</div>}
         </div>
         <div className="pt-modal-footer">
@@ -1344,8 +1397,176 @@ function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
   );
 }
 
+// ── Post-trade review verdict helpers ──
+function verdictEmoji(v) {
+  return v === 'right' ? '\u2705'
+    : v === 'wrong' ? '\u274C'
+    : v === 'partial' ? '\u{1F7E1}'
+    : v === 'unclear' ? '\u2754'
+    : '';
+}
+function verdictLabel(v) {
+  return v === 'right' ? 'Right'
+    : v === 'wrong' ? 'Wrong'
+    : v === 'partial' ? 'Partial'
+    : v === 'unclear' ? 'Unclear'
+    : '\u2014';
+}
+
+// ── Expandable row drawer shown under a portfolio position ──
+function TradeDetailDrawer({ trade, onUpdateReview }) {
+  const isClosed = trade.status === 'closed';
+
+  // Editable review state (for closed trades only).
+  const [verdict, setVerdict] = useState(trade.ai_review_verdict || '');
+  const [reviewNotes, setReviewNotes] = useState(trade.ai_review_notes || '');
+  const [saving, setSaving] = useState(false);
+  const [savedMsg, setSavedMsg] = useState('');
+
+  const dirty = (verdict || '') !== (trade.ai_review_verdict || '')
+    || (reviewNotes || '') !== (trade.ai_review_notes || '');
+
+  const handleSave = async () => {
+    if (!onUpdateReview) return;
+    setSaving(true);
+    setSavedMsg('');
+    try {
+      await onUpdateReview(trade.id, {
+        verdict: verdict || null,
+        notes: reviewNotes.trim() || null,
+      });
+      setSavedMsg('Saved');
+      setTimeout(() => setSavedMsg(''), 1800);
+    } catch (e) {
+      setSavedMsg('Failed: ' + (e.message || 'unknown'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const strength = trade.signal_strength_at_entry != null
+    ? Math.round(parseFloat(trade.signal_strength_at_entry))
+    : null;
+  const rec = trade.ai_recommendation_at_entry || null;
+  const mcap = trade.market_cap_at_entry != null
+    ? parseFloat(trade.market_cap_at_entry)
+    : null;
+  const formatMcap = (m) => m == null ? null
+    : m >= 1000 ? `$${(m / 1000).toFixed(2)}B`
+    : m >= 1 ? `$${m.toFixed(2)}B`
+    : `$${(m * 1000).toFixed(0)}M`;
+
+  const verdictOptions = [
+    { value: 'right', label: '\u2705 Right' },
+    { value: 'partial', label: '\u{1F7E1} Partial' },
+    { value: 'wrong', label: '\u274C Wrong' },
+    { value: 'unclear', label: '\u2754 Unclear' },
+  ];
+
+  return (
+    <div className="pt-drawer">
+      <div className="pt-drawer-grid">
+        {/* 1. Your notes */}
+        <section className="pt-drawer-section">
+          <div className="pt-drawer-heading">{"\u{1F4DD}"} Your notes at buy</div>
+          {trade.notes && trade.notes.trim() ? (
+            <p className="pt-drawer-note">{trade.notes}</p>
+          ) : (
+            <p className="pt-drawer-empty">No notes captured at buy.</p>
+          )}
+        </section>
+
+        {/* 2. AI reasoning at entry (frozen snapshot) */}
+        <section className="pt-drawer-section">
+          <div className="pt-drawer-heading">
+            {"\u{1F916}"} AI reasoning @ entry
+            <span className="pt-drawer-frozen" title="Frozen snapshot from the moment you bought — won't change if the AI re-rates the stock.">snapshot</span>
+          </div>
+          <div className="pt-drawer-chips">
+            {rec && <span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span>}
+            {strength != null && <span className="pt-drawer-chip">Strength {strength}/100</span>}
+            {trade.signal_type_at_entry && <span className="pt-drawer-chip">{trade.signal_type_at_entry}</span>}
+            {trade.source_at_entry && <span className="pt-drawer-chip">{trade.source_at_entry}</span>}
+            {mcap != null && <span className="pt-drawer-chip">Mcap {formatMcap(mcap)}</span>}
+            {trade.forecast_sell_date_at_entry && (
+              <span className="pt-drawer-chip">
+                Target sell: {new Date(trade.forecast_sell_date_at_entry).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              </span>
+            )}
+          </div>
+          {trade.recommendation_reason_at_entry && (
+            <div className="pt-drawer-reason">
+              <div className="pt-drawer-reason-label">Why BUY:</div>
+              <p>{trade.recommendation_reason_at_entry}</p>
+            </div>
+          )}
+          {trade.alert_reason_at_entry && (
+            <div className="pt-drawer-reason">
+              <div className="pt-drawer-reason-label">Catalyst / signal:</div>
+              <p>{trade.alert_reason_at_entry}</p>
+            </div>
+          )}
+          {!trade.recommendation_reason_at_entry && !trade.alert_reason_at_entry && (
+            <p className="pt-drawer-empty">No AI reasoning captured for this entry.</p>
+          )}
+        </section>
+
+        {/* 3. Post-trade review — only for closed trades */}
+        {isClosed && (
+          <section className="pt-drawer-section pt-drawer-review">
+            <div className="pt-drawer-heading">
+              {"\u{1F3AF}"} Post-trade review
+              <span className="pt-drawer-frozen">feedback loop</span>
+            </div>
+            <div className="pt-drawer-sub">
+              Looking back, was the AI call at entry right? Your notes feed back into tuning future picks.
+            </div>
+            <div className="pt-review-chips">
+              {verdictOptions.map(opt => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className={`pt-review-chip ${verdict === opt.value ? 'selected' : ''}`}
+                  onClick={() => setVerdict(verdict === opt.value ? '' : opt.value)}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="pt-review-notes"
+              value={reviewNotes}
+              onChange={(e) => setReviewNotes(e.target.value)}
+              placeholder="What did we learn? (e.g. social surge faded without volume follow-through)"
+              rows={3}
+            />
+            <div className="pt-drawer-review-actions">
+              <button
+                className="pt-btn-primary"
+                disabled={!dirty || saving}
+                onClick={handleSave}
+              >
+                {saving ? 'Saving\u2026' : 'Save review'}
+              </button>
+              {savedMsg && <span className="pt-drawer-saved">{savedMsg}</span>}
+              {trade.ai_review_at && !dirty && (
+                <span className="pt-drawer-saved-at">
+                  Last reviewed {new Date(trade.ai_review_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                </span>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ── Portfolio Tab ──
-function PortfolioTab({ trades, alerts, onSell, onDelete, onBuyFromWatchlist }) {
+function PortfolioTab({ trades, alerts, onSell, onDelete, onBuyFromWatchlist, onUpdateReview }) {
+  const [expandedId, setExpandedId] = useState(null);
+  const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id);
+
   const getLatest = (ticker) => {
     const alert = alerts.find(a => a.ticker === ticker);
     if (!alert) return null;
@@ -1482,27 +1703,50 @@ function PortfolioTab({ trades, alerts, onSell, onDelete, onBuyFromWatchlist }) 
                   const pnl = current - invested;
                   const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
                   const rec = t.ai_recommendation_at_entry || 'HOLD';
+                  const isOpen = expandedId === t.id;
+                  const hasNote = !!(t.notes && t.notes.trim());
                   return (
-                    <tr key={t.id}>
-                      <td className="pt-table-ticker">{t.ticker}</td>
-                      <td>{fmtDate(t.entry_date)}</td>
-                      <td>{daysHeld(t)}d</td>
-                      <td>${parseFloat(t.entry_price).toFixed(2)}</td>
-                      <td>{latest != null ? '$' + latest.toFixed(2) : '\u{2014}'}</td>
-                      <td>{parseFloat(t.shares).toFixed(4)}</td>
-                      <td>${invested.toFixed(2)}</td>
-                      <td>${current.toFixed(2)}</td>
-                      <td className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
-                        {fmt$(pnl)} <br />
-                        <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
-                      </td>
-                      <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
-                      <td>
-                        <button className="pt-sell-btn" onClick={() => onSell(t, latest != null ? latest : parseFloat(t.entry_price))}>
-                          {"\u{1F4B0}"} Sell
-                        </button>
-                      </td>
-                    </tr>
+                    <React.Fragment key={t.id}>
+                      <tr className={`pt-row ${isOpen ? 'pt-row-expanded' : ''}`}>
+                        <td className="pt-table-ticker">
+                          <button
+                            type="button"
+                            className="pt-expand-btn"
+                            onClick={() => toggleExpand(t.id)}
+                            aria-expanded={isOpen}
+                            title={hasNote ? t.notes : 'View details'}
+                          >
+                            <span className={`pt-chevron ${isOpen ? 'open' : ''}`}>{"\u25B8"}</span>
+                            {t.ticker}
+                            {hasNote && <span className="pt-note-dot" title="Has notes">{"\u{1F4DD}"}</span>}
+                          </button>
+                        </td>
+                        <td>{fmtDate(t.entry_date)}</td>
+                        <td>{daysHeld(t)}d</td>
+                        <td>${parseFloat(t.entry_price).toFixed(2)}</td>
+                        <td>{latest != null ? '$' + latest.toFixed(2) : '\u{2014}'}</td>
+                        <td>{parseFloat(t.shares).toFixed(4)}</td>
+                        <td>${invested.toFixed(2)}</td>
+                        <td>${current.toFixed(2)}</td>
+                        <td className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
+                          {fmt$(pnl)} <br />
+                          <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
+                        </td>
+                        <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
+                        <td>
+                          <button className="pt-sell-btn" onClick={() => onSell(t, latest != null ? latest : parseFloat(t.entry_price))}>
+                            {"\u{1F4B0}"} Sell
+                          </button>
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="pt-drawer-row">
+                          <td colSpan={11}>
+                            <TradeDetailDrawer trade={t} onUpdateReview={onUpdateReview} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -1540,26 +1784,50 @@ function PortfolioTab({ trades, alerts, onSell, onDelete, onBuyFromWatchlist }) 
                   const pnl = proceeds - invested;
                   const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
                   const rec = t.ai_recommendation_at_entry || 'HOLD';
+                  const isOpen = expandedId === t.id;
+                  const hasNote = !!(t.notes && t.notes.trim());
                   return (
-                    <tr key={t.id}>
-                      <td className="pt-table-ticker">{t.ticker}</td>
-                      <td>{fmtDate(t.entry_date)} {"\u{2192}"} {fmtDate(t.exit_date)}</td>
-                      <td>{daysHeld(t)}d</td>
-                      <td>${parseFloat(t.entry_price).toFixed(2)}</td>
-                      <td>${parseFloat(t.exit_price).toFixed(2)}</td>
-                      <td>${invested.toFixed(2)}</td>
-                      <td>${proceeds.toFixed(2)}</td>
-                      <td className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
-                        {fmt$(pnl)} <br />
-                        <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
-                      </td>
-                      <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
-                      <td>
-                        <button className="pt-delete-btn" onClick={() => { if (confirm('Delete this closed trade permanently?')) onDelete(t.id); }}>
-                          {"\u{1F5D1}"}
-                        </button>
-                      </td>
-                    </tr>
+                    <React.Fragment key={t.id}>
+                      <tr className={`pt-row ${isOpen ? 'pt-row-expanded' : ''}`}>
+                        <td className="pt-table-ticker">
+                          <button
+                            type="button"
+                            className="pt-expand-btn"
+                            onClick={() => toggleExpand(t.id)}
+                            aria-expanded={isOpen}
+                            title={hasNote ? t.notes : 'View details'}
+                          >
+                            <span className={`pt-chevron ${isOpen ? 'open' : ''}`}>{"\u25B8"}</span>
+                            {t.ticker}
+                            {hasNote && <span className="pt-note-dot">{"\u{1F4DD}"}</span>}
+                            {t.ai_review_verdict && <span className={`pt-verdict-dot pt-verdict-${t.ai_review_verdict}`} title={`Reviewed: ${t.ai_review_verdict}`}>{verdictEmoji(t.ai_review_verdict)}</span>}
+                          </button>
+                        </td>
+                        <td>{fmtDate(t.entry_date)} {"\u{2192}"} {fmtDate(t.exit_date)}</td>
+                        <td>{daysHeld(t)}d</td>
+                        <td>${parseFloat(t.entry_price).toFixed(2)}</td>
+                        <td>${parseFloat(t.exit_price).toFixed(2)}</td>
+                        <td>${invested.toFixed(2)}</td>
+                        <td>${proceeds.toFixed(2)}</td>
+                        <td className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
+                          {fmt$(pnl)} <br />
+                          <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
+                        </td>
+                        <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
+                        <td>
+                          <button className="pt-delete-btn" onClick={() => { if (confirm('Delete this closed trade permanently?')) onDelete(t.id); }}>
+                            {"\u{1F5D1}"}
+                          </button>
+                        </td>
+                      </tr>
+                      {isOpen && (
+                        <tr className="pt-drawer-row">
+                          <td colSpan={10}>
+                            <TradeDetailDrawer trade={t} onUpdateReview={onUpdateReview} />
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })}
               </tbody>
@@ -2341,6 +2609,13 @@ export default function Dashboard() {
         signal_strength_at_entry: alert.signal_strength ?? null,
         signal_type_at_entry: alert.signal_type || null,
         notes,
+        // Freeze the AI reasoning at the moment of purchase so audit trail
+        // survives even if the underlying alert is re-rated or dropped.
+        recommendation_reason_at_entry: alert.recommendation_reason || null,
+        alert_reason_at_entry: alert.alert_reason || null,
+        forecast_sell_date_at_entry: alert.forecast_sell_date || null,
+        market_cap_at_entry: alert.market_cap ?? null,
+        source_at_entry: alert.source || null,
       }),
     });
     if (!res.ok) throw new Error('Server rejected the trade');
@@ -2349,12 +2624,17 @@ export default function Dashboard() {
     setBuyModalState(null);
   }, [buyModalState]);
 
-  const handleConfirmSell = useCallback(async ({ price }) => {
+  const handleConfirmSell = useCallback(async ({ price, ai_review_verdict, ai_review_notes }) => {
     const { trade } = sellModalState;
     const res = await fetch('/api/paper-trades', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: trade.id, exit_price: price }),
+      body: JSON.stringify({
+        id: trade.id,
+        exit_price: price,
+        ai_review_verdict: ai_review_verdict ?? null,
+        ai_review_notes: ai_review_notes ?? null,
+      }),
     });
     if (!res.ok) throw new Error('Server rejected the sell');
     const data = await res.json();
@@ -2367,6 +2647,24 @@ export default function Dashboard() {
   const handleDeleteTrade = useCallback(async (id) => {
     const res = await fetch(`/api/paper-trades?id=${id}`, { method: 'DELETE' });
     if (res.ok) setPaperTrades(prev => prev.filter(t => t.id !== id));
+  }, []);
+
+  // Save / edit the AI review on an already-closed trade (post-trade feedback loop).
+  const handleUpdateReview = useCallback(async (id, { verdict, notes }) => {
+    const res = await fetch('/api/paper-trades', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        ai_review_verdict: verdict ?? null,
+        ai_review_notes: notes ?? null,
+      }),
+    });
+    if (!res.ok) throw new Error('Failed to save review');
+    const data = await res.json();
+    if (data?.trade) {
+      setPaperTrades(prev => prev.map(t => t.id === data.trade.id ? data.trade : t));
+    }
   }, []);
 
   const handleJumpToCard = useCallback((alert) => {
@@ -2735,6 +3033,7 @@ export default function Dashboard() {
           alerts={alerts}
           onSell={handleOpenSellModal}
           onDelete={handleDeleteTrade}
+          onUpdateReview={handleUpdateReview}
         />
       ) : activeTab === 'leaderboard' ? (
         <LeaderboardTab alerts={alerts} currentUserId={profile?.id} />

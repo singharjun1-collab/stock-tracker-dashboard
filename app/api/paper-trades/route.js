@@ -34,6 +34,12 @@ export async function POST(request) {
     const {
       ticker, company, alert_id, entry_price, entry_amount,
       ai_recommendation_at_entry, signal_strength_at_entry, signal_type_at_entry, notes,
+      // AI reasoning snapshot (frozen at entry for audit)
+      recommendation_reason_at_entry,
+      alert_reason_at_entry,
+      forecast_sell_date_at_entry,
+      market_cap_at_entry,
+      source_at_entry,
     } = body;
 
     if (!ticker || !entry_price || !entry_amount) {
@@ -61,6 +67,11 @@ export async function POST(request) {
         signal_strength_at_entry: signal_strength_at_entry || null,
         signal_type_at_entry: signal_type_at_entry || null,
         notes: notes || null,
+        recommendation_reason_at_entry: recommendation_reason_at_entry || null,
+        alert_reason_at_entry: alert_reason_at_entry || null,
+        forecast_sell_date_at_entry: forecast_sell_date_at_entry || null,
+        market_cap_at_entry: market_cap_at_entry ?? null,
+        source_at_entry: source_at_entry || null,
       })
       .select()
       .single();
@@ -80,7 +91,7 @@ export async function PATCH(request) {
 
   try {
     const body = await request.json();
-    const { id, exit_price, notes } = body;
+    const { id, exit_price, notes, ai_review_verdict, ai_review_notes } = body;
     if (!id) return NextResponse.json({ error: 'Missing trade id' }, { status: 400 });
 
     const supabase = createSupabaseServerClient();
@@ -108,6 +119,21 @@ export async function PATCH(request) {
     }
 
     if (notes !== undefined) update.notes = notes;
+
+    if (ai_review_verdict !== undefined || ai_review_notes !== undefined) {
+      if (ai_review_verdict !== undefined && ai_review_verdict !== null
+          && !['right', 'wrong', 'partial', 'unclear'].includes(ai_review_verdict)) {
+        return NextResponse.json({ error: 'Invalid review verdict' }, { status: 400 });
+      }
+      if (ai_review_verdict !== undefined) update.ai_review_verdict = ai_review_verdict || null;
+      if (ai_review_notes !== undefined) update.ai_review_notes = ai_review_notes || null;
+      update.ai_review_at = new Date().toISOString();
+    }
+
+    // Guard: require at least one actual field change beyond updated_at
+    if (Object.keys(update).length === 1) {
+      return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    }
 
     const { data, error: dbErr } = await supabase
       .from('paper_trades')
