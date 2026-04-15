@@ -1033,3 +1033,219 @@ footer span { color: #4fc3f7; }
   width: 10px; height: 10px; border-radius: 50%;
   display: inline-block;
 }
+
+/* ──────────────────────────────────────────────────────── */
+/* Quick Scan Table (top-of-dashboard sortable overview)     */
+/* ──────────────────────────────────────────────────────── */
+.quicktable-section {
+  margin: 20px 0 28px;
+  background: linear-gradient(180deg, rgba(15, 28, 45, 0.85) 0%, rgba(10, 20, 35, 0.85) 100%);
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 14px;
+  padding: 18px 20px 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+.quicktable-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.quicktable-title {
+  margin: 0;
+  font-size: 1.2rem;
+  color: #e6f3ff;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.quicktable-count {
+  font-size: 0.75rem;
+  color: #7a9bc0;
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  padding: 2px 10px;
+  border-radius: 20px;
+  font-weight: 600;
+}
+.quicktable-hint {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: #6a89a8;
+}
+.quicktable-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.quicktable-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 8px;
+  padding: 0 8px;
+  min-width: 240px;
+}
+.quicktable-search input {
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #e6f3ff;
+  padding: 8px 6px;
+  font-size: 0.85rem;
+  width: 100%;
+}
+.qt-search-icon { color: #4a7a9e; font-size: 0.9rem; }
+.qt-clear {
+  background: none; border: none; color: #7a9bc0;
+  cursor: pointer; font-size: 0.9rem; padding: 2px 6px;
+}
+.qt-clear:hover { color: #e6f3ff; }
+.qt-status-filter {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  color: #e6f3ff;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.quicktable-wrap {
+  overflow-x: auto;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(0, 0, 0, 0.25);
+  max-height: 620px;
+  overflow-y: auto;
+}
+.quicktable {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.82rem;
+}
+.quicktable thead th {
+  position: sticky;
+  top: 0;
+  background: #0d1f33;
+  color: #a0c0dc;
+  text-align: left;
+  padding: 10px 12px;
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border-bottom: 1px solid rgba(0, 229, 255, 0.25);
+  white-space: nowrap;
+  user-select: none;
+  z-index: 5;
+}
+.quicktable th.qt-sortable { cursor: pointer; transition: background 0.15s; }
+.quicktable th.qt-sortable:hover { background: #142a44; color: #e6f3ff; }
+.qt-sort { margin-left: 4px; color: #4a7a9e; font-size: 0.7rem; }
+.quicktable th.qt-sortable:hover .qt-sort { color: #00e5ff; }
+
+.quicktable tbody td {
+  padding: 10px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.quicktable tbody tr:hover td { background: rgba(0, 229, 255, 0.04); }
+.quicktable tbody tr.row-dropped td { opacity: 0.55; }
+
+/* Sticky columns */
+.quicktable .qt-sticky { position: sticky; z-index: 3; background: #0a1728; }
+.quicktable thead .qt-sticky { z-index: 6; background: #0d1f33; }
+.quicktable .qt-sticky-star { left: 0; width: 40px; }
+.quicktable .qt-sticky-ticker { left: 40px; box-shadow: 2px 0 6px rgba(0, 0, 0, 0.4); }
+.quicktable tbody tr:hover .qt-sticky { background: #102438; }
+
+/* Ticker / Company buttons */
+.qt-ticker-btn,
+.qt-company-btn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+}
+.qt-ticker-btn {
+  color: #00e5ff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  letter-spacing: 0.3px;
+}
+.qt-ticker-btn:hover { color: #7af7ff; text-decoration: underline; }
+.qt-company-btn {
+  color: #a0b8d0;
+  font-size: 0.82rem;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+}
+.qt-company-btn:hover { color: #e6f3ff; text-decoration: underline; }
+
+.qt-muted { color: #7a9bc0; font-size: 0.8rem; }
+
+/* Forecast sell cell */
+.qt-forecast-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.qt-forecast-price {
+  color: #fbbf24;
+  font-weight: 700;
+  font-size: 0.88rem;
+}
+.qt-forecast-upside {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.qt-forecast-est {
+  font-size: 0.6rem;
+  color: #6a89a8;
+  background: rgba(106, 137, 168, 0.15);
+  border: 1px solid rgba(106, 137, 168, 0.3);
+  padding: 1px 5px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.qt-empty {
+  text-align: center;
+  color: #6a89a8;
+  padding: 32px !important;
+  font-style: italic;
+}
+
+/* In-table signal bars — compact */
+.quicktable .signal-bars-wrap { font-size: 0.75rem; }
+
+/* Card flash on jump-to */
+@keyframes cardFlash {
+  0%   { box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.0); }
+  30%  { box-shadow: 0 0 0 3px rgba(0, 229, 255, 0.9), 0 0 30px rgba(0, 229, 255, 0.55); }
+  100% { box-shadow: 0 0 0 2px rgba(0, 229, 255, 0.0); }
+}
+.card.card-flash { animation: cardFlash 1.6s ease-out; }
+
+@media (max-width: 768px) {
+  .quicktable { font-size: 0.76rem; }
+  .quicktable tbody td,
+  .quicktable thead th { padding: 8px 8px; }
+  .qt-company-btn { max-width: 140px; }
+  .quicktable-search { min-width: 180px; }
+}

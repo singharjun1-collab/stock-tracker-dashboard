@@ -468,7 +468,7 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
     : null;
 
   return (
-    <div className={`card ${perfStatus}${isNew ? ' card-new' : ''}${isDropped ? ' card-dropped' : ''}${isWatched ? ' card-watched' : ''}`}>
+    <div id={`card-${alert.ticker}`} className={`card ${perfStatus}${isNew ? ' card-new' : ''}${isDropped ? ' card-dropped' : ''}${isWatched ? ' card-watched' : ''}`}>
       <div className="card-top">
         <div>
           <div className="ticker">
@@ -1114,6 +1114,213 @@ function AnalyticsTab({ alerts }) {
 // ══════════════════════════════════════
 // ═══ MAIN DASHBOARD ═══
 // ══════════════════════════════════════
+// ── Quick Sortable Table (top-of-dashboard at-a-glance table) ──
+function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
+  const [sortKey, setSortKey] = useState('signal_strength');
+  const [sortDir, setSortDir] = useState('desc');
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('current');
+
+  const calcForecast = (alert) => {
+    const entry = parseFloat(alert.price_at_alert);
+    if (alert.forecast_sell_price) {
+      return { price: parseFloat(alert.forecast_sell_price), source: 'ai' };
+    }
+    const rec = alert.recommendation || 'HOLD';
+    const latest = alert.prices[alert.prices.length - 1];
+    if (rec === 'BUY')  return { price: entry * 1.15, source: 'calc' };
+    if (rec === 'HOLD') return { price: entry * 1.08, source: 'calc' };
+    return { price: latest?.price || entry, source: 'calc' };
+  };
+  const daysHeld = (a) => Math.max(0, Math.floor((new Date() - new Date(a.alert_date + 'T00:00:00')) / 86400000));
+  const daysToForecast = (a) => a.forecast_sell_date
+    ? Math.ceil((new Date(a.forecast_sell_date + 'T00:00:00') - new Date()) / 86400000)
+    : null;
+  const latestPct = (a) => a.prices[a.prices.length - 1]?.pct_change || 0;
+  const latestPrice = (a) => a.prices[a.prices.length - 1]?.price ?? null;
+
+  const rows = useMemo(() => {
+    let list = alerts;
+    if (statusFilter === 'current') list = list.filter(a => a.status !== 'dropped');
+    else if (statusFilter !== 'all') list = list.filter(a => a.status === statusFilter);
+    if (query.trim()) {
+      const q = query.toLowerCase().trim();
+      list = list.filter(a =>
+        a.ticker.toLowerCase().includes(q) ||
+        (a.company || '').toLowerCase().includes(q) ||
+        (a.signal_type || '').toLowerCase().includes(q)
+      );
+    }
+    const accessor = {
+      ticker: a => a.ticker,
+      company: a => a.company || '',
+      status: a => a.status || 'active',
+      alert_date: a => a.alert_date,
+      source: a => getSourceMeta(a.source).label,
+      signal_type: a => a.signal_type || '',
+      signal_strength: a => a.signal_strength ?? 0,
+      price_at_alert: a => parseFloat(a.price_at_alert),
+      latest_price: a => latestPrice(a) ?? 0,
+      pct: a => latestPct(a),
+      recommendation: a => ({ BUY: 0, HOLD: 1, SELL: 2 })[a.recommendation || 'HOLD'],
+      forecast_price: a => calcForecast(a).price,
+      days_held: a => daysHeld(a),
+      days_to_forecast: a => daysToForecast(a) ?? 999999,
+    };
+    const acc = accessor[sortKey] || accessor.signal_strength;
+    return [...list].sort((x, y) => {
+      const av = acc(x), bv = acc(y);
+      if (typeof av === 'number' && typeof bv === 'number') {
+        return sortDir === 'asc' ? av - bv : bv - av;
+      }
+      return sortDir === 'asc'
+        ? String(av).localeCompare(String(bv))
+        : String(bv).localeCompare(String(av));
+    });
+  }, [alerts, sortKey, sortDir, query, statusFilter]);
+
+  const clickSort = (key) => {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir(key === 'ticker' || key === 'company' ? 'asc' : 'desc'); }
+  };
+  const sortIcon = (key) => sortKey !== key ? '\u{21C5}' : sortDir === 'asc' ? '\u{25B2}' : '\u{25BC}';
+
+  const headers = [
+    { key: 'ticker',           label: 'Ticker',           sticky: 'ticker' },
+    { key: 'company',          label: 'Company' },
+    { key: 'status',           label: 'Status' },
+    { key: 'alert_date',       label: 'Date' },
+    { key: 'days_held',        label: 'Days Held' },
+    { key: 'source',           label: 'Source' },
+    { key: 'signal_type',      label: 'Signal Type' },
+    { key: 'signal_strength',  label: 'Signal Strength' },
+    { key: 'price_at_alert',   label: 'Entry' },
+    { key: 'latest_price',     label: 'Latest' },
+    { key: 'pct',              label: '% Change' },
+    { key: 'recommendation',   label: 'AI Rec' },
+    { key: 'forecast_price',   label: 'Forecast Sell' },
+    { key: 'days_to_forecast', label: 'Days \u{2192} Sell' },
+  ];
+
+  return (
+    <div className="quicktable-section">
+      <div className="quicktable-header">
+        <div>
+          <h2 className="quicktable-title">
+            {"\u{1F4CA}"} Quick Scan
+            <span className="quicktable-count">{rows.length} picks</span>
+          </h2>
+          <p className="quicktable-hint">Click any column header to sort. Click a ticker or company name to jump to its card.</p>
+        </div>
+        <div className="quicktable-controls">
+          <div className="quicktable-search">
+            <span className="qt-search-icon">{"\u{1F50D}"}</span>
+            <input
+              type="text"
+              placeholder="Filter ticker, company, signal..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {query && <button className="qt-clear" onClick={() => setQuery('')}>{"\u{2715}"}</button>}
+          </div>
+          <select className="qt-status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <option value="current">Current (New + Active)</option>
+            <option value="new">New only</option>
+            <option value="active">Active only</option>
+            <option value="dropped">Dropped only</option>
+            <option value="all">All (incl. dropped)</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="quicktable-wrap">
+        <table className="quicktable">
+          <thead>
+            <tr>
+              <th className="qt-sticky qt-sticky-star">{"\u{2B50}"}</th>
+              {headers.map(h => (
+                <th
+                  key={h.key}
+                  className={`qt-sortable${h.sticky === 'ticker' ? ' qt-sticky qt-sticky-ticker' : ''}`}
+                  onClick={() => clickSort(h.key)}
+                >
+                  {h.label} <span className="qt-sort">{sortIcon(h.key)}</span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr><td colSpan={headers.length + 1} className="qt-empty">No picks match your filter.</td></tr>
+            )}
+            {rows.map((a, idx) => {
+              const isW = watchlist.includes(a.ticker);
+              const latest = a.prices[a.prices.length - 1];
+              const pct = latest?.pct_change || 0;
+              const perf = getStatus(pct);
+              const rec = a.recommendation || 'HOLD';
+              const fc = calcForecast(a);
+              const entry = parseFloat(a.price_at_alert);
+              const upside = entry > 0 ? ((fc.price - entry) / entry) * 100 : 0;
+              const pickStatus = a.status || 'active';
+              const pickLabel = pickStatus === 'new' ? '\u{1F195} NEW' : pickStatus === 'dropped' ? '\u{1F4E6} DROPPED' : '\u{1F7E2} ACTIVE';
+              const srcMeta = getSourceMeta(a.source);
+              const dh = daysHeld(a);
+              const dtf = daysToForecast(a);
+              return (
+                <tr key={a.id || `${a.ticker}-${idx}`} className={pickStatus === 'dropped' ? 'row-dropped' : ''}>
+                  <td className="qt-sticky qt-sticky-star">
+                    <button
+                      className={`watchlist-btn-sm ${isW ? 'watched' : ''}`}
+                      onClick={() => onToggleWatchlist(a.ticker)}
+                      title={isW ? 'Remove from watchlist' : 'Add to watchlist'}
+                    >
+                      {isW ? '\u{2605}' : '\u{2606}'}
+                    </button>
+                  </td>
+                  <td className="qt-sticky qt-sticky-ticker qt-ticker">
+                    <button className="qt-ticker-btn" onClick={() => onJumpToCard(a)} title="Jump to card">{a.ticker}</button>
+                  </td>
+                  <td className="qt-company">
+                    <button className="qt-company-btn" onClick={() => onJumpToCard(a)} title="View full card">{a.company}</button>
+                  </td>
+                  <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
+                  <td className="qt-muted tbl-alert-date">{a.alert_date}</td>
+                  <td className="qt-muted">{dh}d</td>
+                  <td><span className={`source-badge-sm ${srcMeta.cls}`}>{srcMeta.emoji} {srcMeta.label}</span></td>
+                  <td><span className="signal-chip">{a.signal_type}</span></td>
+                  <td>
+                    <SignalBars
+                      score={a.signal_strength}
+                      subScores={a.signal_sub_scores}
+                      sourceCount={a.signal_source_count}
+                      mentionCount={a.signal_mention_count}
+                    />
+                  </td>
+                  <td className="tbl-alert-price">${entry.toFixed(2)}</td>
+                  <td>{latest?.price != null ? '$' + latest.price.toFixed(2) : '\u{2014}'}</td>
+                  <td className={`tbl-${perf}`}>{fmtPct(pct)}</td>
+                  <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
+                  <td className="qt-forecast">
+                    <div className="qt-forecast-inner">
+                      <span className="qt-forecast-price">${fc.price.toFixed(2)}</span>
+                      <span className={`qt-forecast-upside ${upside >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmtPct(upside)}</span>
+                      {fc.source === 'calc' && <span className="qt-forecast-est" title="Estimated from AI rec (BUY +15%, HOLD +8%)">est</span>}
+                    </div>
+                  </td>
+                  <td className="qt-muted">
+                    {dtf === null ? '\u{2014}' : dtf < 0 ? <span className="pct-neg">Overdue</span> : dtf + 'd'}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1173,6 +1380,22 @@ export default function Dashboard() {
       // Revert on error
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, user_rating: a.user_rating } : a));
     }
+  }, []);
+
+  const handleJumpToCard = useCallback((alert) => {
+    const tab = alert.status === 'dropped' ? 'dropped'
+      : alert.status === 'new' ? 'new' : 'active';
+    setActiveTab(tab);
+    setSearchQuery('');
+    setFilter('ALL');
+    setTimeout(() => {
+      const el = document.getElementById(`card-${alert.ticker}`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.classList.add('card-flash');
+        setTimeout(() => el.classList.remove('card-flash'), 1600);
+      }
+    }, 120);
   }, []);
 
   const handleSaveAISetting = useCallback(async (key, value) => {
@@ -1294,6 +1517,14 @@ export default function Dashboard() {
         <h1>{"\u{1F4C8}"} Social Stock <span>Intelligence Monitor</span></h1>
         <div className="subtitle">Last updated: {dateStr} {"\u{B7}"} Auto-scan complete</div>
       </header>
+
+      {/* QUICK SCAN TABLE (sortable, top-of-dashboard at-a-glance view) */}
+      <QuickTable
+        alerts={alerts}
+        watchlist={watchlist}
+        onToggleWatchlist={handleToggleWatchlist}
+        onJumpToCard={handleJumpToCard}
+      />
 
       {/* STATS BAR */}
       <div className="stats-bar">
