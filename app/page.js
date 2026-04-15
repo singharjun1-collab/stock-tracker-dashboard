@@ -11,23 +11,21 @@ export default function LoginPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const supabase = createSupabaseBrowserClient();
-    supabase.auth.getUser().then(async ({ data: { user } }) => {
-      if (!user) {
-        setChecking(false);
-        return;
-      }
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('status')
-        .eq('id', user.id)
-        .single();
-      if (profile?.status === 'approved') {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/pending');
-      }
-    }).catch(() => setChecking(false));
+    // Ask the server (via HTTP-only cookies) who we are
+    fetch('/api/profile', { cache: 'no-store' })
+      .then(res => {
+        if (res.status === 401) { setChecking(false); return null; }
+        return res.json();
+      })
+      .then(data => {
+        if (!data?.profile) { setChecking(false); return; }
+        if (data.profile.status === 'approved') {
+          router.replace('/dashboard');
+        } else {
+          router.replace('/pending');
+        }
+      })
+      .catch(() => setChecking(false));
   }, [router]);
 
   const handleGoogleSignIn = async () => {
