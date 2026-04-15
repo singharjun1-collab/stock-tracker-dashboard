@@ -1116,32 +1116,67 @@ function AnalyticsTab({ alerts }) {
 // ══════════════════════════════════════
 // ── Lightweight inline SVG sparkline (no Chart.js) for table rows ──
 function MiniSparkline({ prices, width = 90, height = 28 }) {
+  const [hoverIdx, setHoverIdx] = useState(null);
   if (!prices || prices.length < 2) return <span className="qt-muted">{"\u{2014}"}</span>;
-  const vals = prices.map(p => p.price).filter(v => typeof v === 'number');
-  if (vals.length < 2) return <span className="qt-muted">{"\u{2014}"}</span>;
+  const pts = prices.filter(p => typeof p.price === 'number');
+  if (pts.length < 2) return <span className="qt-muted">{"\u{2014}"}</span>;
+  const vals = pts.map(p => p.price);
   const min = Math.min(...vals);
   const max = Math.max(...vals);
   const range = max - min || 1;
   const stepX = width / (vals.length - 1);
-  const points = vals.map((v, i) => {
-    const x = i * stepX;
-    const y = height - ((v - min) / range) * height;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(' ');
+  const coords = vals.map((v, i) => ({
+    x: i * stepX,
+    y: height - ((v - min) / range) * height,
+  }));
+  const polyPoints = coords.map(c => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
   const isUp = vals[vals.length - 1] >= vals[0];
   const stroke = isUp ? '#22c55e' : '#ef4444';
   const fill = isUp ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
-  const areaPath = `M0,${height} L${points.replace(/ /g, ' L')} L${width},${height} Z`;
-  const pctOverall = ((vals[vals.length - 1] - vals[0]) / vals[0]) * 100;
+  const areaPath = `M0,${height} L${polyPoints.replace(/ /g, ' L')} L${width},${height} Z`;
+
+  const handleMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const idx = Math.round((x / rect.width) * (vals.length - 1));
+    setHoverIdx(Math.max(0, Math.min(vals.length - 1, idx)));
+  };
+  const formatDate = (d) => {
+    if (!d) return '';
+    try {
+      return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch { return d; }
+  };
+
+  const hover = hoverIdx !== null ? { c: coords[hoverIdx], p: pts[hoverIdx] } : null;
+
   return (
     <div
       className="mini-sparkline"
-      title={`${vals.length}-day trend: ${pctOverall >= 0 ? '+' : ''}${pctOverall.toFixed(1)}%`}
+      onMouseMove={handleMove}
+      onMouseLeave={() => setHoverIdx(null)}
     >
       <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
         <path d={areaPath} fill={fill} stroke="none" />
-        <polyline points={points} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+        <polyline points={polyPoints} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+        {hover && (
+          <>
+            <line x1={hover.c.x} y1="0" x2={hover.c.x} y2={height} stroke="#7a9bc0" strokeWidth="0.5" strokeDasharray="2,2" />
+            <circle cx={hover.c.x} cy={hover.c.y} r="2.5" fill={stroke} stroke="#0a1728" strokeWidth="1" />
+          </>
+        )}
       </svg>
+      {hover && (
+        <div className="mini-sparkline-tooltip">
+          <span className="mst-date">{formatDate(hover.p.date)}</span>
+          <span className="mst-price">${hover.p.price.toFixed(2)}</span>
+          {typeof hover.p.pct_change === 'number' && (
+            <span className={hover.p.pct_change >= 0 ? 'pct-pos' : 'pct-neg'}>
+              {hover.p.pct_change >= 0 ? '+' : ''}{hover.p.pct_change.toFixed(2)}%
+            </span>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1152,6 +1187,23 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
   const [sortDir, setSortDir] = useState('desc');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('current');
+  const [collapsed, setCollapsed] = useState(false);
+
+  // Persist collapsed preference in a cookie
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const m = document.cookie.match(/(?:^|; )qt_collapsed=([^;]*)/);
+    if (m && m[1] === '1') setCollapsed(true);
+  }, []);
+  const toggleCollapsed = () => {
+    setCollapsed(prev => {
+      const next = !prev;
+      if (typeof document !== 'undefined') {
+        document.cookie = `qt_collapsed=${next ? '1' : '0'}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+      }
+      return next;
+    });
+  };
 
   // Forecast sell target — tuned by AI rec AND signal strength.
   // Stronger conviction signals earn higher price targets.
@@ -1248,43 +1300,58 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
     { key: 'price_at_alert',   label: 'Entry' },
     { key: 'latest_price',     label: 'Latest' },
     { key: 'pct',              label: '% Change' },
-    { key: null,               label: 'Trend' },
+    { key: null,               label: 'Trend (7d)' },
     { key: 'recommendation',   label: 'AI Rec' },
     { key: 'forecast_price',   label: 'Forecast Sell' },
     { key: 'days_to_forecast', label: 'Days \u{2192} Sell' },
   ];
 
   return (
-    <div className="quicktable-section">
+    <div className={`quicktable-section${collapsed ? ' quicktable-collapsed' : ''}`}>
       <div className="quicktable-header">
-        <div>
-          <h2 className="quicktable-title">
-            {"\u{1F4CA}"} Quick Scan
-            <span className="quicktable-count">{rows.length} picks</span>
-          </h2>
-          <p className="quicktable-hint">Click any column header to sort. Click a ticker or company name to jump to its card.</p>
-        </div>
-        <div className="quicktable-controls">
-          <div className="quicktable-search">
-            <span className="qt-search-icon">{"\u{1F50D}"}</span>
-            <input
-              type="text"
-              placeholder="Filter ticker, company, signal..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {query && <button className="qt-clear" onClick={() => setQuery('')}>{"\u{2715}"}</button>}
+        <div className="quicktable-title-wrap">
+          <button
+            className="qt-collapse-btn"
+            onClick={toggleCollapsed}
+            title={collapsed ? 'Expand Quick Scan table' : 'Collapse Quick Scan table'}
+            aria-expanded={!collapsed}
+          >
+            <span className={`qt-caret ${collapsed ? 'collapsed' : ''}`}>{"\u{25BC}"}</span>
+          </button>
+          <div>
+            <h2 className="quicktable-title">
+              {"\u{1F4CA}"} Quick Scan
+              <span className="quicktable-count">{rows.length} picks</span>
+            </h2>
+            {!collapsed && (
+              <p className="quicktable-hint">Click any column header to sort. Click a ticker or company name to jump to its card.</p>
+            )}
           </div>
-          <select className="qt-status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
-            <option value="current">Current (New + Active)</option>
-            <option value="new">New only</option>
-            <option value="active">Active only</option>
-            <option value="dropped">Dropped only</option>
-            <option value="all">All (incl. dropped)</option>
-          </select>
         </div>
+        {!collapsed && (
+          <div className="quicktable-controls">
+            <div className="quicktable-search">
+              <span className="qt-search-icon">{"\u{1F50D}"}</span>
+              <input
+                type="text"
+                placeholder="Filter ticker, company, signal..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              {query && <button className="qt-clear" onClick={() => setQuery('')}>{"\u{2715}"}</button>}
+            </div>
+            <select className="qt-status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="current">Current (New + Active)</option>
+              <option value="new">New only</option>
+              <option value="active">Active only</option>
+              <option value="dropped">Dropped only</option>
+              <option value="all">All (incl. dropped)</option>
+            </select>
+          </div>
+        )}
       </div>
 
+      {!collapsed && (
       <div className="quicktable-wrap">
         <table className="quicktable">
           <thead>
@@ -1379,6 +1446,7 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
           </tbody>
         </table>
       </div>
+      )}
     </div>
   );
 }
