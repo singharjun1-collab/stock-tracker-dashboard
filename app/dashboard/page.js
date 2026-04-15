@@ -1114,6 +1114,38 @@ function AnalyticsTab({ alerts }) {
 // ══════════════════════════════════════
 // ═══ MAIN DASHBOARD ═══
 // ══════════════════════════════════════
+// ── Lightweight inline SVG sparkline (no Chart.js) for table rows ──
+function MiniSparkline({ prices, width = 90, height = 28 }) {
+  if (!prices || prices.length < 2) return <span className="qt-muted">{"\u{2014}"}</span>;
+  const vals = prices.map(p => p.price).filter(v => typeof v === 'number');
+  if (vals.length < 2) return <span className="qt-muted">{"\u{2014}"}</span>;
+  const min = Math.min(...vals);
+  const max = Math.max(...vals);
+  const range = max - min || 1;
+  const stepX = width / (vals.length - 1);
+  const points = vals.map((v, i) => {
+    const x = i * stepX;
+    const y = height - ((v - min) / range) * height;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const isUp = vals[vals.length - 1] >= vals[0];
+  const stroke = isUp ? '#22c55e' : '#ef4444';
+  const fill = isUp ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)';
+  const areaPath = `M0,${height} L${points.replace(/ /g, ' L')} L${width},${height} Z`;
+  const pctOverall = ((vals[vals.length - 1] - vals[0]) / vals[0]) * 100;
+  return (
+    <div
+      className="mini-sparkline"
+      title={`${vals.length}-day trend: ${pctOverall >= 0 ? '+' : ''}${pctOverall.toFixed(1)}%`}
+    >
+      <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
+        <path d={areaPath} fill={fill} stroke="none" />
+        <polyline points={points} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" />
+      </svg>
+    </div>
+  );
+}
+
 // ── Quick Sortable Table (top-of-dashboard at-a-glance table) ──
 function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
   const [sortKey, setSortKey] = useState('signal_strength');
@@ -1121,17 +1153,36 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('current');
 
+  // Forecast sell target — tuned by AI rec AND signal strength.
+  // Stronger conviction signals earn higher price targets.
+  // Tiers (signal strength 0-100): weak <40, moderate 40-59, strong 60-79, very strong 80+.
   const calcForecast = (alert) => {
     const entry = parseFloat(alert.price_at_alert);
     if (alert.forecast_sell_price) {
-      return { price: parseFloat(alert.forecast_sell_price), source: 'ai' };
+      return { price: parseFloat(alert.forecast_sell_price), upsidePct: null, tier: 'ai', source: 'ai' };
     }
     const rec = alert.recommendation || 'HOLD';
     const latest = alert.prices[alert.prices.length - 1];
-    if (rec === 'BUY')  return { price: entry * 1.15, source: 'calc' };
-    if (rec === 'HOLD') return { price: entry * 1.08, source: 'calc' };
-    return { price: latest?.price || entry, source: 'calc' };
+    const ss = alert.signal_strength ?? 0;
+    const tier = ss >= 80 ? 'very-strong' : ss >= 60 ? 'strong' : ss >= 40 ? 'moderate' : 'weak';
+
+    if (rec === 'SELL') {
+      return { price: latest?.price || entry, upsidePct: 0, tier, source: 'calc' };
+    }
+    // BUY / HOLD multipliers by signal tier
+    const table = {
+      BUY:  { 'very-strong': 0.22, strong: 0.17, moderate: 0.13, weak: 0.10 },
+      HOLD: { 'very-strong': 0.13, strong: 0.10, moderate: 0.07, weak: 0.04 },
+    };
+    const upsidePct = (table[rec] || table.HOLD)[tier];
+    return { price: entry * (1 + upsidePct), upsidePct: upsidePct * 100, tier, source: 'calc' };
   };
+
+  const tierLabel = (t) =>
+    t === 'very-strong' ? 'Very Strong' :
+    t === 'strong'      ? 'Strong' :
+    t === 'moderate'    ? 'Moderate' :
+    t === 'weak'        ? 'Weak' : 'AI';
   const daysHeld = (a) => Math.max(0, Math.floor((new Date() - new Date(a.alert_date + 'T00:00:00')) / 86400000));
   const daysToForecast = (a) => a.forecast_sell_date
     ? Math.ceil((new Date(a.forecast_sell_date + 'T00:00:00') - new Date()) / 86400000)
@@ -1197,6 +1248,7 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
     { key: 'price_at_alert',   label: 'Entry' },
     { key: 'latest_price',     label: 'Latest' },
     { key: 'pct',              label: '% Change' },
+    { key: null,               label: 'Trend' },
     { key: 'recommendation',   label: 'AI Rec' },
     { key: 'forecast_price',   label: 'Forecast Sell' },
     { key: 'days_to_forecast', label: 'Days \u{2192} Sell' },
@@ -1238,7 +1290,7 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
           <thead>
             <tr>
               <th className="qt-sticky qt-sticky-star">{"\u{2B50}"}</th>
-              {headers.map(h => (
+              {headers.map((h, i) => h.key ? (
                 <th
                   key={h.key}
                   className={`qt-sortable${h.sticky === 'ticker' ? ' qt-sticky qt-sticky-ticker' : ''}`}
@@ -1246,6 +1298,8 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
                 >
                   {h.label} <span className="qt-sort">{sortIcon(h.key)}</span>
                 </th>
+              ) : (
+                <th key={`static-${i}`}>{h.label}</th>
               ))}
             </tr>
           </thead>
@@ -1300,12 +1354,20 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
                   <td className="tbl-alert-price">${entry.toFixed(2)}</td>
                   <td>{latest?.price != null ? '$' + latest.price.toFixed(2) : '\u{2014}'}</td>
                   <td className={`tbl-${perf}`}>{fmtPct(pct)}</td>
+                  <td className="qt-trend"><MiniSparkline prices={a.prices} /></td>
                   <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
                   <td className="qt-forecast">
                     <div className="qt-forecast-inner">
                       <span className="qt-forecast-price">${fc.price.toFixed(2)}</span>
                       <span className={`qt-forecast-upside ${upside >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmtPct(upside)}</span>
-                      {fc.source === 'calc' && <span className="qt-forecast-est" title="Estimated from AI rec (BUY +15%, HOLD +8%)">est</span>}
+                      {fc.source === 'calc' && (
+                        <span
+                          className="qt-forecast-est"
+                          title={`Estimated: ${rec} + ${tierLabel(fc.tier)} signal \u2192 +${(fc.upsidePct ?? 0).toFixed(0)}%`}
+                        >
+                          est
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="qt-muted">

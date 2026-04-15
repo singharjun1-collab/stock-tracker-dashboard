@@ -1224,6 +1224,17 @@ footer span { color: #4fc3f7; }
   letter-spacing: 0.5px;
 }
 
+.qt-trend { padding: 4px 10px !important; }
+.mini-sparkline {
+  display: inline-flex;
+  align-items: center;
+  line-height: 0;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 2px 4px;
+  border-radius: 4px;
+}
+.mini-sparkline svg { display: block; }
+
 .qt-empty {
   text-align: center;
   color: #6a89a8;
