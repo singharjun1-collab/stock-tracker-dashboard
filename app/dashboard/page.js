@@ -275,6 +275,102 @@ function RedditLinks({ ticker }) {
   );
 }
 
+// ── News Headlines (foldable, last 7 days) ──
+function NewsHeadlines({ ticker }) {
+  const [news, setNews] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    if (!open || news !== null) return;
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/news?ticker=${encodeURIComponent(ticker)}`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(d => { if (!cancelled) { setNews(d.news || []); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setNews([]); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [ticker, open, news]);
+
+  return (
+    <div className="news-section">
+      <button className="news-toggle" onClick={() => setOpen(!open)}>
+        {open ? '\u25BE' : '\u25B8'} {"\uD83D\uDCF0"} News Headlines (7d)
+      </button>
+      {open && (
+        <div className="news-body">
+          {loading && <div className="news-loading">Loading news...</div>}
+          {!loading && news && news.length === 0 && (
+            <div className="news-empty">No recent news found</div>
+          )}
+          {!loading && news && news.length > 0 && (
+            <div className="news-list">
+              {news.map((item, i) => {
+                const dateStr = item.publishedAt
+                  ? new Date(item.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                  : '';
+                return (
+                  <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" className="news-item">
+                    <span className="news-title">{item.title}</span>
+                    <span className="news-meta">
+                      {item.publisher && <span className="news-publisher">{item.publisher}</span>}
+                      {dateStr && <span className="news-date">{dateStr}</span>}
+                    </span>
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Next Earnings Date ──
+function EarningsDate({ ticker }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/earnings?ticker=${encodeURIComponent(ticker)}`)
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(d => { if (!cancelled) { setData(d); setLoading(false); } })
+      .catch(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [ticker]);
+
+  if (loading || !data || !data.earningsDate) return null;
+
+  const days = data.daysUntilEarnings;
+  const isPast = days !== null && days < 0;
+  const isSoon = days !== null && days >= 0 && days <= 7;
+
+  return (
+    <div className={`earnings-badge ${isSoon ? 'earnings-soon' : ''} ${isPast ? 'earnings-past' : ''}`}>
+      <span className="earnings-icon">{"\uD83D\uDCC5"}</span>
+      <span className="earnings-label">Next Earnings:</span>
+      <span className="earnings-value">
+        {data.earningsDateFormatted}
+        {data.earningsDateEnd && data.earningsDateEnd !== data.earningsDate && (
+          <> {"\u2013"} {data.earningsDateEndFormatted}</>
+        )}
+      </span>
+      {days !== null && !isPast && (
+        <span className={`earnings-countdown ${isSoon ? 'earnings-countdown-soon' : ''}`}>
+          ({days === 0 ? 'Today' : `${days}d away`})
+        </span>
+      )}
+      {isPast && (
+        <span className="earnings-countdown earnings-countdown-past">
+          (Passed)
+        </span>
+      )}
+    </div>
+  );
+}
+
 // ── Historic Chart ──
 function HistoricChart({ ticker, canvasId }) {
   const canvasRef = useRef(null);
@@ -560,6 +656,8 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
 
       <AnalystBadge ticker={alert.ticker} />
 
+      <EarningsDate ticker={alert.ticker} />
+
       <div className="alert-reason">{alert.alert_reason}</div>
 
       {/* SIGNAL CHANGE INFO */}
@@ -619,6 +717,7 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
         </div>
       )}
 
+      <NewsHeadlines ticker={alert.ticker} />
       <ProfitLossCalc priceAtAlert={alert.price_at_alert} latestPrice={latest?.price} />
       <RedditLinks ticker={alert.ticker} />
 

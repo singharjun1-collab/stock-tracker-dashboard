@@ -566,6 +566,69 @@ body {
 }
 .reddit-link:hover { background: #991b1b; border-color: #ef4444; transform: translateY(-1px); }
 
+/* ── NEWS HEADLINES (foldable) ── */
+.news-section { margin-top: 10px; }
+.news-toggle {
+  background: none; border: none; color: #a78bfa; cursor: pointer;
+  font-size: 0.78rem; font-weight: 600; padding: 4px 0;
+  transition: color 0.2s;
+}
+.news-toggle:hover { color: #c4b5fd; }
+.news-body {
+  margin-top: 6px; padding: 10px;
+  background: rgba(10, 14, 26, 0.6); border: 1px solid #1e3a5f; border-radius: 8px;
+  max-height: 260px; overflow-y: auto;
+}
+.news-body::-webkit-scrollbar { width: 4px; }
+.news-body::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 4px; }
+.news-loading { color: #7a9bc0; font-size: 0.75rem; text-align: center; padding: 8px 0; }
+.news-empty { color: #5a7a9c; font-size: 0.75rem; text-align: center; padding: 8px 0; font-style: italic; }
+.news-list { display: flex; flex-direction: column; gap: 6px; }
+.news-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 10px; border-radius: 6px;
+  background: rgba(30, 58, 95, 0.25); border: 1px solid rgba(30, 58, 95, 0.4);
+  text-decoration: none; color: inherit;
+  transition: all 0.2s;
+}
+.news-item:hover {
+  background: rgba(30, 58, 95, 0.45);
+  border-color: #4fc3f7;
+  transform: translateY(-1px);
+}
+.news-title {
+  font-size: 0.76rem; font-weight: 600; color: #e0e6f0;
+  line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.news-meta {
+  display: flex; gap: 8px; align-items: center;
+  font-size: 0.65rem; color: #5a7a9c;
+}
+.news-publisher { font-weight: 600; color: #7a9bc0; }
+.news-date { opacity: 0.8; }
+
+/* ── NEXT EARNINGS DATE ── */
+.earnings-badge {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  margin-top: 8px; padding: 8px 12px;
+  background: rgba(30, 58, 95, 0.2); border: 1px solid #1e3a5f; border-radius: 8px;
+  font-size: 0.76rem; color: #a0b8d0;
+}
+.earnings-badge.earnings-soon {
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.35);
+}
+.earnings-badge.earnings-past {
+  opacity: 0.5;
+}
+.earnings-icon { font-size: 0.9rem; }
+.earnings-label { font-weight: 600; color: #7a9bc0; }
+.earnings-value { font-weight: 700; color: #e0e6f0; }
+.earnings-countdown { font-size: 0.7rem; color: #5a7a9c; }
+.earnings-countdown-soon { color: #fbbf24; font-weight: 700; }
+.earnings-countdown-past { color: #5a7a9c; font-style: italic; }
+
 /* ── Research link ── */
 .research-row { margin-top: 8px; }
 .research-link {
