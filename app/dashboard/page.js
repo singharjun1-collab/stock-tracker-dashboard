@@ -1012,9 +1012,9 @@ function AISettingsPanel({ settings, onSave }) {
                 <td>Total alerts + signal-change events for this ticker across the scan window</td>
               </tr>
               <tr>
-                <td>Velocity</td>
+                <td>Momentum timing</td>
                 <td>{Math.round(SIGNAL_WEIGHTS.velocity * 100)}%</td>
-                <td>How fast the move is accelerating &mdash; latest day&apos;s % change vs. prior days&apos; average</td>
+                <td>Rewards <strong>early</strong> momentum (bell-curve peaks at ~2% acceleration) and penalizes stocks that already ran far from alert price. If it already surged 15%+, the score drops sharply &mdash; the easy money is gone.</td>
               </tr>
               <tr>
                 <td>Sentiment + analyst</td>
