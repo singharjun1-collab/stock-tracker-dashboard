@@ -2215,6 +2215,33 @@ footer span { color: #4fc3f7; }
   margin: 4px 0 6px;
 }
 
+.lb-pl-section {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 6px 0 8px;
+  width: 100%;
+}
+
+.lb-pl-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.lb-pl-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #7a9bc0;
+  min-width: 42px;
+  text-align: right;
+}
+
 .lb-stats-row {
   display: flex;
   gap: 10px;

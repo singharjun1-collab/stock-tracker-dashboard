@@ -2354,12 +2354,26 @@ function LeaderboardTab({ alerts, currentUserId }) {
     return hist.length ? parseFloat(hist[hist.length - 1].price) : parseFloat(a.price_at_alert);
   };
 
-  // Compute unrealized PL for each user using current prices
+  // Compute unrealized PL for each user using current live prices
   const rows = data.leaderboard.map(s => {
-    // Stored realized PL is accurate for closed; we approximate unrealized via current prices per-user only when drilled in
+    let unrealizedPL = 0;
+    let openInvested = 0;
+    if (s.openTrades) {
+      for (const ot of s.openTrades) {
+        const cur = getPrice(ot.ticker);
+        openInvested += ot.entry_amount;
+        if (cur != null) {
+          unrealizedPL += (cur * ot.shares) - ot.entry_amount;
+        }
+      }
+    }
+    const closedInvested = s.totalInvested - openInvested;
     return {
       ...s,
-      totalPL: s.realizedPL, // open positions not known at summary level; shown in drill-in
+      unrealizedPL,
+      openInvested,
+      closedInvested,
+      totalPL: s.realizedPL + unrealizedPL,
     };
   }).sort((a, b) => (b.totalPL || 0) - (a.totalPL || 0));
 
@@ -2392,12 +2406,28 @@ function LeaderboardTab({ alerts, currentUserId }) {
                   {r.profile.id === currentUserId && <span className="lb-you-badge">You</span>}
                   {r.profile.is_admin && <span className="lb-admin-badge">Admin</span>}
                 </div>
-                <div className={`lb-pl ${r.realizedPL >= 0 ? 'pct-pos' : 'pct-neg'}`}>
-                  {r.realizedPL >= 0 ? '+' : ''}${r.realizedPL.toFixed(2)}
-                  {r.totalInvested > 0 && (
-                    <span className="lb-pl-pct">
-                      ({r.realizedPL >= 0 ? '+' : ''}{((r.realizedPL / r.totalInvested) * 100).toFixed(1)}%)
-                    </span>
+                <div className="lb-pl-section">
+                  {r.closedCount > 0 && (
+                    <div className="lb-pl-row">
+                      <span className="lb-pl-label">Actual</span>
+                      <span className={r.realizedPL >= 0 ? 'pct-pos' : 'pct-neg'}>
+                        {r.realizedPL >= 0 ? '+' : ''}{'\u0024'}{Math.abs(r.realizedPL).toFixed(2)}
+                        {r.closedInvested > 0 && (
+                          <span className="lb-pl-pct"> ({r.realizedPL >= 0 ? '+' : ''}{((r.realizedPL / r.closedInvested) * 100).toFixed(1)}%)</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
+                  {r.openCount > 0 && (
+                    <div className="lb-pl-row">
+                      <span className="lb-pl-label">Paper</span>
+                      <span className={r.unrealizedPL >= 0 ? 'pct-pos' : 'pct-neg'}>
+                        {r.unrealizedPL >= 0 ? '+' : ''}{'\u0024'}{Math.abs(r.unrealizedPL).toFixed(2)}
+                        {r.openInvested > 0 && (
+                          <span className="lb-pl-pct"> ({r.unrealizedPL >= 0 ? '+' : ''}{((r.unrealizedPL / r.openInvested) * 100).toFixed(1)}%)</span>
+                        )}
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div className="lb-stats-row">

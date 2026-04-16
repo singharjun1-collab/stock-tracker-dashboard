@@ -33,6 +33,7 @@ export async function GET(request) {
     profile: p,
     openCount: 0, closedCount: 0,
     totalInvested: 0, realizedPL: 0, winRate: null, wins: 0, losses: 0,
+    openTrades: [], // ticker/shares/entry_amount so client can compute unrealized PL from live prices
   };
 
   for (const t of trades) {
@@ -46,6 +47,7 @@ export async function GET(request) {
       if (pl > 0) s.wins += 1; else if (pl < 0) s.losses += 1;
     } else {
       s.openCount += 1;
+      s.openTrades.push({ ticker: t.ticker, shares: parseFloat(t.shares), entry_amount: parseFloat(t.entry_amount) });
     }
   }
 
