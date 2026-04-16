@@ -2449,7 +2449,7 @@ function LeaderboardTab({ alerts, currentUserId }) {
   const getPrice = (ticker) => {
     const a = alerts.find(x => x.ticker === ticker);
     if (!a) return null;
-    const hist = a.price_history || [];
+    const hist = a.prices || [];
     return hist.length ? parseFloat(hist[hist.length - 1].price) : parseFloat(a.price_at_alert);
   };
 
