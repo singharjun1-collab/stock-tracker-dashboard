@@ -2516,6 +2516,7 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('ALL');
+  const [recFilter, setRecFilter] = useState('ALL');   // 'ALL' | 'BUY' | 'SELL'
   const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [mcapRange, setMcapRange] = useState([0, 5000]);
@@ -2781,6 +2782,9 @@ export default function Dashboard() {
       );
     }
 
+    // Recommendation filter (BUY / SELL)
+    if (recFilter !== 'ALL') filtered = filtered.filter(a => a.recommendation === recFilter);
+
     // Market cap filter
     if (mcapRange[0] > 0 || mcapRange[1] < 5000) {
       filtered = filtered.filter(a => {
@@ -2790,7 +2794,7 @@ export default function Dashboard() {
     }
 
     return filtered;
-  }, [filter, searchQuery, mcapRange]);
+  }, [filter, recFilter, searchQuery, mcapRange]);
 
   const newPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'new')), [alerts]);
   const activePicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'active')), [alerts]);
@@ -2955,37 +2959,51 @@ export default function Dashboard() {
 
       {/* STATS BAR */}
       <div className="stats-bar">
-        <div className="stat-card">
+        <div className={`stat-card stat-card-click${activeTab === 'active' && recFilter === 'ALL' ? ' stat-card-active' : ''}`}
+          onClick={() => { setActiveTab('active'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div className="stat-value">{totalCurrent}</div>
           <div className="stat-label">Current Picks</div>
         </div>
-        <div className="stat-card">
+        <div className={`stat-card stat-card-click${activeTab === 'new' ? ' stat-card-active' : ''}`}
+          onClick={() => { setActiveTab('new'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div className="stat-value" style={{ color: '#00e5ff' }}>{newPicks.length}</div>
           <div className="stat-label">{"\u{1F195}"} New Today</div>
         </div>
-        <div className="stat-card stat-buy-glow">
+        <div className={`stat-card stat-buy-glow stat-card-click${recFilter === 'BUY' ? ' stat-card-active' : ''}`}
+          onClick={() => { setActiveTab('active'); setRecFilter('BUY'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div className="stat-value" style={{ color: '#22c55e' }}>{buys}</div>
           <div className="stat-label">{"\u{1F7E2}"} AI Says BUY</div>
         </div>
-        <div className="stat-card">
+        <div className={`stat-card stat-card-click${recFilter === 'SELL' ? ' stat-card-active' : ''}`}
+          onClick={() => { setActiveTab('active'); setRecFilter('SELL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div className="stat-value" style={{ color: '#ef4444' }}>{sells}</div>
           <div className="stat-label">{"\u{1F534}"} AI Says SELL</div>
         </div>
-        <div className="stat-card">
+        <div className={`stat-card stat-card-click${activeTab === 'analytics' ? ' stat-card-active' : ''}`}
+          onClick={() => { setActiveTab('analytics'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div className="stat-value" style={{ color: avgPct >= 0 ? '#22c55e' : '#ef4444' }}>
             {fmtPct(avgPct)}
           </div>
           <div className="stat-label">Avg Return</div>
         </div>
-        <div className="stat-card">
+        <div className={`stat-card stat-card-click${activeTab === 'watchlist' ? ' stat-card-active' : ''}`}
+          onClick={() => { setActiveTab('watchlist'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div className="stat-value" style={{ color: '#fbbf24' }}>{watchlist.length}</div>
           <div className="stat-label">{"\u{2B50}"} Watchlist</div>
         </div>
-        <div className="stat-card">
+        <div className={`stat-card stat-card-click${activeTab === 'dropped' ? ' stat-card-active' : ''}`}
+          onClick={() => { setActiveTab('dropped'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
           <div className="stat-value" style={{ color: '#7a9bc0' }}>{droppedPicks.length}</div>
           <div className="stat-label">{"\u{1F4E6}"} Dropped</div>
         </div>
       </div>
+      {recFilter !== 'ALL' && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+          <button className="rec-filter-chip" onClick={() => setRecFilter('ALL')}>
+            Showing {recFilter} only &times;
+          </button>
+        </div>
+      )}
 
       {/* TOP GAINERS / BIGGEST LOSERS */}
       {(() => {
@@ -3043,13 +3061,14 @@ export default function Dashboard() {
       </div>
 
       {/* TABS */}
+      <div id="tabs-anchor" />
       <div className="tabs-container">
         <div className="tabs-row">
           {tabs.map(tab => (
             <button
               key={tab.id}
               className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${tab.id === 'new' && newPicks.length > 0 ? 'tab-glow' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => { setActiveTab(tab.id); setRecFilter('ALL'); }}
             >
               {tab.label}
               {tab.count !== null && <span className="tab-count">{tab.count}</span>}
