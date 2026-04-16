@@ -79,6 +79,7 @@ const SOURCE_META = {
   wsb: { label: 'WallStreetBets', emoji: '\u{1F7E0}', cls: 'src-wsb' },
   reddit: { label: 'Reddit', emoji: '\u{1F534}', cls: 'src-reddit' },
   polymarket: { label: 'Polymarket', emoji: '\u{1F535}', cls: 'src-poly' },
+  kalshi: { label: 'Kalshi', emoji: '\u{1F537}', cls: 'src-kalshi' },
   yahoo: { label: 'Yahoo Finance', emoji: '\u{1F7E3}', cls: 'src-yahoo' },
   google: { label: 'Google Finance', emoji: '\u{1F7E2}', cls: 'src-google' },
   stocktwits: { label: 'StockTwits', emoji: '\u{1F534}', cls: 'src-st' },
@@ -90,6 +91,7 @@ function getSourceMeta(source) {
   if (key.includes('wsb') || key.includes('wallstreetbets')) return SOURCE_META.wsb;
   if (key.includes('reddit')) return SOURCE_META.reddit;
   if (key.includes('poly')) return SOURCE_META.polymarket;
+  if (key.includes('kalshi')) return SOURCE_META.kalshi;
   if (key.includes('yahoo')) return SOURCE_META.yahoo;
   if (key.includes('google')) return SOURCE_META.google;
   if (key.includes('stocktwit')) return SOURCE_META.stocktwits;
@@ -1002,7 +1004,7 @@ function AISettingsPanel({ settings, onSave }) {
               <tr>
                 <td>Unique sources</td>
                 <td>{Math.round(SIGNAL_WEIGHTS.source_count * 100)}%</td>
-                <td>Distinct platforms mentioning the ticker (Reddit, WSB, StockTwits, Yahoo, Polymarket, analyst reports)</td>
+                <td>Distinct platforms mentioning the ticker (Reddit, WSB, StockTwits, Yahoo, Polymarket, Kalshi, analyst reports)</td>
               </tr>
               <tr>
                 <td>Mention volume</td>
@@ -3285,7 +3287,7 @@ export default function Dashboard() {
       </div>
 
       <footer>
-        {"\u{26A1}"} Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB {"\u{B7}"} Reddit {"\u{B7}"} Polymarket {"\u{B7}"} Yahoo Finance {"\u{B7}"} Google Finance {"\u{B7}"} StockTwits</span>
+        {"\u{26A1}"} Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB {"\u{B7}"} Reddit {"\u{B7}"} Polymarket {"\u{B7}"} Kalshi {"\u{B7}"} Yahoo Finance {"\u{B7}"} Google Finance {"\u{B7}"} StockTwits</span>
         <div className="disclaimer">{"\u{26A0}"}{"\u{FE0F}"} AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
       </footer>
     </>

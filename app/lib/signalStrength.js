@@ -72,9 +72,9 @@ export function computeSignalStrength(alert, activityIndex = {}) {
   const activity = activityIndex[t] || { sources: new Set(), mentionCount: 0, signalChanges: 0 };
 
   // --- Source score (30%) ---
-  // 1 source = 20, 2 = 45, 3 = 65, 4 = 80, 5+ = 100
+  // 1 source = 15, 2 = 35, 3 = 55, 4 = 70, 5 = 85, 6+ = 100
   const srcN = activity.sources.size || 1;
-  const sourceScore = Math.min(100, [0, 20, 45, 65, 80, 100][Math.min(srcN, 5)] || 100);
+  const sourceScore = Math.min(100, [0, 15, 35, 55, 70, 85, 100][Math.min(srcN, 6)] || 100);
 
   // --- Mention-volume score (25%) ---
   // Total mentions = alerts for this ticker + signal-change events.
