@@ -5,7 +5,7 @@
  *
  *   30% — Unique sources (how many distinct platforms mention the ticker)
  *   25% — Mention volume (total alerts + signal changes for this ticker)
- *   25% — Velocity (how fast the price/mentions are accelerating)
+ *   25% — Momentum Timing (rewards early movers, penalizes stocks that already ran)
  *   20% — Sentiment + analyst consensus
  *
  * Bucket mapping:
@@ -88,23 +88,50 @@ export function computeSignalStrength(alert, activityIndex = {}) {
   else if (mentions <= 8) mentionScore = 90;
   else mentionScore = 100;
 
-  // --- Velocity score (25%) ---
-  // Acceleration of the stock itself: last day's pct_change vs avg of prior days.
+  // --- Momentum Timing score (25%) ---
+  // Quant approach: bell-curve rewards EARLY acceleration; penalizes parabolic
+  // moves and stocks that have already run significantly from alert price.
+  //
+  // Two factors multiplied together:
+  //   (1) Acceleration shape — Gaussian peaking at ~2% accel (sweet spot).
+  //       Extreme acceleration (6%+) gets crushed because the move already
+  //       happened; slight deceleration is treated as neutral.
+  //   (2) Cumulative-gain decay — if the stock already ran 15-20%+ from the
+  //       alert price, the easy money is gone. Smooth S-curve penalty.
   const prices = Array.isArray(alert?.prices) ? alert.prices : [];
-  let velocityScore = 30; // neutral default
+  let velocityScore = 35; // neutral default (no price data)
   if (prices.length >= 2) {
-    const last = Math.abs(parseFloat(prices[prices.length - 1]?.pct_change) || 0);
+    const lastAbs = Math.abs(parseFloat(prices[prices.length - 1]?.pct_change) || 0);
     const priorArr = prices.slice(0, -1).map(p => Math.abs(parseFloat(p.pct_change) || 0));
     const priorAvg = priorArr.length
       ? priorArr.reduce((s, x) => s + x, 0) / priorArr.length
       : 0;
-    const accel = last - priorAvg; // positive => accelerating
-    // Map: accel <= 0 => 20, 0-1% => 40, 1-3% => 60, 3-6% => 80, 6%+ => 100
-    if (accel <= 0) velocityScore = 20;
-    else if (accel <= 1) velocityScore = 40;
-    else if (accel <= 3) velocityScore = 60;
-    else if (accel <= 6) velocityScore = 80;
-    else velocityScore = 100;
+    const accel = lastAbs - priorAvg; // positive => accelerating
+
+    // (1) Bell-curve acceleration: sweet spot at ~2%
+    const sweetSpot = 2.0;
+    const width = 2.0;
+    let accelScore;
+    if (accel >= 0) {
+      accelScore = 95 * Math.exp(-Math.pow(accel - sweetSpot, 2) / (2 * width * width));
+    } else {
+      // Decelerating: gentle slope down from 40
+      accelScore = Math.max(10, 40 + accel * 6);
+    }
+    accelScore = Math.max(5, Math.min(95, accelScore));
+
+    // (2) Cumulative-gain decay: if the stock already ran far from alert price
+    //     the momentum is "spent" — penalize proportionally.
+    const alertPrice = parseFloat(alert?.price_at_alert) || 0;
+    const latestPrice = parseFloat(prices[prices.length - 1]?.price) || 0;
+    let gainDecay = 1.0;
+    if (alertPrice > 0 && latestPrice > alertPrice) {
+      const cumPct = ((latestPrice - alertPrice) / alertPrice) * 100;
+      // Smooth S-curve: no penalty under ~5%, steep decay 10-25%, floor ~0.15
+      gainDecay = 0.15 + 0.85 / (1 + Math.pow(Math.max(0, cumPct - 5) / 12, 2.2));
+    }
+
+    velocityScore = Math.max(5, Math.round(accelScore * gainDecay));
   }
 
   // --- Sentiment + analyst score (20%) ---

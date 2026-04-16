@@ -34,7 +34,7 @@ function SignalBars({ score, subScores, sourceCount, mentionCount }) {
           <>
             <div className="tt-row"><span>Source score (30%)</span><span>{subScores.source}/100</span></div>
             <div className="tt-row"><span>Mention score (25%)</span><span>{subScores.mention}/100</span></div>
-            <div className="tt-row"><span>Velocity score (25%)</span><span>{subScores.velocity}/100</span></div>
+            <div className="tt-row"><span>Momentum timing (25%)</span><span>{subScores.velocity}/100</span></div>
             <div className="tt-row"><span>Sentiment score (20%)</span><span>{subScores.sentiment}/100</span></div>
           </>
         )}
