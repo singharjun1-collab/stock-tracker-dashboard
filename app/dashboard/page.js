@@ -1965,6 +1965,91 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
   const [statusFilter, setStatusFilter] = useState('current');
   const [collapsed, setCollapsed] = useState(false);
 
+  // ── Column definitions (default order) ──
+  const DEFAULT_HEADERS = [
+    { key: 'ticker',           label: 'Ticker',           sticky: 'ticker' },
+    { key: 'company',          label: 'Company' },
+    { key: 'status',           label: 'Status' },
+    { key: 'alert_date',       label: 'Date' },
+    { key: 'days_held',        label: 'Days Since Alert' },
+    { key: 'source',           label: 'Source' },
+    { key: 'signal_type',      label: 'Signal Type' },
+    { key: 'signal_strength',  label: 'Signal Strength' },
+    { key: 'price_at_alert',   label: 'Entry' },
+    { key: 'latest_price',     label: 'Latest' },
+    { key: 'pct',              label: '% Change' },
+    { key: 'trend',            label: 'Trend (7d)' },
+    { key: 'recommendation',   label: 'AI Rec' },
+    { key: 'forecast_price',   label: 'Forecast Sell' },
+    { key: 'days_to_forecast', label: 'Days \u{2192} Sell' },
+  ];
+  const ALL_KEYS = DEFAULT_HEADERS.map(h => h.key);
+
+  // ── Persisted column order & visibility (cookie-based) ──
+  const [colOrder, setColOrder] = useState(ALL_KEYS);
+  const [hiddenCols, setHiddenCols] = useState([]);
+  const [showColSettings, setShowColSettings] = useState(false);
+  const [dragIdx, setDragIdx] = useState(null);
+
+  // Load from cookie on mount
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    try {
+      const m = document.cookie.match(/(?:^|; )qt_columns=([^;]*)/);
+      if (m) {
+        const parsed = JSON.parse(decodeURIComponent(m[1]));
+        if (parsed.order?.length) {
+          // Merge: keep saved order, append any new cols not in saved list
+          const merged = [...parsed.order.filter(k => ALL_KEYS.includes(k)), ...ALL_KEYS.filter(k => !parsed.order.includes(k))];
+          setColOrder(merged);
+        }
+        if (parsed.hidden?.length) setHiddenCols(parsed.hidden.filter(k => ALL_KEYS.includes(k)));
+      }
+    } catch {}
+  }, []);
+
+  const persistColumns = (order, hidden) => {
+    if (typeof document === 'undefined') return;
+    const val = encodeURIComponent(JSON.stringify({ order, hidden }));
+    document.cookie = `qt_columns=${val}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+  };
+
+  const toggleColVisibility = (key) => {
+    // Don't allow hiding ticker
+    if (key === 'ticker') return;
+    setHiddenCols(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+      persistColumns(colOrder, next);
+      return next;
+    });
+  };
+
+  const handleDragStart = (idx) => setDragIdx(idx);
+  const handleDragOver = (e, idx) => {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) return;
+    setColOrder(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(dragIdx, 1);
+      next.splice(idx, 0, moved);
+      persistColumns(next, hiddenCols);
+      return next;
+    });
+    setDragIdx(idx);
+  };
+  const handleDragEnd = () => setDragIdx(null);
+
+  const resetColumns = () => {
+    setColOrder(ALL_KEYS);
+    setHiddenCols([]);
+    persistColumns(ALL_KEYS, []);
+  };
+
+  // Build visible headers in user order
+  const headerMap = {};
+  DEFAULT_HEADERS.forEach(h => { headerMap[h.key] = h; });
+  const visibleHeaders = colOrder.filter(k => !hiddenCols.includes(k)).map(k => headerMap[k]);
+
   // Persist collapsed preference in a cookie
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -2064,23 +2149,7 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
   };
   const sortIcon = (key) => sortKey !== key ? '\u{21C5}' : sortDir === 'asc' ? '\u{25B2}' : '\u{25BC}';
 
-  const headers = [
-    { key: 'ticker',           label: 'Ticker',           sticky: 'ticker' },
-    { key: 'company',          label: 'Company' },
-    { key: 'status',           label: 'Status' },
-    { key: 'alert_date',       label: 'Date' },
-    { key: 'days_held',        label: 'Days Since Alert' },
-    { key: 'source',           label: 'Source' },
-    { key: 'signal_type',      label: 'Signal Type' },
-    { key: 'signal_strength',  label: 'Signal Strength' },
-    { key: 'price_at_alert',   label: 'Entry' },
-    { key: 'latest_price',     label: 'Latest' },
-    { key: 'pct',              label: '% Change' },
-    { key: null,               label: 'Trend (7d)' },
-    { key: 'recommendation',   label: 'AI Rec' },
-    { key: 'forecast_price',   label: 'Forecast Sell' },
-    { key: 'days_to_forecast', label: 'Days \u{2192} Sell' },
-  ];
+  const headers = visibleHeaders;
 
   return (
     <div className={`quicktable-section${collapsed ? ' quicktable-collapsed' : ''}`}>
@@ -2123,6 +2192,52 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
               <option value="dropped">Dropped only</option>
               <option value="all">All (incl. dropped)</option>
             </select>
+            <div className="qt-col-settings-wrap">
+              <button
+                className="qt-col-settings-btn"
+                onClick={() => setShowColSettings(prev => !prev)}
+                title="Customize columns"
+              >
+                {"\u{2699}"} Columns
+              </button>
+              {showColSettings && (
+                <div className="qt-col-dropdown">
+                  <div className="qt-col-dropdown-header">
+                    <span>Drag to reorder, toggle to show/hide</span>
+                    <button className="qt-col-reset-btn" onClick={resetColumns}>Reset</button>
+                  </div>
+                  <ul className="qt-col-list">
+                    {colOrder.map((key, idx) => {
+                      const h = headerMap[key];
+                      if (!h) return null;
+                      const isHidden = hiddenCols.includes(key);
+                      const isTicker = key === 'ticker';
+                      return (
+                        <li
+                          key={key}
+                          className={`qt-col-item ${dragIdx === idx ? 'qt-col-dragging' : ''} ${isTicker ? 'qt-col-locked' : ''}`}
+                          draggable={!isTicker}
+                          onDragStart={() => handleDragStart(idx)}
+                          onDragOver={(e) => handleDragOver(e, idx)}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <span className="qt-col-grip">{isTicker ? '\u{1F512}' : '\u{2630}'}</span>
+                          <label className="qt-col-label">
+                            <input
+                              type="checkbox"
+                              checked={!isHidden}
+                              disabled={isTicker}
+                              onChange={() => toggleColVisibility(key)}
+                            />
+                            {h.label}
+                          </label>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -2133,17 +2248,18 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
           <thead>
             <tr>
               <th className="qt-sticky qt-sticky-star">{"\u{2B50}"}</th>
-              {headers.map((h, i) => h.key ? (
-                <th
-                  key={h.key}
-                  className={`qt-sortable${h.sticky === 'ticker' ? ' qt-sticky qt-sticky-ticker' : ''}`}
-                  onClick={() => clickSort(h.key)}
-                >
-                  {h.label} <span className="qt-sort">{sortIcon(h.key)}</span>
-                </th>
-              ) : (
-                <th key={`static-${i}`}>{h.label}</th>
-              ))}
+              {headers.map((h) => {
+                const isSortable = h.key && h.key !== 'trend';
+                return (
+                  <th
+                    key={h.key}
+                    className={`${isSortable ? 'qt-sortable' : ''}${h.sticky === 'ticker' ? ' qt-sticky qt-sticky-ticker' : ''}`}
+                    onClick={isSortable ? () => clickSort(h.key) : undefined}
+                  >
+                    {h.label} {isSortable && <span className="qt-sort">{sortIcon(h.key)}</span>}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -2164,6 +2280,25 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
               const srcMeta = getSourceMeta(a.source);
               const dh = daysHeld(a);
               const dtf = daysToForecast(a);
+
+              // Dynamic cell renderer keyed by column key
+              const cellMap = {
+                ticker: <td key="ticker" className="qt-sticky qt-sticky-ticker qt-ticker"><button className="qt-ticker-btn" onClick={() => onJumpToCard(a)} title="Jump to card">{a.ticker}</button></td>,
+                company: <td key="company" className="qt-company"><button className="qt-company-btn" onClick={() => onJumpToCard(a)} title="View full card">{a.company}</button></td>,
+                status: <td key="status"><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>,
+                alert_date: <td key="alert_date" className="qt-muted tbl-alert-date">{a.alert_date}</td>,
+                days_held: <td key="days_held" className="qt-muted">{dh}d</td>,
+                source: <td key="source"><span className={`source-badge-sm ${srcMeta.cls}`}>{srcMeta.emoji} {srcMeta.label}</span></td>,
+                signal_type: <td key="signal_type"><span className="signal-chip">{a.signal_type}</span></td>,
+                signal_strength: <td key="signal_strength"><SignalBars score={a.signal_strength} subScores={a.signal_sub_scores} sourceCount={a.signal_source_count} mentionCount={a.signal_mention_count} /></td>,
+                price_at_alert: <td key="price_at_alert" className="tbl-alert-price">${entry.toFixed(2)}</td>,
+                latest_price: <td key="latest_price">{latest?.price != null ? '$' + latest.price.toFixed(2) : '\u{2014}'}</td>,
+                pct: <td key="pct" className={`tbl-${perf}`}>{fmtPct(pct)}</td>,
+                trend: <td key="trend" className="qt-trend"><MiniSparkline prices={a.prices} /></td>,
+                recommendation: <td key="recommendation"><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>,
+                forecast_price: <td key="forecast_price" className="qt-forecast"><div className="qt-forecast-inner"><span className="qt-forecast-price">${fc.price.toFixed(2)}</span><span className={`qt-forecast-upside ${upside >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmtPct(upside)}</span>{fc.source === 'calc' && <span className="qt-forecast-est" title={`Estimated: ${rec} + ${tierLabel(fc.tier)} signal \u2192 +${(fc.upsidePct ?? 0).toFixed(0)}%`}>est</span>}</div></td>,
+                days_to_forecast: <td key="days_to_forecast" className="qt-muted">{dtf === null ? '\u{2014}' : dtf < 0 ? <span className="pct-neg">Overdue</span> : dtf + 'd'}</td>,
+              };
               return (
                 <tr key={a.id || `${a.ticker}-${idx}`} className={pickStatus === 'dropped' ? 'row-dropped' : ''}>
                   <td className="qt-sticky qt-sticky-star">
@@ -2175,47 +2310,7 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
                       {isW ? '\u{2605}' : '\u{2606}'}
                     </button>
                   </td>
-                  <td className="qt-sticky qt-sticky-ticker qt-ticker">
-                    <button className="qt-ticker-btn" onClick={() => onJumpToCard(a)} title="Jump to card">{a.ticker}</button>
-                  </td>
-                  <td className="qt-company">
-                    <button className="qt-company-btn" onClick={() => onJumpToCard(a)} title="View full card">{a.company}</button>
-                  </td>
-                  <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
-                  <td className="qt-muted tbl-alert-date">{a.alert_date}</td>
-                  <td className="qt-muted">{dh}d</td>
-                  <td><span className={`source-badge-sm ${srcMeta.cls}`}>{srcMeta.emoji} {srcMeta.label}</span></td>
-                  <td><span className="signal-chip">{a.signal_type}</span></td>
-                  <td>
-                    <SignalBars
-                      score={a.signal_strength}
-                      subScores={a.signal_sub_scores}
-                      sourceCount={a.signal_source_count}
-                      mentionCount={a.signal_mention_count}
-                    />
-                  </td>
-                  <td className="tbl-alert-price">${entry.toFixed(2)}</td>
-                  <td>{latest?.price != null ? '$' + latest.price.toFixed(2) : '\u{2014}'}</td>
-                  <td className={`tbl-${perf}`}>{fmtPct(pct)}</td>
-                  <td className="qt-trend"><MiniSparkline prices={a.prices} /></td>
-                  <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
-                  <td className="qt-forecast">
-                    <div className="qt-forecast-inner">
-                      <span className="qt-forecast-price">${fc.price.toFixed(2)}</span>
-                      <span className={`qt-forecast-upside ${upside >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmtPct(upside)}</span>
-                      {fc.source === 'calc' && (
-                        <span
-                          className="qt-forecast-est"
-                          title={`Estimated: ${rec} + ${tierLabel(fc.tier)} signal \u2192 +${(fc.upsidePct ?? 0).toFixed(0)}%`}
-                        >
-                          est
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="qt-muted">
-                    {dtf === null ? '\u{2014}' : dtf < 0 ? <span className="pct-neg">Overdue</span> : dtf + 'd'}
-                  </td>
+                  {headers.map(h => cellMap[h.key])}
                 </tr>
               );
             })}
@@ -2299,8 +2394,14 @@ function LeaderboardTab({ alerts, currentUserId }) {
                 </div>
                 <div className={`lb-pl ${r.realizedPL >= 0 ? 'pct-pos' : 'pct-neg'}`}>
                   {r.realizedPL >= 0 ? '+' : ''}${r.realizedPL.toFixed(2)}
+                  {r.totalInvested > 0 && (
+                    <span className="lb-pl-pct">
+                      ({r.realizedPL >= 0 ? '+' : ''}{((r.realizedPL / r.totalInvested) * 100).toFixed(1)}%)
+                    </span>
+                  )}
                 </div>
                 <div className="lb-stats-row">
+                  <span>${r.totalInvested.toFixed(0)} invested</span>
                   <span>{r.closedCount} closed</span>
                   <span>{r.openCount} open</span>
                   {r.winRate !== null && <span>{(r.winRate * 100).toFixed(0)}% win</span>}
@@ -2327,7 +2428,10 @@ function LeaderboardTab({ alerts, currentUserId }) {
                 {selectedSummary.profile.display_name || selectedSummary.profile.email.split('@')[0]}
                 {selectedSummary.profile.is_admin && <span className="lb-admin-badge">Admin</span>}
               </div>
-              <div className="lb-detail-sub">{selectedSummary.closedCount} closed trades {"\u{B7}"} {selectedSummary.openCount} open</div>
+              <div className="lb-detail-sub">
+                ${selectedSummary.totalInvested.toFixed(2)} invested {"\u{B7}"} {selectedSummary.closedCount} closed {"\u{B7}"} {selectedSummary.openCount} open
+                {selectedSummary.totalInvested > 0 && <> {"\u{B7}"} <span className={selectedSummary.realizedPL >= 0 ? 'pct-pos' : 'pct-neg'}>{selectedSummary.realizedPL >= 0 ? '+' : ''}{((selectedSummary.realizedPL / selectedSummary.totalInvested) * 100).toFixed(1)}% return</span></>}
+              </div>
             </div>
           </div>
 
@@ -2346,16 +2450,18 @@ function LeaderboardTab({ alerts, currentUserId }) {
                       <tbody>
                         {open.map(t => {
                           const cur = getPrice(t.ticker);
+                          const invested = parseFloat(t.entry_amount);
                           const curVal = cur ? cur * parseFloat(t.shares) : null;
-                          const pl = curVal ? curVal - parseFloat(t.entry_amount) : null;
+                          const pl = curVal ? curVal - invested : null;
+                          const plPct = (pl !== null && invested > 0) ? (pl / invested) * 100 : null;
                           return (
                             <tr key={t.id}>
                               <td><strong>{t.ticker}</strong></td>
                               <td>{new Date(t.entry_date).toLocaleDateString()}</td>
-                              <td>${parseFloat(t.entry_amount).toFixed(2)}</td>
-                              <td>{curVal ? `$${curVal.toFixed(2)}` : '—'}</td>
+                              <td>${invested.toFixed(2)}</td>
+                              <td>{curVal ? `$${curVal.toFixed(2)}` : '\u{2014}'}</td>
                               <td className={pl === null ? '' : pl >= 0 ? 'pct-pos' : 'pct-neg'}>
-                                {pl === null ? '—' : `${pl >= 0 ? '+' : ''}$${pl.toFixed(2)}`}
+                                {pl === null ? '\u{2014}' : <>{pl >= 0 ? '+' : ''}${pl.toFixed(2)}<br /><span className="pt-sub">({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)</span></>}
                               </td>
                             </tr>
                           );
@@ -2371,16 +2477,19 @@ function LeaderboardTab({ alerts, currentUserId }) {
                       <thead><tr><th>Ticker</th><th>Entered</th><th>Exited</th><th>Entry $</th><th>Exit $</th><th>P/L</th></tr></thead>
                       <tbody>
                         {closed.map(t => {
-                          const pl = (parseFloat(t.exit_amount) || 0) - (parseFloat(t.entry_amount) || 0);
+                          const invested = parseFloat(t.entry_amount) || 0;
+                          const pl = (parseFloat(t.exit_amount) || 0) - invested;
+                          const plPct = invested > 0 ? (pl / invested) * 100 : 0;
                           return (
                             <tr key={t.id}>
                               <td><strong>{t.ticker}</strong></td>
                               <td>{new Date(t.entry_date).toLocaleDateString()}</td>
                               <td>{new Date(t.exit_date).toLocaleDateString()}</td>
-                              <td>${parseFloat(t.entry_amount).toFixed(2)}</td>
+                              <td>${invested.toFixed(2)}</td>
                               <td>${parseFloat(t.exit_amount).toFixed(2)}</td>
                               <td className={pl >= 0 ? 'pct-pos' : 'pct-neg'}>
-                                {pl >= 0 ? '+' : ''}${pl.toFixed(2)}
+                                {pl >= 0 ? '+' : ''}${pl.toFixed(2)}<br />
+                                <span className="pt-sub">({plPct >= 0 ? '+' : ''}{plPct.toFixed(1)}%)</span>
                               </td>
                             </tr>
                           );
