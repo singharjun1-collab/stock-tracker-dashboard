@@ -1713,11 +1713,17 @@ function TradeDetailDrawer({ trade, onUpdateReview }) {
 }
 
 // ── Portfolio Tab ──
-function PortfolioTab({ trades, alerts, onSell, onDelete, onBuyFromWatchlist, onUpdateReview }) {
+function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, onRefreshPrices, onSell, onDelete, onBuyFromWatchlist, onUpdateReview }) {
   const [expandedId, setExpandedId] = useState(null);
   const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id);
 
+  // Prefer the shared current_prices map (single source of truth, fresh
+  // for every ticker including dropped ones). Fall back to the viewer's
+  // alerts feed only if a ticker is missing from the map (first run
+  // before backfill, or an unknown ticker).
   const getLatest = (ticker) => {
+    const live = prices?.[ticker]?.price;
+    if (live != null && !Number.isNaN(live)) return live;
     const alert = alerts.find(a => a.ticker === ticker);
     if (!alert) return null;
     const last = alert.prices[alert.prices.length - 1];
@@ -1765,8 +1771,68 @@ function PortfolioTab({ trades, alerts, onSell, onDelete, onBuyFromWatchlist, on
   const fmt$ = (v) => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
   const fmtDate = (d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
+  // Find the freshest price timestamp across currently-held tickers.
+  // Used in the "Prices updated …" label next to the Refresh button.
+  const pricesFreshestAt = (() => {
+    const tickersHeld = new Set(openTrades.map(t => t.ticker));
+    let freshest = null;
+    for (const tk of tickersHeld) {
+      const ts = prices?.[tk]?.updated_at;
+      if (!ts) continue;
+      if (!freshest || new Date(ts) > new Date(freshest)) freshest = ts;
+    }
+    return freshest || pricesAsOf || null;
+  })();
+
+  const fmtAgo = (iso) => {
+    if (!iso) return '—';
+    const diff = Math.max(0, Date.now() - new Date(iso).getTime());
+    const s = Math.round(diff / 1000);
+    if (s < 60) return `${s}s ago`;
+    const m = Math.round(s / 60);
+    if (m < 60) return `${m}m ago`;
+    const h = Math.round(m / 60);
+    if (h < 48) return `${h}h ago`;
+    return new Date(iso).toLocaleString();
+  };
+
   return (
     <div className="portfolio-tab">
+      {/* Prices refresh bar */}
+      {onRefreshPrices && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-end',
+            gap: 12,
+            margin: '0 0 12px',
+            fontSize: '0.85rem',
+            color: '#7a9bc0',
+          }}
+        >
+          <span title={pricesFreshestAt || ''}>
+            Prices updated {fmtAgo(pricesFreshestAt)}
+          </span>
+          <button
+            type="button"
+            onClick={onRefreshPrices}
+            disabled={pricesRefreshing}
+            style={{
+              padding: '6px 12px',
+              background: 'rgba(97, 175, 254, 0.15)',
+              border: '1px solid rgba(97, 175, 254, 0.4)',
+              borderRadius: 6,
+              color: '#9fc5f0',
+              cursor: pricesRefreshing ? 'wait' : 'pointer',
+              fontSize: '0.85rem',
+            }}
+          >
+            {pricesRefreshing ? 'Refreshing…' : '↻ Refresh prices'}
+          </button>
+        </div>
+      )}
+
       {/* Summary */}
       <div className="pt-summary-grid">
         <div className="pt-stat">
@@ -2422,18 +2488,23 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
 }
 
 // ---------- LEADERBOARD TAB ----------
-function LeaderboardTab({ alerts, currentUserId }) {
+function LeaderboardTab({ alerts, prices, currentUserId }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [userTrades, setUserTrades] = useState(null);
+
+  // Refetch the leaderboard data whenever prices refresh. This keeps every
+  // user's realized/unrealized P/L in sync with the latest quote without
+  // forcing a full page reload.
+  const pricesKey = prices ? Object.keys(prices).length : 0;
 
   useEffect(() => {
     fetch('/api/leaderboard')
       .then(r => r.ok ? r.json() : null)
       .then(d => { setData(d); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [pricesKey]);
 
   useEffect(() => {
     if (!selectedUserId) { setUserTrades(null); return; }
@@ -2445,8 +2516,12 @@ function LeaderboardTab({ alerts, currentUserId }) {
   if (loading) return <div style={{ padding: 40, textAlign: 'center', color: '#7a9bc0' }}>Loading community portfolios…</div>;
   if (!data?.leaderboard?.length) return <div style={{ padding: 40, textAlign: 'center', color: '#7a9bc0' }}>No approved users yet.</div>;
 
-  // Get current price for a trade (from live alerts)
+  // Prefer the shared current_prices map so every user's portfolio is
+  // priced the same way regardless of who's viewing. Fall back to the
+  // viewer's alerts feed only if a ticker is missing from the map.
   const getPrice = (ticker) => {
+    const live = prices?.[ticker]?.price;
+    if (live != null && !Number.isNaN(live)) return live;
     const a = alerts.find(x => x.ticker === ticker);
     if (!a) return null;
     const hist = a.prices || [];
@@ -2766,6 +2841,13 @@ export default function Dashboard() {
   const [aiSettings, setAISettings] = useState({});
   const [watchlist, setWatchlistState] = useState([]);
   const [paperTrades, setPaperTrades] = useState([]);
+  // Live ticker -> { price, price_date, updated_at } map. Single source of
+  // truth for Portfolio + Leaderboard P/L so staleness in one user's
+  // alerts[] can't skew everyone else's view. Refreshed on a 2-min timer
+  // plus on tab focus, plus on the manual "Refresh prices" button.
+  const [prices, setPrices] = useState({});
+  const [pricesAsOf, setPricesAsOf] = useState(null);
+  const [pricesRefreshing, setPricesRefreshing] = useState(false);
   const [buyModalState, setBuyModalState] = useState(null);   // { alert, currentPrice }
   const [sellModalState, setSellModalState] = useState(null); // { trade, currentPrice }
   const [profile, setProfile] = useState(null);
@@ -2815,6 +2897,74 @@ export default function Dashboard() {
       .then(data => { if (data?.settings) setAISettings(data.settings); })
       .catch(() => {});
   }, [router]);
+
+  // ── Live price refresh ─────────────────────────────────────────────
+  // Fetches the shared current_prices map from /api/prices. Called on
+  // mount, every 2 minutes while the tab is visible, whenever the user
+  // switches back to the tab, and on-demand via the Refresh button.
+  const refreshPrices = useCallback(async () => {
+    try {
+      setPricesRefreshing(true);
+      const res = await fetch('/api/prices', { cache: 'no-store' });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.prices) setPrices(data.prices);
+      if (data?.as_of) setPricesAsOf(data.as_of);
+    } catch {
+      // Intentionally swallow — next poll will retry. A failed refresh
+      // should never break the dashboard.
+    } finally {
+      setPricesRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initial fetch
+    refreshPrices();
+
+    // 2-minute polling, paused while tab is hidden to save bandwidth.
+    let intervalId = null;
+    const startPolling = () => {
+      if (intervalId != null) return;
+      intervalId = setInterval(refreshPrices, 120_000);
+    };
+    const stopPolling = () => {
+      if (intervalId == null) return;
+      clearInterval(intervalId);
+      intervalId = null;
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        refreshPrices(); // Catch up immediately on focus
+        startPolling();
+      } else {
+        stopPolling();
+      }
+    };
+
+    // Start polling if tab is currently visible
+    if (document.visibilityState === 'visible') startPolling();
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', refreshPrices);
+
+    return () => {
+      stopPolling();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', refreshPrices);
+    };
+  }, [refreshPrices]);
+
+  // Also refetch paper trades alongside prices so Portfolio P/L stays
+  // consistent when another tab/session closes a trade.
+  const refreshPaperTrades = useCallback(async () => {
+    try {
+      const res = await fetch('/api/paper-trades');
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data?.trades) setPaperTrades(data.trades);
+    } catch {}
+  }, []);
 
   const handleToggleWatchlist = useCallback((ticker) => {
     const newList = toggleWatchlist(ticker);
@@ -3346,12 +3496,16 @@ export default function Dashboard() {
         <PortfolioTab
           trades={paperTrades}
           alerts={alerts}
+          prices={prices}
+          pricesAsOf={pricesAsOf}
+          pricesRefreshing={pricesRefreshing}
+          onRefreshPrices={() => { refreshPrices(); refreshPaperTrades(); }}
           onSell={handleOpenSellModal}
           onDelete={handleDeleteTrade}
           onUpdateReview={handleUpdateReview}
         />
       ) : activeTab === 'leaderboard' ? (
-        <LeaderboardTab alerts={alerts} currentUserId={profile?.id} />
+        <LeaderboardTab alerts={alerts} prices={prices} currentUserId={profile?.id} />
       ) : activeTab === 'users' && profile?.is_admin ? (
         <UsersAdminTab currentUserId={profile.id} />
       ) : (
