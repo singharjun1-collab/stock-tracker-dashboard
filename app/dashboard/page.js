@@ -2989,6 +2989,18 @@ function UsersAdminTab({ currentUserId }) {
   );
 }
 
+// ── Cookie helpers for collapsible section preferences ──
+function readCookieFlag(name, defaultVal = false) {
+  if (typeof document === 'undefined') return defaultVal;
+  const m = document.cookie.match(new RegExp('(?:^|; )' + name + '=([^;]*)'));
+  if (!m) return defaultVal;
+  return m[1] === '1';
+}
+function writeCookieFlag(name, val) {
+  if (typeof document === 'undefined') return;
+  document.cookie = `${name}=${val ? '1' : '0'}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
+
 export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -3003,6 +3015,22 @@ export default function Dashboard() {
   const [aiSettings, setAISettings] = useState({});
   const [watchlist, setWatchlistState] = useState([]);
   const [paperTrades, setPaperTrades] = useState([]);
+  // Collapse preferences for the dashboard "summary" sections (stats bar, movers).
+  // Persisted in cookies so the layout sticks across visits.
+  const [statsCollapsed, setStatsCollapsed] = useState(false);
+  const [moversCollapsed, setMoversCollapsed] = useState(false);
+  // Mobile-only toggle: on small screens we only show one of Gainers / Losers at a time.
+  const [moversMobileView, setMoversMobileView] = useState('gainers'); // 'gainers' | 'losers'
+  useEffect(() => {
+    setStatsCollapsed(readCookieFlag('stats_collapsed', false));
+    setMoversCollapsed(readCookieFlag('movers_collapsed', false));
+  }, []);
+  const toggleStatsCollapsed = useCallback(() => {
+    setStatsCollapsed(prev => { const next = !prev; writeCookieFlag('stats_collapsed', next); return next; });
+  }, []);
+  const toggleMoversCollapsed = useCallback(() => {
+    setMoversCollapsed(prev => { const next = !prev; writeCookieFlag('movers_collapsed', next); return next; });
+  }, []);
   // Live ticker -> { price, price_date, updated_at } map. Single source of
   // truth for Portfolio + Leaderboard P/L so staleness in one user's
   // alerts[] can't skew everyone else's view. Refreshed on a 2-min timer
@@ -3570,100 +3598,8 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* QUICK SCAN TABLE (sortable, top-of-dashboard at-a-glance view) */}
-      <QuickTable
-        alerts={alerts}
-        watchlist={watchlist}
-        onToggleWatchlist={handleToggleWatchlist}
-        onJumpToCard={handleJumpToCard}
-      />
-
-      {/* STATS BAR */}
-      <div className="stats-bar">
-        <div className={`stat-card stat-card-click${activeTab === 'active' && recFilter === 'ALL' ? ' stat-card-active' : ''}`}
-          onClick={() => { setActiveTab('active'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
-          <div className="stat-value">{totalCurrent}</div>
-          <div className="stat-label">Current Picks</div>
-        </div>
-        <div className={`stat-card stat-card-click${activeTab === 'new' ? ' stat-card-active' : ''}`}
-          onClick={() => { setActiveTab('new'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
-          <div className="stat-value" style={{ color: '#00e5ff' }}>{newPicks.length}</div>
-          <div className="stat-label">{"\u{1F195}"} New Today</div>
-        </div>
-        <div className={`stat-card stat-buy-glow stat-card-click${recFilter === 'BUY' ? ' stat-card-active' : ''}`}
-          onClick={() => { setActiveTab('active'); setRecFilter('BUY'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
-          <div className="stat-value" style={{ color: '#22c55e' }}>{buys}</div>
-          <div className="stat-label">{"\u{1F7E2}"} AI Says BUY</div>
-        </div>
-        <div className={`stat-card stat-card-click${recFilter === 'SELL' ? ' stat-card-active' : ''}`}
-          onClick={() => { setActiveTab('active'); setRecFilter('SELL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
-          <div className="stat-value" style={{ color: '#ef4444' }}>{sells}</div>
-          <div className="stat-label">{"\u{1F534}"} AI Says SELL</div>
-        </div>
-        <div className={`stat-card stat-card-click${activeTab === 'analytics' ? ' stat-card-active' : ''}`}
-          onClick={() => { setActiveTab('analytics'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
-          <div className="stat-value" style={{ color: avgPct >= 0 ? '#22c55e' : '#ef4444' }}>
-            {fmtPct(avgPct)}
-          </div>
-          <div className="stat-label">Avg Return</div>
-        </div>
-        <div className={`stat-card stat-card-click${activeTab === 'watchlist' ? ' stat-card-active' : ''}`}
-          onClick={() => { setActiveTab('watchlist'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
-          <div className="stat-value" style={{ color: '#fbbf24' }}>{watchlist.length}</div>
-          <div className="stat-label">{"\u{2B50}"} Watchlist</div>
-        </div>
-        <div className={`stat-card stat-card-click${activeTab === 'dropped' ? ' stat-card-active' : ''}`}
-          onClick={() => { setActiveTab('dropped'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
-          <div className="stat-value" style={{ color: '#7a9bc0' }}>{droppedPicks.length}</div>
-          <div className="stat-label">{"\u{1F4E6}"} Dropped</div>
-        </div>
-      </div>
-      {recFilter !== 'ALL' && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
-          <button className="rec-filter-chip" onClick={() => setRecFilter('ALL')}>
-            Showing {recFilter} only &times;
-          </button>
-        </div>
-      )}
-
-      {/* TOP GAINERS / BIGGEST LOSERS */}
-      {(() => {
-        const sorted = currentPicks
-          .map(a => ({ ticker: a.ticker, company: a.company, pct: getLatestPct(a) }))
-          .sort((a, b) => b.pct - a.pct);
-        const topGainers = sorted.slice(0, 5);
-        const topLosers = [...sorted].sort((a, b) => a.pct - b.pct).slice(0, 5);
-        return (
-          <div className="movers-row">
-            <div className="movers-card">
-              <h3 className="movers-heading movers-gainers-heading">{"\u{1F4C8}"} Top Gainers</h3>
-              <div className="movers-list">
-                {topGainers.map((s, i) => (
-                  <div key={s.ticker} className="movers-item">
-                    <span className="movers-rank">{i + 1}</span>
-                    <span className="movers-ticker">{s.ticker}</span>
-                    <span className="movers-pct pct-pos">{fmtPct(s.pct)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="movers-card">
-              <h3 className="movers-heading movers-losers-heading">{"\u{1F4C9}"} Biggest Losers</h3>
-              <div className="movers-list">
-                {topLosers.map((s, i) => (
-                  <div key={s.ticker} className="movers-item">
-                    <span className="movers-rank">{i + 1}</span>
-                    <span className="movers-ticker">{s.ticker}</span>
-                    <span className="movers-pct pct-neg">{fmtPct(s.pct)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* SEARCH BAR */}
+      {/* ─── PRIMARY NAVIGATION: SEARCH + TABS (sticky) ─── */}
+      {/* Search moved here (from below movers) so it's reachable without scrolling, especially on mobile. */}
       <div className="search-bar-container">
         <div className="search-bar">
           <span className="search-icon">{"\u{1F50D}"}</span>
@@ -3681,43 +3617,206 @@ export default function Dashboard() {
         <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
       </div>
 
-      {/* TABS */}
+      {/* Sticky tabs wrapper — tabs stay pinned to top as user scrolls */}
       <div id="tabs-anchor" />
-      <div className="tabs-container">
-        <div className="tabs-row">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${tab.id === 'new' && newPicks.length > 0 ? 'tab-glow' : ''}`}
-              onClick={() => { setActiveTab(tab.id); setRecFilter('ALL'); }}
-            >
-              {tab.label}
-              {tab.count !== null && <span className="tab-count">{tab.count}</span>}
-            </button>
-          ))}
+      <div className="tabs-sticky-wrap">
+        <div className="tabs-container">
+          <div className="tabs-row">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${tab.id === 'new' && newPicks.length > 0 ? 'tab-glow' : ''}`}
+                onClick={() => { setActiveTab(tab.id); setRecFilter('ALL'); }}
+              >
+                {tab.label}
+                {tab.count !== null && <span className="tab-count">{tab.count}</span>}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
 
-      {/* FILTER BAR (signal type) - shown on all tabs except analytics */}
-      {activeTab !== 'analytics' && (
-        <div className="filter-bar">
-          {signalTypes.map(type => (
-            <button
-              key={type}
-              className={`filter-btn ${filter === type ? 'active' : ''}`}
-              onClick={() => setFilter(type)}
-            >
-              {type}
-            </button>
-          ))}
-        </div>
-      )}
+        {/* FILTER BAR (signal type) - shown on all tabs except analytics */}
+        {activeTab !== 'analytics' && (
+          <div className="filter-bar">
+            {signalTypes.map(type => (
+              <button
+                key={type}
+                className={`filter-btn ${filter === type ? 'active' : ''}`}
+                onClick={() => setFilter(type)}
+              >
+                {type}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ACTIVE AI FILTER BANNER - shows when a non-default AI filter is applied */}
       <ActiveAIFilterBanner
         settings={aiSettings}
         onClear={handleSaveAISetting}
         onOpenSettings={() => setShowAISettings(true)}
+      />
+
+      {/* ─── COLLAPSIBLE STATS BAR ─── */}
+      <div className={`stats-section${statsCollapsed ? ' stats-collapsed' : ''}`}>
+        <div className="section-collapse-header">
+          <button
+            className="section-collapse-btn"
+            onClick={toggleStatsCollapsed}
+            title={statsCollapsed ? 'Expand stats' : 'Collapse stats'}
+            aria-expanded={!statsCollapsed}
+          >
+            <span className={`section-caret${statsCollapsed ? ' collapsed' : ''}`}>{"\u{25BC}"}</span>
+            <span className="section-collapse-title">{"\u{1F4CA}"} Overview</span>
+            {statsCollapsed && (
+              <span className="section-collapse-summary">
+                {totalCurrent} picks &middot; {buys} BUY &middot; {sells} SELL &middot; {fmtPct(avgPct)} avg
+              </span>
+            )}
+          </button>
+        </div>
+        {!statsCollapsed && (
+          <>
+            <div className="stats-bar">
+              <div className={`stat-card stat-card-click${activeTab === 'active' && recFilter === 'ALL' ? ' stat-card-active' : ''}`}
+                onClick={() => { setActiveTab('active'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                <div className="stat-value">{totalCurrent}</div>
+                <div className="stat-label">Current Picks</div>
+              </div>
+              <div className={`stat-card stat-card-click${activeTab === 'new' ? ' stat-card-active' : ''}`}
+                onClick={() => { setActiveTab('new'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                <div className="stat-value" style={{ color: '#00e5ff' }}>{newPicks.length}</div>
+                <div className="stat-label">{"\u{1F195}"} New Today</div>
+              </div>
+              <div className={`stat-card stat-buy-glow stat-card-click${recFilter === 'BUY' ? ' stat-card-active' : ''}`}
+                onClick={() => { setActiveTab('active'); setRecFilter('BUY'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                <div className="stat-value" style={{ color: '#22c55e' }}>{buys}</div>
+                <div className="stat-label">{"\u{1F7E2}"} AI Says BUY</div>
+              </div>
+              <div className={`stat-card stat-card-click${recFilter === 'SELL' ? ' stat-card-active' : ''}`}
+                onClick={() => { setActiveTab('active'); setRecFilter('SELL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                <div className="stat-value" style={{ color: '#ef4444' }}>{sells}</div>
+                <div className="stat-label">{"\u{1F534}"} AI Says SELL</div>
+              </div>
+              <div className={`stat-card stat-card-click${activeTab === 'analytics' ? ' stat-card-active' : ''}`}
+                onClick={() => { setActiveTab('analytics'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                <div className="stat-value" style={{ color: avgPct >= 0 ? '#22c55e' : '#ef4444' }}>
+                  {fmtPct(avgPct)}
+                </div>
+                <div className="stat-label">Avg Return</div>
+              </div>
+              <div className={`stat-card stat-card-click${activeTab === 'watchlist' ? ' stat-card-active' : ''}`}
+                onClick={() => { setActiveTab('watchlist'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                <div className="stat-value" style={{ color: '#fbbf24' }}>{watchlist.length}</div>
+                <div className="stat-label">{"\u{2B50}"} Watchlist</div>
+              </div>
+              <div className={`stat-card stat-card-click${activeTab === 'dropped' ? ' stat-card-active' : ''}`}
+                onClick={() => { setActiveTab('dropped'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                <div className="stat-value" style={{ color: '#7a9bc0' }}>{droppedPicks.length}</div>
+                <div className="stat-label">{"\u{1F4E6}"} Dropped</div>
+              </div>
+            </div>
+            {recFilter !== 'ALL' && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 8 }}>
+                <button className="rec-filter-chip" onClick={() => setRecFilter('ALL')}>
+                  Showing {recFilter} only &times;
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* ─── COLLAPSIBLE TOP GAINERS / BIGGEST LOSERS ─── */}
+      {(() => {
+        const sorted = currentPicks
+          .map(a => ({ ticker: a.ticker, company: a.company, pct: getLatestPct(a) }))
+          .sort((a, b) => b.pct - a.pct);
+        const topGainers = sorted.slice(0, 5);
+        const topLosers = [...sorted].sort((a, b) => a.pct - b.pct).slice(0, 5);
+        const topGainerPct = topGainers[0]?.pct;
+        const topLoserPct = topLosers[0]?.pct;
+        return (
+          <div className={`movers-section${moversCollapsed ? ' movers-collapsed' : ''}`}>
+            <div className="section-collapse-header">
+              <button
+                className="section-collapse-btn"
+                onClick={toggleMoversCollapsed}
+                title={moversCollapsed ? 'Expand movers' : 'Collapse movers'}
+                aria-expanded={!moversCollapsed}
+              >
+                <span className={`section-caret${moversCollapsed ? ' collapsed' : ''}`}>{"\u{25BC}"}</span>
+                <span className="section-collapse-title">{"\u{1F504}"} Top Movers</span>
+                {moversCollapsed && (topGainers.length > 0 || topLosers.length > 0) && (
+                  <span className="section-collapse-summary">
+                    {topGainers[0] && <>Top: <b style={{ color: '#22c55e' }}>{topGainers[0].ticker} {fmtPct(topGainerPct)}</b></>}
+                    {topGainers[0] && topLosers[0] && ' · '}
+                    {topLosers[0] && <>Worst: <b style={{ color: '#ef4444' }}>{topLosers[0].ticker} {fmtPct(topLoserPct)}</b></>}
+                  </span>
+                )}
+              </button>
+
+              {/* Mobile-only gainers/losers toggle — shows just one list at a time on small screens */}
+              {!moversCollapsed && (
+                <div className="movers-mobile-toggle" role="tablist">
+                  <button
+                    role="tab"
+                    aria-selected={moversMobileView === 'gainers'}
+                    className={`movers-toggle-btn${moversMobileView === 'gainers' ? ' active' : ''}`}
+                    onClick={() => setMoversMobileView('gainers')}
+                  >
+                    {"\u{1F4C8}"} Gainers
+                  </button>
+                  <button
+                    role="tab"
+                    aria-selected={moversMobileView === 'losers'}
+                    className={`movers-toggle-btn${moversMobileView === 'losers' ? ' active' : ''}`}
+                    onClick={() => setMoversMobileView('losers')}
+                  >
+                    {"\u{1F4C9}"} Losers
+                  </button>
+                </div>
+              )}
+            </div>
+            {!moversCollapsed && (
+              <div className="movers-row">
+                <div className={`movers-card movers-gainers${moversMobileView === 'gainers' ? ' movers-mobile-visible' : ''}`}>
+                  <h3 className="movers-heading movers-gainers-heading">{"\u{1F4C8}"} Top Gainers</h3>
+                  <div className="movers-list">
+                    {topGainers.map((s, i) => (
+                      <div key={s.ticker} className="movers-item">
+                        <span className="movers-rank">{i + 1}</span>
+                        <span className="movers-ticker">{s.ticker}</span>
+                        <span className="movers-pct pct-pos">{fmtPct(s.pct)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className={`movers-card movers-losers${moversMobileView === 'losers' ? ' movers-mobile-visible' : ''}`}>
+                  <h3 className="movers-heading movers-losers-heading">{"\u{1F4C9}"} Biggest Losers</h3>
+                  <div className="movers-list">
+                    {topLosers.map((s, i) => (
+                      <div key={s.ticker} className="movers-item">
+                        <span className="movers-rank">{i + 1}</span>
+                        <span className="movers-ticker">{s.ticker}</span>
+                        <span className="movers-pct pct-neg">{fmtPct(s.pct)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* QUICK SCAN TABLE (already has its own collapse control) */}
+      <QuickTable
+        alerts={alerts}
+        watchlist={watchlist}
+        onToggleWatchlist={handleToggleWatchlist}
+        onJumpToCard={handleJumpToCard}
       />
 
       {/* TAB CONTENT */}
@@ -3938,6 +4037,45 @@ export default function Dashboard() {
         {"\u{26A1}"} Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB {"\u{B7}"} Reddit {"\u{B7}"} Polymarket {"\u{B7}"} Kalshi {"\u{B7}"} Yahoo Finance {"\u{B7}"} Google Finance {"\u{B7}"} StockTwits</span>
         <div className="disclaimer">{"\u{26A0}"}{"\u{FE0F}"} AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
       </footer>
+
+      {/* ─── MOBILE BOTTOM NAV BAR ───
+          Fixed thumb-reachable nav for phones. Hidden on desktop via CSS.
+          Mirrors the most commonly used tabs so users don't have to scroll back up. */}
+      <nav className="mobile-bottom-nav" aria-label="Primary">
+        <button
+          className={`mb-nav-btn${activeTab === 'active' ? ' active' : ''}`}
+          onClick={() => { setActiveTab('active'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Active picks"
+        >
+          <span className="mb-nav-icon">{"\u{1F525}"}</span>
+          <span className="mb-nav-label">Active</span>
+        </button>
+        <button
+          className={`mb-nav-btn${activeTab === 'watchlist' ? ' active' : ''}`}
+          onClick={() => { setActiveTab('watchlist'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Watchlist"
+        >
+          <span className="mb-nav-icon">{"\u{2B50}"}</span>
+          <span className="mb-nav-label">Watchlist</span>
+          {watchlist.length > 0 && <span className="mb-nav-badge">{watchlist.length}</span>}
+        </button>
+        <button
+          className={`mb-nav-btn${activeTab === 'portfolio' ? ' active' : ''}`}
+          onClick={() => { setActiveTab('portfolio'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Portfolio"
+        >
+          <span className="mb-nav-icon">{"\u{1F4BC}"}</span>
+          <span className="mb-nav-label">Portfolio</span>
+        </button>
+        <button
+          className={`mb-nav-btn${activeTab === 'leaderboard' ? ' active' : ''}`}
+          onClick={() => { setActiveTab('leaderboard'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Leaderboard"
+        >
+          <span className="mb-nav-icon">{"\u{1F3C6}"}</span>
+          <span className="mb-nav-label">Leaders</span>
+        </button>
+      </nav>
     </>
   );
 }

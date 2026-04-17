@@ -3067,3 +3067,174 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   background: rgba(34,197,94,0.25);
   border-color: #22c55e;
 }
+
+/* ═══════════════════════════════════════════════════════════
+   NAV + COLLAPSIBLE SECTIONS (2026-04-17 redesign)
+   Search + tabs promoted to top. Stats and movers are
+   collapsible. Tabs pin to top on scroll. Mobile gets
+   horizontal scroll tabs + a bottom nav bar.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── STICKY TAB WRAPPER ── */
+.tabs-sticky-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: rgba(10, 14, 26, 0.92);
+  backdrop-filter: saturate(140%) blur(10px);
+  -webkit-backdrop-filter: saturate(140%) blur(10px);
+  border-bottom: 1px solid rgba(30, 58, 95, 0.4);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+.tabs-sticky-wrap .tabs-container { margin: 0; padding: 6px 40px 0; }
+.tabs-sticky-wrap .filter-bar { padding: 8px 40px 10px; margin: 0; }
+
+/* Improve horizontal scroll appearance for the tab row */
+.tabs-row::-webkit-scrollbar { height: 0; }
+.tabs-row { scrollbar-width: none; }
+/* Subtle edge fade so users know the tab row scrolls sideways */
+.tabs-container { position: relative; }
+.tabs-container::after {
+  content: '';
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 28px;
+  pointer-events: none;
+  background: linear-gradient(to right, rgba(10, 14, 26, 0), rgba(10, 14, 26, 0.9));
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+@media (max-width: 768px) {
+  .tabs-container::after { opacity: 1; }
+}
+
+/* ── COLLAPSIBLE SECTION HEADERS (shared style for Stats + Movers) ── */
+.section-collapse-header {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 10px 40px 0;
+}
+.section-collapse-btn {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: none; color: #b8d4f0;
+  font-size: 0.88rem; font-weight: 700; letter-spacing: 0.3px;
+  cursor: pointer; padding: 6px 8px; border-radius: 8px;
+  transition: background 0.15s;
+  flex: 1; min-width: 0;
+}
+.section-collapse-btn:hover { background: rgba(79, 195, 247, 0.06); }
+.section-collapse-title { color: #b8d4f0; white-space: nowrap; }
+.section-collapse-summary {
+  color: #7a9bc0; font-size: 0.78rem; font-weight: 500;
+  margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.section-caret {
+  display: inline-block; color: #4fc3f7; font-size: 0.7rem;
+  transition: transform 0.2s ease;
+}
+.section-caret.collapsed { transform: rotate(-90deg); }
+
+/* Stats section — collapse just hides the cards, header stays */
+.stats-section { margin-top: 6px; }
+.stats-section.stats-collapsed .stats-bar { display: none; }
+
+/* Movers section — collapse hides row, header stays */
+.movers-section { margin-top: 6px; }
+.movers-section.movers-collapsed .movers-row { display: none; }
+.movers-section .movers-row { margin-top: 8px; }
+
+/* ── MOBILE GAINERS/LOSERS TOGGLE ──
+   On desktop: side-by-side, toggle hidden.
+   On mobile:  one at a time, toggle shown. */
+.movers-mobile-toggle { display: none; gap: 4px; }
+.movers-toggle-btn {
+  padding: 6px 12px; border-radius: 18px; font-size: 0.75rem; font-weight: 700;
+  background: #0f1d30; color: #7a9bc0; border: 1px solid #1e3a5f;
+  cursor: pointer; transition: all 0.2s;
+  white-space: nowrap;
+}
+.movers-toggle-btn.active {
+  background: rgba(79, 195, 247, 0.12); color: #4fc3f7; border-color: #4fc3f7;
+}
+
+@media (max-width: 768px) {
+  .movers-mobile-toggle { display: flex; }
+  /* Only show one card at a time on mobile, based on toggle state */
+  .movers-row .movers-card { display: none; }
+  .movers-row .movers-card.movers-mobile-visible { display: block; }
+  /* Hide the individual card heading on mobile since the toggle shows which is which */
+  .movers-row .movers-card .movers-heading { display: none; }
+  .section-collapse-header { padding: 10px 16px 0; flex-wrap: wrap; }
+}
+
+/* ── MOBILE BOTTOM NAV BAR ── */
+.mobile-bottom-nav {
+  display: none; /* shown only on mobile via media query */
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  z-index: 100;
+  background: rgba(10, 14, 26, 0.96);
+  backdrop-filter: saturate(140%) blur(14px);
+  -webkit-backdrop-filter: saturate(140%) blur(14px);
+  border-top: 1px solid #1e3a5f;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
+  padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px));
+  justify-content: space-around;
+  align-items: stretch;
+}
+.mb-nav-btn {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 2px;
+  background: none; border: none; color: #7a9bc0;
+  padding: 6px 4px; border-radius: 10px;
+  cursor: pointer; transition: all 0.15s;
+  position: relative;
+  min-height: 48px;
+}
+.mb-nav-btn:hover { color: #b8d4f0; background: rgba(79, 195, 247, 0.05); }
+.mb-nav-btn.active {
+  color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.1);
+}
+.mb-nav-btn.active::before {
+  content: '';
+  position: absolute;
+  top: -6px; left: 50%; transform: translateX(-50%);
+  width: 32px; height: 3px;
+  background: #4fc3f7; border-radius: 0 0 3px 3px;
+}
+.mb-nav-icon { font-size: 1.15rem; line-height: 1; }
+.mb-nav-label {
+  font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.3px; line-height: 1;
+}
+.mb-nav-badge {
+  position: absolute; top: 4px; right: 20%;
+  background: #fbbf24; color: #1a1a1a;
+  font-size: 0.58rem; font-weight: 800;
+  padding: 1px 5px; border-radius: 8px;
+  min-width: 14px; text-align: center;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav { display: flex; }
+  /* Push footer/content up so bottom nav doesn't cover it */
+  body { padding-bottom: 72px; }
+  /* Tighten desktop padding on nav wrappers */
+  .tabs-sticky-wrap .tabs-container { padding: 6px 16px 0; }
+  .tabs-sticky-wrap .filter-bar { padding: 8px 16px 10px; }
+}
+
+/* ── SMALL SCREEN TIGHTENING (<=600px) ── */
+@media (max-width: 600px) {
+  .section-collapse-header { padding: 8px 16px 0; }
+  .section-collapse-title { font-size: 0.82rem; }
+  .section-collapse-summary { font-size: 0.72rem; }
+  .stats-bar { padding: 12px 16px; }
+  .stat-card { min-width: 0; flex: 1 1 calc(50% - 8px); padding: 10px 8px; }
+  .stat-value { font-size: 1.3rem; }
+  .stat-label { font-size: 0.68rem; }
+  /* Make the tab row a bit more compact so more fit in view */
+  .tab-btn { padding: 10px 10px; font-size: 0.75rem; }
+  .tab-count { font-size: 0.62rem; padding: 1px 6px; }
+}
+
