@@ -721,32 +721,42 @@ function AlertCard({
       </div>
 
       {/* TRADE PLAN — entry / take profit / stop loss */}
-      {hasPlan && (
-        <div className="ac-plan">
-          {alert.entry_low != null && (
-            <div className="ac-plan-item ac-plan-entry">
-              <span className="ac-plan-lbl">Entry</span>
-              <span className="ac-plan-val">
-                ${parseFloat(alert.entry_low).toFixed(2)}–${parseFloat(alert.entry_high || alert.entry_low).toFixed(2)}
-              </span>
-            </div>
-          )}
-          {alert.target_low != null && (
-            <div className={`ac-plan-item ac-plan-target${targetHit ? ' hit' : ''}`}>
-              <span className="ac-plan-lbl">🎯 {targetHit ? 'Target hit ✓' : 'Take profit'}</span>
-              <span className="ac-plan-val">
-                ${parseFloat(alert.target_low).toFixed(2)}–${parseFloat(alert.target_high || alert.target_low).toFixed(2)}
-              </span>
-            </div>
-          )}
-          {alert.stop_loss != null && (
-            <div className={`ac-plan-item ac-plan-stop${stopHit ? ' hit' : ''}`}>
-              <span className="ac-plan-lbl">{stopHit ? 'Stop hit ✓' : 'Stop loss'}</span>
-              <span className="ac-plan-val">${parseFloat(alert.stop_loss).toFixed(2)}</span>
-            </div>
-          )}
-        </div>
-      )}
+      {hasPlan && (() => {
+        // Smart decimal formatting — stocks ≥$100 drop the cents so the chip
+        // range (e.g. $138–$144) fits in the narrow 3-column layout.
+        const fmtP = (n) => {
+          const v = parseFloat(n);
+          return v >= 100 ? `$${Math.round(v)}` : `$${v.toFixed(2)}`;
+        };
+        const fmtRange = (lo, hi) => {
+          const l = parseFloat(lo);
+          const h = parseFloat(hi || lo);
+          if (Math.abs(l - h) < 0.01) return fmtP(l);
+          return `${fmtP(l)}–${fmtP(h)}`;
+        };
+        return (
+          <div className="ac-plan">
+            {alert.entry_low != null && (
+              <div className="ac-plan-item ac-plan-entry">
+                <span className="ac-plan-lbl">Entry</span>
+                <span className="ac-plan-val">{fmtRange(alert.entry_low, alert.entry_high)}</span>
+              </div>
+            )}
+            {alert.target_low != null && (
+              <div className={`ac-plan-item ac-plan-target${targetHit ? ' hit' : ''}`}>
+                <span className="ac-plan-lbl">🎯 {targetHit ? 'Hit ✓' : 'Target'}</span>
+                <span className="ac-plan-val">{fmtRange(alert.target_low, alert.target_high)}</span>
+              </div>
+            )}
+            {alert.stop_loss != null && (
+              <div className={`ac-plan-item ac-plan-stop${stopHit ? ' hit' : ''}`}>
+                <span className="ac-plan-lbl">{stopHit ? 'Stop hit ✓' : 'Stop'}</span>
+                <span className="ac-plan-val">{fmtP(alert.stop_loss)}</span>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* AI READ — one-line call-explanation from the daily job */}
       {(alert.ai_read || alert.recommendation_reason) && (
