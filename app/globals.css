@@ -3343,6 +3343,9 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   /* Tighten desktop padding on nav wrappers */
   .tabs-sticky-wrap .tabs-container { padding: 6px 16px 0; }
   .tabs-sticky-wrap .filter-bar { padding: 8px 16px 10px; }
+  /* Hide the top tab row on mobile — the bottom nav already handles
+     tab switching, so the duplicate top row was just noise. */
+  .tabs-sticky-wrap { display: none; }
 }
 
 /* ── SMALL SCREEN TIGHTENING (<=600px) ── */
