@@ -64,13 +64,17 @@ function fmtPct(pct) {
   return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
 }
 function recLabel(rec) {
-  if (rec === 'BUY') return '\u{1F7E2} BUY';
+  if (rec === 'BUY')  return '\u{1F7E2} BUY';
   if (rec === 'SELL') return '\u{1F534} SELL';
+  if (rec === 'TRIM') return '\u{2702}\u{FE0F} TRIM';
+  if (rec === 'EXIT') return '\u{1F3C1} EXIT';
   return '\u{1F7E1} HOLD';
 }
 function recClass(rec) {
-  if (rec === 'BUY') return 'rec-buy';
+  if (rec === 'BUY')  return 'rec-buy';
   if (rec === 'SELL') return 'rec-sell';
+  if (rec === 'TRIM') return 'rec-trim';
+  if (rec === 'EXIT') return 'rec-exit';
   return 'rec-hold';
 }
 
@@ -1892,6 +1896,26 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
     return last?.price ?? parseFloat(alert.price_at_alert);
   };
 
+  // Look up the matching alert (live AI view) for a ticker. Returns null if the
+  // AI no longer tracks it (e.g. dropped with no re-scan).
+  const getAlert = (ticker) => alerts.find(a => a.ticker === ticker) || null;
+
+  // Live recommendation: what the AI would say RIGHT NOW. Falls back to the
+  // frozen entry rec only when we have no live alert for the ticker.
+  const getLiveRec = (trade) => {
+    const a = getAlert(trade.ticker);
+    if (a && a.recommendation) return String(a.recommendation).toUpperCase();
+    return trade.ai_recommendation_at_entry || 'HOLD';
+  };
+
+  // True if the live price has broken below the AI's stop-loss level.
+  const isStopHit = (ticker) => {
+    const a = getAlert(ticker);
+    if (!a || a.stop_loss == null) return false;
+    const p = getLatest(ticker);
+    return p != null && p <= parseFloat(a.stop_loss);
+  };
+
   const openTrades = trades.filter(t => t.status === 'open');
   const closedTrades = trades.filter(t => t.status === 'closed');
 
@@ -2069,7 +2093,7 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                   <th>Invested</th>
                   <th>Current Value</th>
                   <th>P/L</th>
-                  <th>AI Rec @ Entry</th>
+                  <th title="What the AI would recommend RIGHT NOW based on the latest scan. Click a row to see the original recommendation at entry.">AI Rec (Live)</th>
                   <th></th>
                 </tr>
               </thead>
@@ -2080,7 +2104,12 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                   const current = latest != null ? latest * parseFloat(t.shares) : invested;
                   const pnl = current - invested;
                   const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
-                  const rec = t.ai_recommendation_at_entry || 'HOLD';
+                  const entryRec = t.ai_recommendation_at_entry || 'HOLD';
+                  const liveRec = getLiveRec(t);
+                  const stopHit = isStopHit(t.ticker);
+                  const recTitle = liveRec !== entryRec
+                    ? `AI now says ${liveRec}. At entry it said ${entryRec}.`
+                    : `AI still says ${liveRec} (same as at entry).`;
                   const isOpen = expandedId === t.id;
                   const hasNote = !!(t.notes && t.notes.trim());
                   return (
@@ -2097,6 +2126,14 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                             <span className={`pt-chevron ${isOpen ? 'open' : ''}`}>{"\u25B8"}</span>
                             {t.ticker}
                             {hasNote && <span className="pt-note-dot" title="Has notes">{"\u{1F4DD}"}</span>}
+                            {stopHit && (
+                              <span
+                                className="pt-stop-badge"
+                                title="Price has broken below the AI's stop-loss level."
+                              >
+                                {"\u{1F6D1}"} STOP HIT
+                              </span>
+                            )}
                           </button>
                         </td>
                         <td>{fmtDate(t.entry_date)}</td>
@@ -2110,7 +2147,20 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                           {fmt$(pnl)} <br />
                           <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
                         </td>
-                        <td><span className={`rec-chip ${recClass(rec)}`}>{recLabel(rec)}</span></td>
+                        <td>
+                          <span className={`rec-chip ${recClass(liveRec)}`} title={recTitle}>
+                            {recLabel(liveRec)}
+                          </span>
+                          {liveRec !== entryRec && (
+                            <div
+                              className="pt-sub"
+                              title={`Entry rec was ${entryRec}`}
+                              style={{ marginTop: '2px', fontSize: '0.62rem', opacity: 0.7 }}
+                            >
+                              was {entryRec}
+                            </div>
+                          )}
+                        </td>
                         <td>
                           <button className="pt-sell-btn" onClick={() => onSell(t, latest != null ? latest : parseFloat(t.entry_price))}>
                             {"\u{1F4B0}"} Sell
