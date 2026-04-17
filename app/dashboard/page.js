@@ -539,151 +539,272 @@ function RatingButtons({ alertId, currentRating, onRate }) {
 }
 
 // ── Alert Card ──
-function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, onRate, openPosition, onOpenBuyModal, onOpenSellModal }) {
+// Redesigned card layout (Apr 2026). Key structure:
+//   HEADER: status dot · ticker · live price · live % change · signal bars · dismiss (×)
+//           company · market-hours dot · ET time
+//   HERO:   AI recommendation chip (BUY/HOLD/TRIM/EXIT/SELL) · since-alert % · days-ago
+//   BADGES: WSB (↑/↓) · Polymarket · market cap · volume spike · earnings
+//   PLAN:   Entry zone · Take profit (🎯) · Stop loss
+//   AI READ: one-line plain-English rationale
+//   52-WEEK BAR · 3-month chart · alert reason · analyst · signal change · notes
+// Fields that come from the AI/daily-job (entry/target/stop/ai_read/volume_ratio/
+// week52/wsb_trend/TRIM/EXIT) gracefully hide if null so the card always renders.
+function AlertCard({
+  alert, index, sectionPrefix, watchlist,
+  onToggleWatchlist, onRate, onDismiss, onSaveNote,
+  userNote, openPosition, onOpenBuyModal, onOpenSellModal
+}) {
+  const [compact, setCompact] = useState(false);
+  const [noteEditing, setNoteEditing] = useState(false);
+  const [noteDraft, setNoteDraft] = useState(userNote || '');
+
+  useEffect(() => { setNoteDraft(userNote || ''); }, [userNote]);
+
   const latest = alert.prices[alert.prices.length - 1];
   const pct = latest?.pct_change || 0;
-  const perfStatus = getStatus(pct);
   const isNew = alert.status === 'new';
   const isDropped = alert.status === 'dropped';
   const isWatched = watchlist.includes(alert.ticker);
   const sourceMeta = getSourceMeta(alert.source);
+  const rec = (alert.recommendation || 'HOLD').toUpperCase();
 
+  // Status dot — win/neutral/loss based on since-alert %
+  const dotClass = pct >= 5 ? 'win' : pct <= -5 ? 'loss' : 'neutral';
+
+  // Rec chip variant + hero tone
+  const recVariant = ['BUY', 'HOLD', 'SELL', 'TRIM', 'EXIT'].includes(rec)
+    ? rec.toLowerCase() : 'hold';
+  const heroTone = rec === 'SELL' ? 'loss'
+    : (rec === 'TRIM' || rec === 'EXIT') ? 'neutral' : '';
+
+  // Days since alert
   const alertDateObj = new Date(alert.alert_date + 'T00:00:00');
-  const alertDateFormatted = alertDateObj.toLocaleDateString('en-US', {
-    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric'
-  });
+  const daysSinceAlert = Math.floor((Date.now() - alertDateObj.getTime()) / 86400000);
+  const daysLabel = daysSinceAlert <= 0 ? 'today'
+    : daysSinceAlert === 1 ? '1 day ago' : `${daysSinceAlert} days ago`;
 
-  // Forecast sell date
-  const forecastDate = alert.forecast_sell_date
-    ? new Date(alert.forecast_sell_date + 'T00:00:00').toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric', year: 'numeric'
-      })
+  // ET time + market-hours indicator
+  const etNow = new Date();
+  const etParts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', weekday: 'short', hour12: true
+  }).formatToParts(etNow);
+  const etTime = etParts.filter(p => ['hour','minute','literal','dayPeriod'].includes(p.type))
+    .map(p => p.value).join('');
+  const etHour = parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: 'numeric', hour12: false
+  }).format(etNow), 10);
+  const etMin = parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', minute: 'numeric'
+  }).format(etNow), 10);
+  const etDay = etParts.find(p => p.type === 'weekday')?.value;
+  const isWeekday = !['Sat', 'Sun'].includes(etDay);
+  const afterOpen = etHour > 9 || (etHour === 9 && etMin >= 30);
+  const marketOpen = isWeekday && afterOpen && etHour < 16;
+
+  // 52-week position (0–100)
+  const price = latest?.price;
+  const wkLo = alert.week52_low != null ? parseFloat(alert.week52_low) : null;
+  const wkHi = alert.week52_high != null ? parseFloat(alert.week52_high) : null;
+  const wkPct = (wkLo != null && wkHi != null && price != null && wkHi > wkLo)
+    ? Math.min(100, Math.max(0, ((price - wkLo) / (wkHi - wkLo)) * 100))
     : null;
 
-  // Days until forecast
-  const daysUntilForecast = alert.forecast_sell_date
-    ? Math.ceil((new Date(alert.forecast_sell_date) - new Date()) / (1000 * 60 * 60 * 24))
+  // Trade-plan flags
+  const hasPlan = alert.entry_low != null || alert.target_low != null || alert.stop_loss != null;
+  const stopHit = alert.stop_loss != null && price != null && price <= parseFloat(alert.stop_loss);
+  const targetHit = alert.target_low != null && price != null && price >= parseFloat(alert.target_low);
+
+  // Volume spike (>= 1.5×)
+  const volSpike = alert.volume_ratio != null && parseFloat(alert.volume_ratio) >= 1.5;
+
+  // Market cap label
+  const mc = alert.market_cap;
+  const mcLabel = mc != null
+    ? `${mc >= 1000 ? '$' + (mc/1000).toFixed(1) + 'T' : '$' + mc.toFixed(1) + 'B'} ${mc >= 200 ? 'Mega' : mc >= 10 ? 'Large' : mc >= 2 ? 'Mid' : 'Small'}`
     : null;
+
+  // WSB trend arrow (only meaningful for WSB-sourced picks)
+  const isWsb = sourceMeta.cls === 'src-wsb';
+  const wsbArrow = isWsb && alert.wsb_trend === 'up' ? ' trend-up'
+    : isWsb && alert.wsb_trend === 'down' ? ' trend-down' : '';
+
+  // AI read tone
+  const aiReadTone = rec === 'SELL' ? 'danger'
+    : rec === 'TRIM' || rec === 'EXIT' ? 'warn' : '';
+
+  const handleDismiss = () => {
+    if (!onDismiss) return;
+    if (typeof window !== 'undefined' && window.confirm(`Dismiss ${alert.ticker}? It'll move to the archive.`)) {
+      onDismiss(alert.id);
+    }
+  };
+  const handleSaveNote = async () => {
+    if (onSaveNote) await onSaveNote(alert.ticker, noteDraft);
+    setNoteEditing(false);
+  };
+  const cancelNote = () => { setNoteDraft(userNote || ''); setNoteEditing(false); };
+
+  const recDisplay = rec === 'EXIT' ? '\u{1F3C1} EXIT' : rec;
 
   return (
-    <div id={`card-${alert.ticker}`} className={`card ${perfStatus}${isNew ? ' card-new' : ''}${isDropped ? ' card-dropped' : ''}${isWatched ? ' card-watched' : ''}`}>
-      <div className="card-top">
-        <div>
-          <div className="ticker">
-            {alert.ticker}
-            {isNew && <span className="new-badge">{"\u{1F195}"} NEW</span>}
-            {isDropped && <span className="dropped-badge">{"\u{1F4E6}"} DROPPED</span>}
+    <div
+      id={`card-${alert.ticker}`}
+      className={`ac ac-${recVariant}${compact ? ' ac-compact' : ''}${isNew ? ' ac-new' : ''}${isDropped ? ' ac-dropped' : ''}${isWatched ? ' ac-watched' : ''}`}
+    >
+      {/* HEADER — ticker, live price, signal bars, dismiss */}
+      <div className="ac-header">
+        <div className="ac-left">
+          <div className="ac-ticker-row">
+            <span className={`ac-dot ac-dot-${dotClass}`} title={`Since alert: ${fmtPct(pct)}`}></span>
+            <span className="ac-ticker">{alert.ticker}</span>
+            {price != null && (
+              <>
+                <span className="ac-live">${price.toFixed(2)}</span>
+                <span className={`ac-live-pct ${pct >= 0 ? 'pos' : 'neg'}`}>
+                  {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
+                </span>
+              </>
+            )}
+            {isNew && <span className="ac-new-pill">NEW</span>}
+            {isDropped && <span className="ac-dropped-pill">DROPPED</span>}
           </div>
-          <div className="company">{alert.company}</div>
+          <div className="ac-company-row">
+            <span className="ac-company">{alert.company}</span>
+            <span className="ac-dot-sep">·</span>
+            <span className={`ac-mkt-dot ${marketOpen ? '' : 'closed'}`} title={marketOpen ? 'Market open' : 'Market closed'}></span>
+            <span className="ac-et-time">{etTime} ET{marketOpen ? '' : ' · closed'}</span>
+          </div>
         </div>
-        <div className="card-top-right">
-          <RatingButtons alertId={alert.id} currentRating={alert.user_rating} onRate={onRate} />
-          <button
-            className={`watchlist-btn ${isWatched ? 'watched' : ''}`}
-            onClick={() => onToggleWatchlist(alert.ticker)}
-            title={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}
-          >
-            {isWatched ? '\u{2605}' : '\u{2606}'}
-          </button>
-          <span className={`status-badge badge-${perfStatus}`}>{statusLabel(pct)}</span>
+        <div className="ac-right">
+          <div className="ac-right-top">
+            <SignalBars
+              score={alert.signal_strength}
+              subScores={alert.signal_sub_scores}
+              sourceCount={alert.signal_source_count}
+              mentionCount={alert.signal_mention_count}
+            />
+            <button className="ac-dismiss" title="Dismiss / archive" onClick={handleDismiss} aria-label="Dismiss">×</button>
+          </div>
+          <div className="ac-actions">
+            <RatingButtons alertId={alert.id} currentRating={alert.user_rating} onRate={onRate} />
+            <button
+              className={`ac-watch-btn ${isWatched ? 'watched' : ''}`}
+              onClick={() => onToggleWatchlist(alert.ticker)}
+              title={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}
+            >
+              {isWatched ? '\u{2605}' : '\u{2606}'}
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* SOURCE BADGE + MARKET CAP */}
-      <div className="card-source-row">
-        <span className={`source-badge-sm ${sourceMeta.cls}`}>{sourceMeta.emoji} {sourceMeta.label}</span>
-        {alert.market_cap != null && (
-          <span className={`mcap-card-badge ${alert.market_cap >= 200 ? 'mcap-mega' : alert.market_cap >= 10 ? 'mcap-large' : alert.market_cap >= 2 ? 'mcap-mid' : 'mcap-small'}`}>
-            {"\u{1F3E2}"} {alert.market_cap >= 1000 ? '$' + (alert.market_cap / 1000).toFixed(1) + 'T' : '$' + alert.market_cap.toFixed(1) + 'B'} {alert.market_cap >= 200 ? 'Mega' : alert.market_cap >= 10 ? 'Large' : alert.market_cap >= 2 ? 'Mid' : 'Small'} Cap
+      {/* HERO — AI recommendation + since-alert */}
+      <div className={`ac-hero ac-hero-${heroTone || recVariant}`}>
+        <span className={`ac-rec-chip ac-rec-${recVariant}`}>{recDisplay}</span>
+        <span className={`ac-since ${pct >= 0 ? 'pos' : 'neg'}`}>
+          {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
+        </span>
+        <span className="ac-since-lbl">since alert<br/>{daysLabel}</span>
+      </div>
+
+      {/* BADGES — source, market cap, volume spike */}
+      <div className="ac-badges">
+        <span className={`ac-b ac-b-source ${sourceMeta.cls}${wsbArrow}`}>
+          {sourceMeta.emoji} {sourceMeta.label}
+        </span>
+        {mcLabel && <span className="ac-b ac-b-mcap">🏢 {mcLabel}</span>}
+        {volSpike && (
+          <span className="ac-b ac-b-vol">
+            🔥 {parseFloat(alert.volume_ratio).toFixed(1)}× vol
           </span>
         )}
-        {alert.market_cap == null && (
-          <span className="mcap-card-badge mcap-unknown">{"\u{1F3E2}"} Market Cap N/A</span>
-        )}
       </div>
 
-      {/* SIGNAL STRENGTH */}
-      <div className="card-source-row" style={{ marginTop: '4px' }}>
-        <SignalBars
-          score={alert.signal_strength}
-          subScores={alert.signal_sub_scores}
-          sourceCount={alert.signal_source_count}
-          mentionCount={alert.signal_mention_count}
-        />
-      </div>
-
-      {/* ALERT DATE & PRICE BANNER */}
-      <div className="alert-date-banner">
-        <div className="alert-date-item">
-          <span className="alert-date-label">{"\u{1F4C5}"} ALERTED</span>
-          <span className="alert-date-value">{alertDateFormatted}</span>
-        </div>
-        <div className="alert-date-item">
-          <span className="alert-date-label">{"\u{1F4B5}"} PRICE AT ALERT</span>
-          <span className="alert-date-value alert-price-highlight">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
-        </div>
-      </div>
-
-      {/* FORECAST SELL DATE */}
-      {forecastDate && (
-        <div className={`forecast-banner ${daysUntilForecast <= 3 ? 'forecast-soon' : daysUntilForecast <= 0 ? 'forecast-passed' : ''}`}>
-          <span className="forecast-label">{"\u{1F3AF}"} FORECAST SELL</span>
-          <span className="forecast-value">{forecastDate}</span>
-          {daysUntilForecast > 0 && <span className="forecast-days">{daysUntilForecast}d away</span>}
-          {daysUntilForecast <= 0 && <span className="forecast-days forecast-overdue">Overdue</span>}
+      {/* TRADE PLAN — entry / take profit / stop loss */}
+      {hasPlan && (
+        <div className="ac-plan">
+          {alert.entry_low != null && (
+            <div className="ac-plan-item ac-plan-entry">
+              <span className="ac-plan-lbl">Entry</span>
+              <span className="ac-plan-val">
+                ${parseFloat(alert.entry_low).toFixed(2)}–${parseFloat(alert.entry_high || alert.entry_low).toFixed(2)}
+              </span>
+            </div>
+          )}
+          {alert.target_low != null && (
+            <div className={`ac-plan-item ac-plan-target${targetHit ? ' hit' : ''}`}>
+              <span className="ac-plan-lbl">🎯 {targetHit ? 'Target hit ✓' : 'Take profit'}</span>
+              <span className="ac-plan-val">
+                ${parseFloat(alert.target_low).toFixed(2)}–${parseFloat(alert.target_high || alert.target_low).toFixed(2)}
+              </span>
+            </div>
+          )}
+          {alert.stop_loss != null && (
+            <div className={`ac-plan-item ac-plan-stop${stopHit ? ' hit' : ''}`}>
+              <span className="ac-plan-lbl">{stopHit ? 'Stop hit ✓' : 'Stop loss'}</span>
+              <span className="ac-plan-val">${parseFloat(alert.stop_loss).toFixed(2)}</span>
+            </div>
+          )}
         </div>
       )}
 
-      <div className="price-row">
-        <span className="price-alert">${parseFloat(alert.price_at_alert).toFixed(2)}</span>
-        <span className="arrow">{"\u{2192}"}</span>
-        <span className="price-current">${latest?.price?.toFixed(2) || '\u{2014}'}</span>
-        <span className={`pct-change ${pctClass(pct)}`}>{fmtPct(pct)}</span>
-      </div>
+      {/* AI READ — one-line call-explanation from the daily job */}
+      {(alert.ai_read || alert.recommendation_reason) && (
+        <div className={`ac-ai-read ${aiReadTone}`}>
+          <span className="ac-ai-icon">🧠</span>
+          <span><b>AI read:</b> {alert.ai_read || alert.recommendation_reason}</span>
+        </div>
+      )}
 
-      <div className="meta-row">
-        <span className="meta-tag">{alert.signal_type}</span>
-      </div>
+      {/* 52-WEEK RANGE */}
+      {wkPct != null && (
+        <div className="ac-range">
+          <div className="ac-range-top">52-week range</div>
+          <div className="ac-range-bar">
+            <div className="ac-range-marker" style={{ left: `${wkPct}%` }}></div>
+          </div>
+          <div className="ac-range-labels">
+            <span>${wkLo.toFixed(2)}</span>
+            <span>{wkPct.toFixed(0)}%</span>
+            <span>${wkHi.toFixed(2)}</span>
+          </div>
+        </div>
+      )}
 
+      {/* CHART */}
       <HistoricChart ticker={alert.ticker} canvasId={`${sectionPrefix}-hist-${index}`} />
 
-      {alert.recommendation && (
-        <div className={`rec-bar ${recClass(alert.recommendation)}`}>
-          <span className="rec-label">{recLabel(alert.recommendation)}</span>
-          <span className="rec-reason">{alert.recommendation_reason || ''}</span>
-        </div>
-      )}
+      {/* ALERT REASON */}
+      {alert.alert_reason && <div className="ac-reason">{alert.alert_reason}</div>}
 
+      {/* ANALYST + EARNINGS */}
       <AnalystBadge ticker={alert.ticker} />
-
       <EarningsDate ticker={alert.ticker} />
 
-      <div className="alert-reason">{alert.alert_reason}</div>
-
-      {/* SIGNAL CHANGE INFO */}
+      {/* SIGNAL CHANGE */}
       {alert.latest_signal_change && (
-        <div className="signal-change-info">
-          <span className="sc-label">{"\u{1F4E2}"} Signal Changed:</span>
-          <span className={`rec-chip ${recClass(alert.latest_signal_change.old_recommendation)}`}>
+        <div className="ac-sig-change">
+          <span>📢 Signal changed:</span>
+          <span className={`ac-mini-chip ${recClass(alert.latest_signal_change.old_recommendation)}`}>
             {alert.latest_signal_change.old_recommendation}
           </span>
-          <span className="sc-arrow">{"\u{2192}"}</span>
-          <span className={`rec-chip ${recClass(alert.latest_signal_change.new_recommendation)}`}>
+          →
+          <span className={`ac-mini-chip ${recClass(alert.latest_signal_change.new_recommendation)}`}>
             {alert.latest_signal_change.new_recommendation}
           </span>
-          <span className="sc-date">
+          <span className="ac-sig-date">
             {new Date(alert.latest_signal_change.change_date || alert.latest_signal_change.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </span>
         </div>
       )}
 
-      {/* PAPER TRADE CONTROLS (only when card is on Watchlist) */}
+      {/* PAPER TRADE (watchlist only) */}
       {sectionPrefix === 'watchlist' && onOpenBuyModal && (
         <div className="paper-trade-row">
           {openPosition ? (() => {
             const invested = parseFloat(openPosition.entry_amount);
             const shares = parseFloat(openPosition.shares);
-            const currentPrice = latest?.price ?? parseFloat(openPosition.entry_price);
+            const currentPrice = price ?? parseFloat(openPosition.entry_price);
             const currentValue = currentPrice * shares;
             const pnl = currentValue - invested;
             const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
@@ -691,7 +812,7 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
               <>
                 <div className="paper-trade-holding">
                   <div className="pth-top">
-                    <span className="pth-label">{"\u{1F4BC}"} PAPER POSITION</span>
+                    <span className="pth-label">💼 PAPER POSITION</span>
                     <span className={`pth-pnl ${pnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
                       {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
                     </span>
@@ -702,28 +823,59 @@ function AlertCard({ alert, index, sectionPrefix, watchlist, onToggleWatchlist, 
                   </div>
                 </div>
                 <button className="paper-trade-btn paper-trade-sell" onClick={() => onOpenSellModal(openPosition, currentPrice)}>
-                  {"\u{1F4B0}"} Paper Sell
+                  💰 Paper Sell
                 </button>
               </>
             );
           })() : (
             <button
               className="paper-trade-btn paper-trade-buy"
-              onClick={() => onOpenBuyModal(alert, latest?.price ?? parseFloat(alert.price_at_alert))}
+              onClick={() => onOpenBuyModal(alert, price ?? parseFloat(alert.price_at_alert))}
             >
-              {"\u{1F4C8}"} Paper Buy
+              📈 Paper Buy
             </button>
           )}
         </div>
       )}
 
-      <NewsHeadlines ticker={alert.ticker} />
-      <ProfitLossCalc priceAtAlert={alert.price_at_alert} latestPrice={latest?.price} />
-      <RedditLinks ticker={alert.ticker} />
+      {/* PERSONAL NOTE */}
+      <div className="ac-note">
+        {noteEditing ? (
+          <div className="ac-note-edit">
+            <input
+              className="ac-note-input"
+              value={noteDraft}
+              maxLength={500}
+              autoFocus
+              placeholder="Why you're watching this…"
+              onChange={(e) => setNoteDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSaveNote();
+                else if (e.key === 'Escape') cancelNote();
+              }}
+            />
+            <button className="ac-note-save" onClick={handleSaveNote}>Save</button>
+            <button className="ac-note-cancel" onClick={cancelNote}>Cancel</button>
+          </div>
+        ) : (
+          <div className="ac-note-view" onClick={() => setNoteEditing(true)} title="Click to edit">
+            <b>My note:</b>{' '}
+            {userNote ? userNote : <span className="ac-note-empty">— click to add</span>}
+          </div>
+        )}
+      </div>
 
+      {/* COLLAPSE TOGGLE */}
+      <button className="ac-expand-btn" onClick={() => setCompact(!compact)}>
+        {compact ? '\u25BE Show details' : '\u25B4 Collapse to compact'}
+      </button>
+
+      {/* RESEARCH FOOTER */}
+      <NewsHeadlines ticker={alert.ticker} />
+      <RedditLinks ticker={alert.ticker} />
       <div className="research-row">
         <a href={`https://finance.yahoo.com/quote/${alert.ticker}`} target="_blank" rel="noopener noreferrer" className="research-link">
-          Yahoo Finance {"\u{2192}"}
+          Yahoo Finance →
         </a>
       </div>
     </div>
@@ -2854,6 +3006,8 @@ export default function Dashboard() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  // Per-user ticker notes, keyed by ticker symbol. Loaded alongside alerts.
+  const [userNotes, setUserNotes] = useState({});
   const router = useRouter();
 
   useEffect(() => {
@@ -2889,6 +3043,17 @@ export default function Dashboard() {
     fetch('/api/paper-trades')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data?.trades) setPaperTrades(data.trades); })
+      .catch(() => {});
+
+    // Fetch per-user notes ({ ticker: { note, updated_at } })
+    fetch('/api/notes')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data?.notes) return;
+        const map = {};
+        Object.entries(data.notes).forEach(([t, v]) => { map[t] = v.note; });
+        setUserNotes(map);
+      })
       .catch(() => {});
 
     // Fetch AI settings
@@ -3018,6 +3183,48 @@ export default function Dashboard() {
     } catch {
       // Revert on error
       setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, user_rating: a.user_rating } : a));
+    }
+  }, []);
+
+  // ── Note save (per-ticker, per-user) ──
+  // Empty string deletes the note server-side. Optimistic local update either way.
+  const handleSaveNote = useCallback(async (ticker, note) => {
+    const trimmed = (note || '').trim();
+    setUserNotes(prev => {
+      const next = { ...prev };
+      if (trimmed) next[ticker] = trimmed;
+      else delete next[ticker];
+      return next;
+    });
+    try {
+      await fetch('/api/notes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticker, note: trimmed }),
+      });
+    } catch {
+      // On error, leave the optimistic state — user can retry on next edit
+    }
+  }, []);
+
+  // ── Dismiss / archive a pick (user-scoped) ──
+  // Optimistically sets dismissed_at locally so the card drops out of
+  // the active view immediately. Archive tab can still find it.
+  const handleDismiss = useCallback(async (alertId) => {
+    setAlerts(prev => prev.map(a =>
+      a.id === alertId ? { ...a, dismissed_at: new Date().toISOString() } : a
+    ));
+    try {
+      await fetch('/api/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alert_id: alertId }),
+      });
+    } catch {
+      // revert
+      setAlerts(prev => prev.map(a =>
+        a.id === alertId ? { ...a, dismissed_at: null } : a
+      ));
     }
   }, []);
 
@@ -3186,10 +3393,12 @@ export default function Dashboard() {
     return filtered;
   }, [filter, recFilter, searchQuery, mcapRange]);
 
-  const newPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'new')), [alerts]);
-  const activePicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'active')), [alerts]);
-  const droppedPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'dropped')), [alerts]);
-  const watchlistPicks = useMemo(() => sortByPerf(alerts.filter(a => watchlist.includes(a.ticker))), [alerts, watchlist]);
+  // Dismissed rows drop out of the normal tabs (they reappear in the Archive section).
+  const notDismissed = (a) => !a.dismissed_at;
+  const newPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'new' && notDismissed(a))), [alerts]);
+  const activePicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'active' && notDismissed(a))), [alerts]);
+  const droppedPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'dropped' && notDismissed(a))), [alerts]);
+  const watchlistPicks = useMemo(() => sortByPerf(alerts.filter(a => watchlist.includes(a.ticker) && notDismissed(a))), [alerts, watchlist]);
 
   const filteredNew = useMemo(() => applyAllFilters(newPicks), [newPicks, applyAllFilters]);
   const filteredActive = useMemo(() => applyAllFilters(activePicks), [activePicks, applyAllFilters]);
@@ -3529,6 +3738,9 @@ export default function Dashboard() {
                 watchlist={watchlist}
                 onToggleWatchlist={handleToggleWatchlist}
                 onRate={handleRate}
+                onDismiss={handleDismiss}
+                onSaveNote={handleSaveNote}
+                userNote={userNotes[alert.ticker]}
                 openPosition={openTradeFor(alert.ticker)}
                 onOpenBuyModal={handleOpenBuyModal}
                 onOpenSellModal={handleOpenSellModal}
