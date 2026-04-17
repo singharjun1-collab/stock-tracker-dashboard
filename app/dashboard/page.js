@@ -3228,6 +3228,18 @@ export default function Dashboard() {
     }
   }, []);
 
+  // ── Un-dismiss / restore a pick from the archive ──
+  const handleUnDismiss = useCallback(async (alertId) => {
+    setAlerts(prev => prev.map(a =>
+      a.id === alertId ? { ...a, dismissed_at: null } : a
+    ));
+    try {
+      await fetch(`/api/dismiss?alert_id=${alertId}`, { method: 'DELETE' });
+    } catch {
+      // revert: leave as dismissed on failure (user can retry)
+    }
+  }, []);
+
   // ── Paper-trading handlers ──
   const openTradeFor = useCallback((ticker) => {
     return paperTrades.find(t => t.ticker === ticker && t.status === 'open');
@@ -3775,7 +3787,14 @@ export default function Dashboard() {
       {/* FULL ARCHIVE TABLE */}
       <div className="archive-section" id="archive-section">
         {showArchive && (
-          <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4C5}"} Full Archive {"\u{2014}"} All Historical Picks ({alerts.length} total) <button className="section-close-btn" onClick={() => setShowArchive(false)}>{"\u{2715}"} Close</button></p>
+          <>
+            <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4C5}"} Full Archive {"\u{2014}"} All Historical Picks ({alerts.length} total) <button className="section-close-btn" onClick={() => setShowArchive(false)}>{"\u{2715}"} Close</button></p>
+            {alerts.some(a => a.dismissed_at) && (
+              <div className="dismissed-banner">
+                🗑️ {alerts.filter(a => a.dismissed_at).length} dismissed pick{alerts.filter(a => a.dismissed_at).length === 1 ? '' : 's'} hidden from the main views — look for the <span className="dismissed-banner-tag">DISMISSED</span> tag below and click <b>↺ Bring back</b> to restore any of them.
+              </div>
+            )}
+          </>
         )}
         {showArchive && (
           <div className="archive-table-wrap">
@@ -3817,22 +3836,37 @@ export default function Dashboard() {
                     const isWatched = watchlist.includes(alert.ticker);
                     const srcMeta = getSourceMeta(alert.source);
                     const signalChange = alert.latest_signal_change;
+                    const isDismissed = !!alert.dismissed_at;
                     return (
-                      <tr key={alert.id || idx} className={pickStatus === 'dropped' ? 'row-dropped' : ''}>
+                      <tr key={alert.id || idx} className={`${pickStatus === 'dropped' ? 'row-dropped' : ''}${isDismissed ? ' row-dismissed' : ''}`}>
                         <td>
-                          <button
-                            className={`watchlist-btn-sm ${isWatched ? 'watched' : ''}`}
-                            onClick={() => handleToggleWatchlist(alert.ticker)}
-                          >
-                            {isWatched ? '\u{2605}' : '\u{2606}'}
-                          </button>
+                          <div className="tbl-first-cell">
+                            <button
+                              className={`watchlist-btn-sm ${isWatched ? 'watched' : ''}`}
+                              onClick={() => handleToggleWatchlist(alert.ticker)}
+                            >
+                              {isWatched ? '\u{2605}' : '\u{2606}'}
+                            </button>
+                            {isDismissed && (
+                              <button
+                                className="tbl-restore-btn"
+                                title="Bring this pick back to the Active view"
+                                onClick={() => handleUnDismiss(alert.id)}
+                              >
+                                ↺ Bring back
+                              </button>
+                            )}
+                          </div>
                         </td>
                         <td>
                           <span className="tbl-rating">
                             {alert.user_rating === 'up' ? '\u{1F44D}' : alert.user_rating === 'down' ? '\u{1F44E}' : '\u{2014}'}
                           </span>
                         </td>
-                        <td><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>
+                        <td>
+                          <span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span>
+                          {isDismissed && <span className="pick-status-chip pick-dismissed" style={{ marginLeft: 6 }}>🗑️ DISMISSED</span>}
+                        </td>
                         <td className="tbl-alert-date">{alert.alert_date}</td>
                         <td className="tbl-ticker">{alert.ticker}</td>
                         <td style={{ color: '#a0b8d0' }}>{alert.company}</td>
