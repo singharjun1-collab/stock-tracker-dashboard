@@ -3326,5 +3326,78 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   /* Make the tab row a bit more compact so more fit in view */
   .tab-btn { padding: 10px 10px; font-size: 0.75rem; }
   .tab-count { font-size: 0.62rem; padding: 1px 6px; }
+  /* 5-tab mobile bottom nav needs smaller labels so everything fits */
+  .mobile-bottom-nav-5 .mb-nav-label { font-size: 0.6rem; }
+  .mobile-bottom-nav-5 .mb-nav-icon  { font-size: 1.05rem; }
+  .mobile-bottom-nav-5 .mb-nav-btn   { padding: 5px 2px; }
+}
+
+/* ── ⋯ MORE-MENU (KEBAB) IN HEADER ──
+   Replaces the old Archive / AI Settings / Alert List buttons with a single
+   compact trigger that opens a dropdown with those destinations plus
+   Quick Scan, Dropped, Analytics, and admin-only Users. Keeps the header
+   clean on desktop and essential on mobile. */
+.kebab-menu-wrap { position: relative; display: inline-block; }
+.header-tool-btn.kebab-trigger {
+  padding: 8px 12px;
+  font-size: 1.15rem;
+  line-height: 1;
+  letter-spacing: 2px;
+  min-width: 40px;
+  justify-content: center;
+}
+.kebab-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 240px;
+  background: linear-gradient(180deg, #0d1e36 0%, #0a1628 100%);
+  border: 1px solid #2a4a7c;
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(74, 163, 255, 0.1);
+  z-index: 200;
+  animation: kebabFadeIn 0.12s ease-out;
+}
+@keyframes kebabFadeIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.kebab-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  background: none;
+  border: none;
+  border-radius: 8px;
+  color: #b8d4f0;
+  font-size: 0.88rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.kebab-item:hover { background: rgba(74, 163, 255, 0.08); color: #e7eef8; }
+.kebab-item.active { background: rgba(74, 163, 255, 0.14); color: #4fc3f7; }
+.kebab-ic { font-size: 1rem; flex-shrink: 0; width: 20px; text-align: center; }
+.kebab-label { flex: 1; }
+.kebab-badge {
+  background: rgba(74, 163, 255, 0.18);
+  color: #4fc3f7;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  flex-shrink: 0;
+}
+.kebab-divider {
+  height: 1px;
+  background: rgba(74, 163, 255, 0.15);
+  margin: 6px 4px;
+}
+@media (max-width: 600px) {
+  .kebab-dropdown { min-width: 220px; right: -4px; }
+  .kebab-item { padding: 11px 12px; font-size: 0.92rem; }
 }
 

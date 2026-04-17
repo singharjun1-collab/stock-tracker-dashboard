@@ -8,26 +8,47 @@ export async function GET() {
   return NextResponse.json({ profile });
 }
 
-// PATCH the current user's display_name (only)
+// PATCH the current user's profile. Accepts:
+//   - display_name   (2-40 chars, trimmed)
+//   - card_expand_default   ('expanded' | 'compact') — saved UI preference
+//     for the global collapse/expand-all toggle on the dashboard
+//
+// At least one valid field must be supplied. Unknown fields are ignored.
 export async function PATCH(request) {
   const profile = await getCurrentProfile();
   if (!profile) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   try {
     const body = await request.json();
-    const { display_name } = body;
-    if (!display_name || typeof display_name !== 'string') {
-      return NextResponse.json({ error: 'Invalid display name' }, { status: 400 });
+    const patch = { updated_at: new Date().toISOString() };
+
+    if (body.display_name !== undefined) {
+      if (typeof body.display_name !== 'string') {
+        return NextResponse.json({ error: 'Invalid display name' }, { status: 400 });
+      }
+      const trimmed = body.display_name.trim().slice(0, 40);
+      if (trimmed.length < 2) {
+        return NextResponse.json({ error: 'Display name too short' }, { status: 400 });
+      }
+      patch.display_name = trimmed;
     }
-    const trimmed = display_name.trim().slice(0, 40);
-    if (trimmed.length < 2) {
-      return NextResponse.json({ error: 'Display name too short' }, { status: 400 });
+
+    if (body.card_expand_default !== undefined) {
+      if (body.card_expand_default !== 'expanded' && body.card_expand_default !== 'compact') {
+        return NextResponse.json({ error: 'Invalid card_expand_default' }, { status: 400 });
+      }
+      patch.card_expand_default = body.card_expand_default;
+    }
+
+    // Require at least one real field (not just updated_at).
+    if (Object.keys(patch).length === 1) {
+      return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
     }
 
     const supabase = createSupabaseServerClient();
     const { data, error } = await supabase
       .from('profiles')
-      .update({ display_name: trimmed, updated_at: new Date().toISOString() })
+      .update(patch)
       .eq('id', profile.id)
       .select()
       .single();

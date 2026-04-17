@@ -3205,6 +3205,19 @@ export default function Dashboard() {
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
+  // More-menu (kebab) in the header — holds secondary destinations
+  // (Quick Scan, Dropped, Archive, Alert List, Analytics, AI Settings, Users)
+  // so the primary tab row stays focused on 5 workflow tabs.
+  const [kebabOpen, setKebabOpen] = useState(false);
+  // Close the ⋯ kebab dropdown when the user clicks anywhere outside it.
+  useEffect(() => {
+    if (!kebabOpen) return;
+    const onDocClick = (e) => {
+      if (!e.target.closest('.kebab-menu-wrap')) setKebabOpen(false);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, [kebabOpen]);
   // Per-user ticker notes, keyed by ticker symbol. Loaded alongside alerts.
   const [userNotes, setUserNotes] = useState({});
   const router = useRouter();
@@ -3223,6 +3236,14 @@ export default function Dashboard() {
         if (data?.profile) {
           if (data.profile.status !== 'approved') { router.replace('/pending'); return; }
           setProfile(data.profile);
+          // Apply the user's saved card-expand preference. 'compact' means
+          // every card starts collapsed; 'expanded' (default) means every
+          // card starts fully expanded. Still respects per-card toggles
+          // afterwards — this only sets the initial global default.
+          if (data.profile.card_expand_default === 'compact') {
+            setAllCompact(true);
+            setCompactNonce(n => n + 1);
+          }
         }
       })
       .catch(() => {});
@@ -3630,16 +3651,15 @@ export default function Dashboard() {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
   });
 
-  // Tab definitions
+  // Primary tab definitions — shown in the main tab bar.
+  // Secondary destinations (Dropped, Analytics, Users) live in the ⋯ kebab menu
+  // in the header but still set `activeTab` so the tab-content blocks render.
   const tabs = [
     { id: 'new', label: '\u{1F195} New', count: newPicks.length },
     { id: 'active', label: '\u{1F525} Active', count: activePicks.length },
-    { id: 'dropped', label: '\u{1F4E6} Dropped', count: droppedPicks.length },
     { id: 'watchlist', label: '\u{2B50} Watchlist', count: watchlistPicks.length },
-    { id: 'portfolio', label: '\u{1F4BC} Portfolio', count: paperTrades.filter(t => t.status === 'open').length || null },
+    { id: 'portfolio', label: '\u{1F4BC} My Portfolio', count: paperTrades.filter(t => t.status === 'open').length || null },
     { id: 'leaderboard', label: '\u{1F3C6} Leaderboard', count: null },
-    { id: 'analytics', label: '\u{1F4CA} Analytics', count: null },
-    ...(profile?.is_admin ? [{ id: 'users', label: '\u{1F464} Users', count: null }] : []),
   ];
 
   // Current tab data
@@ -3671,40 +3691,100 @@ export default function Dashboard() {
           <MarketClock />
         </div>
         <div className="header-tools">
-          <button
-            className={`header-tool-btn ${showArchive ? 'active' : ''}`}
-            onClick={() => {
-              const next = !showArchive;
-              setShowArchive(next);
-              if (next) setTimeout(() => document.getElementById('archive-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-            }}
-            title="Show full archive of all historical picks"
-          >
-            {"\u{1F4C2}"} <span className="header-tool-label">Archive</span>
-            <span className="header-tool-badge">{alerts.length}</span>
-          </button>
-          <button
-            className={`header-tool-btn ${showAISettings ? 'active' : ''}`}
-            onClick={() => {
-              const next = !showAISettings;
-              setShowAISettings(next);
-              if (next) setTimeout(() => document.getElementById('ai-settings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-            }}
-            title="Manage AI engine settings"
-          >
-            {"\u{2699}\u{FE0F}"} <span className="header-tool-label">AI Settings</span>
-          </button>
-          <button
-            className={`header-tool-btn ${showDistList ? 'active' : ''}`}
-            onClick={() => {
-              const next = !showDistList;
-              setShowDistList(next);
-              if (next) setTimeout(() => document.getElementById('dist-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-            }}
-            title="Manage signal change email alerts"
-          >
-            {"\u{1F4E7}"} <span className="header-tool-label">Alert List</span>
-          </button>
+          {/* ─── MORE MENU (kebab) ───
+              Single entry point for less-frequent destinations. Keeps the
+              header uncluttered while still exposing Archive, AI Settings,
+              Alert List, Dropped picks, Analytics, Users, and a jump to
+              Quick Scan. Closing handled by click-outside below. */}
+          <div className="kebab-menu-wrap">
+            <button
+              className={`header-tool-btn kebab-trigger ${kebabOpen ? 'active' : ''}`}
+              onClick={() => setKebabOpen(v => !v)}
+              title="More"
+              aria-label="More"
+              aria-haspopup="menu"
+              aria-expanded={kebabOpen}
+            >
+              {"\u{22EF}"}
+            </button>
+            {kebabOpen && (
+              <div className="kebab-dropdown" role="menu" onClick={e => e.stopPropagation()}>
+                <button
+                  className="kebab-item"
+                  onClick={() => {
+                    setKebabOpen(false);
+                    setTimeout(() => document.getElementById('quick-scan-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                  }}
+                >
+                  <span className="kebab-ic">{"\u{26A1}"}</span>
+                  <span className="kebab-label">Quick Scan</span>
+                  <span className="kebab-badge">{alerts.length}</span>
+                </button>
+                <button
+                  className={`kebab-item${activeTab === 'dropped' ? ' active' : ''}`}
+                  onClick={() => { setActiveTab('dropped'); setRecFilter('ALL'); setKebabOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                >
+                  <span className="kebab-ic">{"\u{1F4E6}"}</span>
+                  <span className="kebab-label">Dropped</span>
+                  <span className="kebab-badge">{droppedPicks.length}</span>
+                </button>
+                <button
+                  className={`kebab-item${showArchive ? ' active' : ''}`}
+                  onClick={() => {
+                    const next = !showArchive;
+                    setShowArchive(next);
+                    setKebabOpen(false);
+                    if (next) setTimeout(() => document.getElementById('archive-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+                  }}
+                >
+                  <span className="kebab-ic">{"\u{1F4C2}"}</span>
+                  <span className="kebab-label">Archive</span>
+                  <span className="kebab-badge">{alerts.length}</span>
+                </button>
+                <button
+                  className={`kebab-item${showDistList ? ' active' : ''}`}
+                  onClick={() => {
+                    const next = !showDistList;
+                    setShowDistList(next);
+                    setKebabOpen(false);
+                    if (next) setTimeout(() => document.getElementById('dist-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+                  }}
+                >
+                  <span className="kebab-ic">{"\u{1F4E7}"}</span>
+                  <span className="kebab-label">Alert List</span>
+                </button>
+                <button
+                  className={`kebab-item${activeTab === 'analytics' ? ' active' : ''}`}
+                  onClick={() => { setActiveTab('analytics'); setRecFilter('ALL'); setKebabOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                >
+                  <span className="kebab-ic">{"\u{1F4CA}"}</span>
+                  <span className="kebab-label">Analytics</span>
+                </button>
+                <div className="kebab-divider" />
+                <button
+                  className={`kebab-item${showAISettings ? ' active' : ''}`}
+                  onClick={() => {
+                    const next = !showAISettings;
+                    setShowAISettings(next);
+                    setKebabOpen(false);
+                    if (next) setTimeout(() => document.getElementById('ai-settings-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+                  }}
+                >
+                  <span className="kebab-ic">{"\u{2699}\u{FE0F}"}</span>
+                  <span className="kebab-label">AI Settings</span>
+                </button>
+                {profile?.is_admin && (
+                  <button
+                    className={`kebab-item${activeTab === 'users' ? ' active' : ''}`}
+                    onClick={() => { setActiveTab('users'); setRecFilter('ALL'); setKebabOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  >
+                    <span className="kebab-ic">{"\u{1F464}"}</span>
+                    <span className="kebab-label">Manage Users</span>
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Profile menu (avatar + name + sign out) */}
           {profile && (
@@ -3817,10 +3897,21 @@ export default function Dashboard() {
             <button
               className="collapse-all-btn"
               onClick={() => {
-                setAllCompact(prev => !prev);
+                setAllCompact(prev => {
+                  const next = !prev;
+                  // Persist as saved user preference so the choice sticks
+                  // across devices. Fire-and-forget; silently no-ops if
+                  // the column isn't present yet (e.g. before migration).
+                  fetch('/api/profile', {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ card_expand_default: next ? 'compact' : 'expanded' }),
+                  }).catch(() => {});
+                  return next;
+                });
                 setCompactNonce(n => n + 1);
               }}
-              title={allCompact ? 'Expand every card to show full details' : 'Collapse every card to compact view'}
+              title={allCompact ? 'Expand every card (saved to your profile)' : 'Collapse every card (saved to your profile)'}
             >
               {allCompact
                 ? <>{"\u25BE"} Expand all</>
@@ -3990,13 +4081,17 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* QUICK SCAN TABLE (already has its own collapse control) */}
-      <QuickTable
-        alerts={alerts}
-        watchlist={watchlist}
-        onToggleWatchlist={handleToggleWatchlist}
-        onJumpToCard={handleJumpToCard}
-      />
+      {/* QUICK SCAN TABLE (already has its own collapse control)
+          Wrapped in a div with id so the ⋯ More menu's "Quick Scan"
+          option can scroll the user directly here. */}
+      <div id="quick-scan-section">
+        <QuickTable
+          alerts={alerts}
+          watchlist={watchlist}
+          onToggleWatchlist={handleToggleWatchlist}
+          onJumpToCard={handleJumpToCard}
+        />
+      </div>
 
       {/* TAB CONTENT */}
       {activeTab === 'analytics' ? (
@@ -4223,7 +4318,16 @@ export default function Dashboard() {
       {/* ─── MOBILE BOTTOM NAV BAR ───
           Fixed thumb-reachable nav for phones. Hidden on desktop via CSS.
           Mirrors the most commonly used tabs so users don't have to scroll back up. */}
-      <nav className="mobile-bottom-nav" aria-label="Primary">
+      <nav className="mobile-bottom-nav mobile-bottom-nav-5" aria-label="Primary">
+        <button
+          className={`mb-nav-btn${activeTab === 'new' ? ' active' : ''}`}
+          onClick={() => { setActiveTab('new'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="New picks"
+        >
+          <span className="mb-nav-icon">{"\u{1F195}"}</span>
+          <span className="mb-nav-label">New</span>
+          {newPicks.length > 0 && <span className="mb-nav-badge">{newPicks.length}</span>}
+        </button>
         <button
           className={`mb-nav-btn${activeTab === 'active' ? ' active' : ''}`}
           onClick={() => { setActiveTab('active'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
@@ -4238,13 +4342,13 @@ export default function Dashboard() {
           aria-label="Watchlist"
         >
           <span className="mb-nav-icon">{"\u{2B50}"}</span>
-          <span className="mb-nav-label">Watchlist</span>
+          <span className="mb-nav-label">Watch</span>
           {watchlist.length > 0 && <span className="mb-nav-badge">{watchlist.length}</span>}
         </button>
         <button
           className={`mb-nav-btn${activeTab === 'portfolio' ? ' active' : ''}`}
           onClick={() => { setActiveTab('portfolio'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          aria-label="Portfolio"
+          aria-label="My Portfolio"
         >
           <span className="mb-nav-icon">{"\u{1F4BC}"}</span>
           <span className="mb-nav-label">Portfolio</span>
