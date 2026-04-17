@@ -1077,6 +1077,56 @@ function MarketCapSlider({ range, onChange }) {
   );
 }
 
+// ── Signal Type Filter Dropdown ──
+// Replaces the old always-visible chip row (ALL / MOMENTUM / CATALYST / SQUEEZE /
+// POLYMARKET / MACRO) with a compact dropdown that sits next to the Market Cap
+// filter in the search row. Matches MarketCapSlider's styling for visual parity.
+function SignalTypeFilter({ value, options, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  // Close on outside click.
+  useEffect(() => {
+    if (!isOpen) return;
+    const onDocClick = (e) => {
+      if (!wrapperRef.current?.contains(e.target)) setIsOpen(false);
+    };
+    document.addEventListener('click', onDocClick);
+    return () => document.removeEventListener('click', onDocClick);
+  }, [isOpen]);
+
+  const isFiltered = value && value !== 'ALL';
+  // Humanize the "POLYMARKET SIGNAL" etc. labels for the trigger button.
+  const labelOf = (v) => (!v || v === 'ALL') ? 'All' : v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/Play|Setup|Signal/i, m => m.toLowerCase());
+
+  return (
+    <div className="mcap-filter-wrapper" ref={wrapperRef}>
+      <button
+        className={`mcap-filter-toggle ${isFiltered ? 'active' : ''}`}
+        onClick={() => setIsOpen(v => !v)}
+        title="Filter by signal type"
+      >
+        {"\u{1F4E1}"} Signal {isFiltered ? `(${labelOf(value)})` : '(All)'}
+      </button>
+      {isOpen && (
+        <div className="mcap-filter-dropdown signal-filter-dropdown">
+          <div className="mcap-presets">
+            {options.map(opt => (
+              <button
+                key={opt}
+                className={`mcap-preset-btn ${value === opt ? 'active' : ''}`}
+                onClick={() => { onChange(opt); setIsOpen(false); }}
+              >
+                {opt === 'ALL' ? 'All' : opt}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Active AI Filter Banner ──
 // Shows on the home page whenever an AI filter is set to a non-default value,
 // so the user can see at a glance that results are being filtered.
@@ -3209,6 +3259,9 @@ export default function Dashboard() {
   // (Quick Scan, Dropped, Archive, Alert List, Analytics, AI Settings, Users)
   // so the primary tab row stays focused on 5 workflow tabs.
   const [kebabOpen, setKebabOpen] = useState(false);
+  // Quick Scan table is hidden by default (takes a lot of vertical space);
+  // revealed on demand via the ⋯ kebab menu, same UX as Archive.
+  const [showQuickScan, setShowQuickScan] = useState(false);
   // Close the ⋯ kebab dropdown when the user clicks anywhere outside it.
   useEffect(() => {
     if (!kebabOpen) return;
@@ -3710,10 +3763,12 @@ export default function Dashboard() {
             {kebabOpen && (
               <div className="kebab-dropdown" role="menu" onClick={e => e.stopPropagation()}>
                 <button
-                  className="kebab-item"
+                  className={`kebab-item${showQuickScan ? ' active' : ''}`}
                   onClick={() => {
+                    const next = !showQuickScan;
+                    setShowQuickScan(next);
                     setKebabOpen(false);
-                    setTimeout(() => document.getElementById('quick-scan-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                    if (next) setTimeout(() => document.getElementById('quick-scan-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
                   }}
                 >
                   <span className="kebab-ic">{"\u{26A1}"}</span>
@@ -3840,8 +3895,9 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ─── PRIMARY NAVIGATION: SEARCH + TABS (sticky) ─── */}
-      {/* Search moved here (from below movers) so it's reachable without scrolling, especially on mobile. */}
+      {/* ─── PRIMARY NAVIGATION: SEARCH + FILTERS + TABS (sticky) ─── */}
+      {/* Search + Signal filter + Market Cap + Collapse-all all live in
+          one row so we don't waste a whole row on signal-type chips. */}
       <div className="search-bar-container">
         <div className="search-bar">
           <span className="search-icon">{"\u{1F50D}"}</span>
@@ -3856,7 +3912,35 @@ export default function Dashboard() {
             <button className="search-clear" onClick={() => setSearchQuery('')}>{"\u{2715}"}</button>
           )}
         </div>
+        {activeTab !== 'analytics' && (
+          <SignalTypeFilter value={filter} options={signalTypes} onChange={setFilter} />
+        )}
         <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
+        {activeTab !== 'analytics' && (
+          <button
+            className="collapse-all-btn collapse-all-inline"
+            onClick={() => {
+              setAllCompact(prev => {
+                const next = !prev;
+                // Persist as saved user preference so the choice sticks
+                // across devices. Fire-and-forget; silently no-ops if
+                // the column isn't present yet (e.g. before migration).
+                fetch('/api/profile', {
+                  method: 'PATCH',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ card_expand_default: next ? 'compact' : 'expanded' }),
+                }).catch(() => {});
+                return next;
+              });
+              setCompactNonce(n => n + 1);
+            }}
+            title={allCompact ? 'Expand every card (saved to your profile)' : 'Collapse every card (saved to your profile)'}
+          >
+            {allCompact
+              ? <>{"\u25BE"} Expand all</>
+              : <>{"\u25B4"} Collapse all</>}
+          </button>
+        )}
       </div>
 
       {/* Sticky tabs wrapper — tabs stay pinned to top as user scrolls */}
@@ -3876,49 +3960,6 @@ export default function Dashboard() {
             ))}
           </div>
         </div>
-
-        {/* FILTER BAR (signal type) - shown on all tabs except analytics */}
-        {activeTab !== 'analytics' && (
-          <div className="filter-bar">
-            <div className="filter-bar-chips">
-              {signalTypes.map(type => (
-                <button
-                  key={type}
-                  className={`filter-btn ${filter === type ? 'active' : ''}`}
-                  onClick={() => setFilter(type)}
-                >
-                  {type}
-                </button>
-              ))}
-            </div>
-            {/* Right-aligned: collapse/expand all cards. Each click bumps a
-                nonce and flips the target state, so individual cards pick up
-                the new state via a useEffect on their forceCompact prop. */}
-            <button
-              className="collapse-all-btn"
-              onClick={() => {
-                setAllCompact(prev => {
-                  const next = !prev;
-                  // Persist as saved user preference so the choice sticks
-                  // across devices. Fire-and-forget; silently no-ops if
-                  // the column isn't present yet (e.g. before migration).
-                  fetch('/api/profile', {
-                    method: 'PATCH',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ card_expand_default: next ? 'compact' : 'expanded' }),
-                  }).catch(() => {});
-                  return next;
-                });
-                setCompactNonce(n => n + 1);
-              }}
-              title={allCompact ? 'Expand every card (saved to your profile)' : 'Collapse every card (saved to your profile)'}
-            >
-              {allCompact
-                ? <>{"\u25BE"} Expand all</>
-                : <>{"\u25B4"} Collapse all</>}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* ACTIVE AI FILTER BANNER - shows when a non-default AI filter is applied */}
@@ -3928,6 +3969,12 @@ export default function Dashboard() {
         onOpenSettings={() => setShowAISettings(true)}
       />
 
+      {/* ─── ANALYTICS-ONLY SECTIONS ───
+          Overview (stats) and Top Movers only render on the Analytics tab
+          so the main workflow tabs (New / Active / Watchlist / Portfolio /
+          Leaderboard) stay focused on cards. Users open Analytics from the
+          ⋯ More menu when they want the bird's-eye view. */}
+      {activeTab === 'analytics' && <>
       {/* ─── COLLAPSIBLE STATS BAR ─── */}
       <div className={`stats-section${statsCollapsed ? ' stats-collapsed' : ''}`}>
         <div className="section-collapse-header">
@@ -4080,17 +4127,21 @@ export default function Dashboard() {
           </div>
         );
       })()}
+      </>}
+      {/* ─── END ANALYTICS-ONLY SECTIONS ─── */}
 
-      {/* QUICK SCAN TABLE (already has its own collapse control)
-          Wrapped in a div with id so the ⋯ More menu's "Quick Scan"
-          option can scroll the user directly here. */}
+      {/* QUICK SCAN TABLE — hidden by default to save vertical space.
+          Opened from the ⋯ More menu. Anchor div is always present so the
+          scroll-into-view call works even when the table itself is collapsed. */}
       <div id="quick-scan-section">
-        <QuickTable
-          alerts={alerts}
-          watchlist={watchlist}
-          onToggleWatchlist={handleToggleWatchlist}
-          onJumpToCard={handleJumpToCard}
-        />
+        {showQuickScan && (
+          <QuickTable
+            alerts={alerts}
+            watchlist={watchlist}
+            onToggleWatchlist={handleToggleWatchlist}
+            onJumpToCard={handleJumpToCard}
+          />
+        )}
       </div>
 
       {/* TAB CONTENT */}

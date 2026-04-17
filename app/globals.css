@@ -3332,6 +3332,20 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   .mobile-bottom-nav-5 .mb-nav-btn   { padding: 5px 2px; }
 }
 
+/* ── INLINE COLLAPSE-ALL BUTTON (now lives in the search row) ──
+   Keeps the same look as the old filter-bar version but without the
+   flex: auto-right-push it had before. */
+.collapse-all-inline {
+  flex-shrink: 0;
+  align-self: stretch;
+}
+
+/* Signal-type dropdown styled identically to MarketCapSlider. The only
+   difference: it's text-only, no slider, so its dropdown panel is narrow. */
+.signal-filter-dropdown {
+  min-width: 200px;
+}
+
 /* ── ⋯ MORE-MENU (KEBAB) IN HEADER ──
    Replaces the old Archive / AI Settings / Alert List buttons with a single
    compact trigger that opens a dropdown with those destinations plus
