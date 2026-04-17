@@ -969,14 +969,45 @@ footer span { color: #4fc3f7; }
   .alert-date-banner { flex-direction: column; gap: 8px; }
   .dist-list-form { flex-direction: column; }
   .dist-input, .dist-input-name { min-width: 100%; }
-  .search-bar-container { padding: 0 16px; flex-direction: column; }
+  /* MOBILE search + filter row:
+     Row 1 = search bar (full width).
+     Row 2 = Signal | Market Cap | Collapse-all as a tight horizontal strip
+     that wraps, rather than three giant full-width stacked buttons. */
+  .search-bar-container {
+    padding: 0 16px;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+  }
+  .search-bar-container .search-bar { flex: 1 1 100%; min-width: 0; }
+  .search-bar-container .mcap-filter-wrapper { flex: 1 1 auto; min-width: 0; }
+  .search-bar-container .mcap-filter-toggle {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 0.75rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .search-bar-container .collapse-all-inline {
+    flex: 0 0 auto;
+    align-self: auto;
+    padding: 8px 10px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+  }
   .tabs-container { padding: 0 16px; }
   .tabs-row { gap: 2px; }
   .tab-btn { padding: 10px 12px; font-size: 0.78rem; }
   .analytics-content { padding: 16px; }
   .source-stats-grid { grid-template-columns: 1fr; }
   .ratings-summary-grid { grid-template-columns: repeat(2, 1fr); }
-  .mcap-filter-dropdown { min-width: 300px; left: 0; right: auto; }
+  /* Market Cap + Signal dropdowns: anchor to the viewport edges on mobile
+     so they never overflow. Signal dropdown only needs ~200px. */
+  .mcap-filter-dropdown { min-width: 0; left: 0; right: 0; width: calc(100vw - 32px); max-width: 360px; }
+  .mcap-filter-dropdown.signal-filter-dropdown { width: auto; min-width: 180px; max-width: 240px; }
   .ai-settings-panel { padding: 16px; }
   .ai-mcap-input-row { flex-direction: column; }
   .ai-mcap-presets { grid-template-columns: repeat(2, 1fr); }
@@ -3411,7 +3442,23 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   margin: 6px 4px;
 }
 @media (max-width: 600px) {
-  .kebab-dropdown { min-width: 220px; right: -4px; }
-  .kebab-item { padding: 11px 12px; font-size: 0.92rem; }
+  /* Full-width sheet-style dropdown anchored to the viewport edges.
+     Using position:fixed decouples from the kebab-wrap so the menu
+     never overflows off-screen regardless of where the header tools
+     wrap to on mobile. top:12px places it near the top where the
+     user's finger is, and the dropdown itself closes on click-outside. */
+  .kebab-dropdown {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(74, 163, 255, 0.15);
+  }
+  .kebab-item { padding: 12px 14px; font-size: 0.95rem; }
 }
 
