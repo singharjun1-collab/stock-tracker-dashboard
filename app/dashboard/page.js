@@ -554,7 +554,8 @@ function RatingButtons({ alertId, currentRating, onRate }) {
 // Fields that come from the AI/daily-job (entry/target/stop/ai_read/volume_ratio/
 // week52/wsb_trend/TRIM/EXIT) gracefully hide if null so the card always renders.
 function AlertCard({
-  alert, index, sectionPrefix, watchlist,
+  alert, index, sectionPrefix, watchlist, sharedPrices,
+  forceCompact, forceCompactNonce,
   onToggleWatchlist, onRate, onDismiss, onSaveNote,
   userNote, openPosition, onOpenBuyModal, onOpenSellModal
 }) {
@@ -564,8 +565,34 @@ function AlertCard({
 
   useEffect(() => { setNoteDraft(userNote || ''); }, [userNote]);
 
-  const latest = alert.prices[alert.prices.length - 1];
-  const pct = latest?.pct_change || 0;
+  // Sync with parent-driven collapse-all/expand-all toggle. The nonce bumps
+  // every time the user clicks the page-level button, guaranteeing this
+  // effect re-fires even if the target state equals the previous one — and
+  // overriding any intermediate per-card toggles.
+  useEffect(() => {
+    if (forceCompactNonce && (forceCompact === true || forceCompact === false)) {
+      setCompact(forceCompact);
+    }
+  }, [forceCompact, forceCompactNonce]);
+
+  // Price resolution — prefer the shared current_prices map (single source
+  // of truth, fresh for every ticker including dropped ones). Fall back to
+  // the per-user stock_prices history; if that's also empty, fall back to
+  // the alert's entry price so the header never goes blank.
+  // Matches the pattern used by Portfolio/Leaderboard.
+  const lastHist = alert.prices[alert.prices.length - 1];
+  const sharedLive = sharedPrices?.[alert.ticker]?.price;
+  const price = (sharedLive != null && !Number.isNaN(sharedLive))
+    ? sharedLive
+    : (lastHist?.price ?? (alert.price_at_alert != null ? parseFloat(alert.price_at_alert) : null));
+  const entryPrice = alert.price_at_alert != null ? parseFloat(alert.price_at_alert) : null;
+  // Recompute pct vs entry when we're showing the shared live price — the
+  // stored pct_change is tied to the per-user history snapshot and can be
+  // stale (or zero) if that row didn't update.
+  const pct = (price != null && entryPrice != null && entryPrice > 0)
+    ? ((price - entryPrice) / entryPrice) * 100
+    : (lastHist?.pct_change || 0);
+  const latest = lastHist; // kept for downstream code that uses the full history row
   const isNew = alert.status === 'new';
   const isDropped = alert.status === 'dropped';
   const isWatched = watchlist.includes(alert.ticker);
@@ -587,26 +614,10 @@ function AlertCard({
   const daysLabel = daysSinceAlert <= 0 ? 'today'
     : daysSinceAlert === 1 ? '1 day ago' : `${daysSinceAlert} days ago`;
 
-  // ET time + market-hours indicator
-  const etNow = new Date();
-  const etParts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit', weekday: 'short', hour12: true
-  }).formatToParts(etNow);
-  const etTime = etParts.filter(p => ['hour','minute','literal','dayPeriod'].includes(p.type))
-    .map(p => p.value).join('');
-  const etHour = parseInt(new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York', hour: 'numeric', hour12: false
-  }).format(etNow), 10);
-  const etMin = parseInt(new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York', minute: 'numeric'
-  }).format(etNow), 10);
-  const etDay = etParts.find(p => p.type === 'weekday')?.value;
-  const isWeekday = !['Sat', 'Sun'].includes(etDay);
-  const afterOpen = etHour > 9 || (etHour === 9 && etMin >= 30);
-  const marketOpen = isWeekday && afterOpen && etHour < 16;
+  // Market-hours indicator was moved to the page-level MarketClock.
+  // Each card no longer displays its own ET time.
 
   // 52-week position (0–100)
-  const price = latest?.price;
   const wkLo = alert.week52_low != null ? parseFloat(alert.week52_low) : null;
   const wkHi = alert.week52_high != null ? parseFloat(alert.week52_high) : null;
   const wkPct = (wkLo != null && wkHi != null && price != null && wkHi > wkLo)
@@ -638,7 +649,7 @@ function AlertCard({
 
   const handleDismiss = () => {
     if (!onDismiss) return;
-    if (typeof window !== 'undefined' && window.confirm(`Dismiss ${alert.ticker}? It'll move to the archive.`)) {
+    if (typeof window !== 'undefined' && window.confirm(`Dismiss ${alert.ticker}? It'll move to your personal archive (only affects your view — other users still see it).`)) {
       onDismiss(alert.id);
     }
   };
@@ -674,9 +685,6 @@ function AlertCard({
           </div>
           <div className="ac-company-row">
             <span className="ac-company">{alert.company}</span>
-            <span className="ac-dot-sep">·</span>
-            <span className={`ac-mkt-dot ${marketOpen ? '' : 'closed'}`} title={marketOpen ? 'Market open' : 'Market closed'}></span>
-            <span className="ac-et-time">{etTime} ET{marketOpen ? '' : ' · closed'}</span>
           </div>
         </div>
         <div className="ac-right">
@@ -687,7 +695,7 @@ function AlertCard({
               sourceCount={alert.signal_source_count}
               mentionCount={alert.signal_mention_count}
             />
-            <button className="ac-dismiss" title="Dismiss / archive" onClick={handleDismiss} aria-label="Dismiss">×</button>
+            <button className="ac-dismiss" title="Dismiss / archive (only hides this card for you)" onClick={handleDismiss} aria-label="Dismiss">×</button>
           </div>
           <div className="ac-actions">
             <RatingButtons alertId={alert.id} currentRating={alert.user_rating} onRate={onRate} />
@@ -3039,6 +3047,104 @@ function UsersAdminTab({ currentUserId }) {
   );
 }
 
+// ── Market Clock ──
+// Single page-level clock showing current ET time + market status (open /
+// closed / pre-market / after-hours) + a countdown to the next state change.
+// Replaces the per-card "2:35 AM ET · closed" rows, which were redundant 59x.
+function MarketClock() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    // Tick every 30s — enough granularity for a minute-resolution display
+    // without spamming re-renders.
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  // Helpers to pull discrete ET fields from a Date object. Using
+  // Intl.DateTimeFormat lets us avoid pulling in a tz library.
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric', minute: '2-digit', weekday: 'short', hour12: true,
+  }).formatToParts(now);
+  const timeStr = parts.filter(p => ['hour','minute','literal','dayPeriod'].includes(p.type))
+    .map(p => p.value).join('');
+  const hour24 = parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', hour: 'numeric', hour12: false,
+  }).format(now), 10);
+  const minute = parseInt(new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York', minute: 'numeric',
+  }).format(now), 10);
+  const weekday = parts.find(p => p.type === 'weekday')?.value;
+  const isWeekend = ['Sat','Sun'].includes(weekday);
+
+  // Minutes since midnight ET for easy state math
+  const mins = hour24 * 60 + minute;
+  const PRE_OPEN  = 4 * 60;        //  4:00 AM ET — pre-market opens
+  const OPEN      = 9 * 60 + 30;   //  9:30 AM ET — regular session opens
+  const CLOSE     = 16 * 60;       //  4:00 PM ET — regular session closes
+  const AFTER_END = 20 * 60;       //  8:00 PM ET — after-hours ends
+
+  let status, statusCls, detail;
+  if (isWeekend) {
+    status = 'Closed';
+    statusCls = 'mc-closed';
+    // Days until Monday
+    const daysToMonday = weekday === 'Sat' ? 2 : 1;
+    const hoursToOpen  = daysToMonday * 24 + (OPEN - mins) / 60;
+    detail = `Opens Monday ${fmtHoursCountdown(hoursToOpen * 60)}`;
+  } else if (mins < PRE_OPEN) {
+    status = 'Closed';
+    statusCls = 'mc-closed';
+    detail = `Pre-market in ${fmtCountdown(PRE_OPEN - mins)}`;
+  } else if (mins < OPEN) {
+    status = 'Pre-market';
+    statusCls = 'mc-pre';
+    detail = `Opens in ${fmtCountdown(OPEN - mins)}`;
+  } else if (mins < CLOSE) {
+    status = 'Open';
+    statusCls = 'mc-open';
+    detail = `Closes in ${fmtCountdown(CLOSE - mins)}`;
+  } else if (mins < AFTER_END) {
+    status = 'After-hours';
+    statusCls = 'mc-after';
+    detail = `After-hours ends ${fmtCountdown(AFTER_END - mins)}`;
+  } else {
+    status = 'Closed';
+    statusCls = 'mc-closed';
+    // next trading day
+    const daysToNext = weekday === 'Fri' ? 3 : 1;
+    const hoursToOpen = daysToNext * 24 + (OPEN - mins) / 60;
+    detail = `Opens ${daysToNext === 1 ? 'tomorrow' : 'Monday'} ${fmtHoursCountdown(hoursToOpen * 60)}`;
+  }
+
+  return (
+    <div className="market-clock" title={`Current Eastern Time: ${timeStr}`}>
+      <span className="mc-time">{timeStr} ET</span>
+      <span className={`mc-status ${statusCls}`}>
+        <span className="mc-dot" />
+        {status}
+      </span>
+      <span className="mc-detail">{detail}</span>
+    </div>
+  );
+}
+
+// Format N minutes as "1h 23m" or "23m"
+function fmtCountdown(totalMins) {
+  const m = Math.max(0, Math.round(totalMins));
+  const h = Math.floor(m / 60);
+  const mm = m % 60;
+  return h > 0 ? `${h}h ${mm}m` : `${mm}m`;
+}
+// Format N minutes over long spans — renders "2d 14h" style
+function fmtHoursCountdown(totalMins) {
+  const m = Math.max(0, Math.round(totalMins));
+  const d = Math.floor(m / (60 * 24));
+  const h = Math.floor((m % (60 * 24)) / 60);
+  return d > 0 ? `in ${d}d ${h}h` : `in ${h}h`;
+}
+
 // ── Cookie helpers for collapsible section preferences ──
 function readCookieFlag(name, defaultVal = false) {
   if (typeof document === 'undefined') return defaultVal;
@@ -3071,6 +3177,11 @@ export default function Dashboard() {
   const [moversCollapsed, setMoversCollapsed] = useState(false);
   // Mobile-only toggle: on small screens we only show one of Gainers / Losers at a time.
   const [moversMobileView, setMoversMobileView] = useState('gainers'); // 'gainers' | 'losers'
+  // "Collapse all / Expand all" toggle. allCompact remembers the target
+  // state; compactNonce bumps every click so cards' useEffect re-fires and
+  // re-syncs even if the user individually re-toggled a card in between.
+  const [allCompact, setAllCompact] = useState(false);
+  const [compactNonce, setCompactNonce] = useState(0);
   useEffect(() => {
     setStatsCollapsed(readCookieFlag('stats_collapsed', false));
     setMoversCollapsed(readCookieFlag('movers_collapsed', false));
@@ -3557,6 +3668,7 @@ export default function Dashboard() {
         <div className="header-main">
           <h1>{"\u{1F4C8}"} Social Stock <span>Intelligence Monitor</span></h1>
           <div className="subtitle">Last updated: {dateStr} {"\u{B7}"} Auto-scan complete</div>
+          <MarketClock />
         </div>
         <div className="header-tools">
           <button
@@ -3688,15 +3800,32 @@ export default function Dashboard() {
         {/* FILTER BAR (signal type) - shown on all tabs except analytics */}
         {activeTab !== 'analytics' && (
           <div className="filter-bar">
-            {signalTypes.map(type => (
-              <button
-                key={type}
-                className={`filter-btn ${filter === type ? 'active' : ''}`}
-                onClick={() => setFilter(type)}
-              >
-                {type}
-              </button>
-            ))}
+            <div className="filter-bar-chips">
+              {signalTypes.map(type => (
+                <button
+                  key={type}
+                  className={`filter-btn ${filter === type ? 'active' : ''}`}
+                  onClick={() => setFilter(type)}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+            {/* Right-aligned: collapse/expand all cards. Each click bumps a
+                nonce and flips the target state, so individual cards pick up
+                the new state via a useEffect on their forceCompact prop. */}
+            <button
+              className="collapse-all-btn"
+              onClick={() => {
+                setAllCompact(prev => !prev);
+                setCompactNonce(n => n + 1);
+              }}
+              title={allCompact ? 'Expand every card to show full details' : 'Collapse every card to compact view'}
+            >
+              {allCompact
+                ? <>{"\u25BE"} Expand all</>
+                : <>{"\u25B4"} Collapse all</>}
+            </button>
           </div>
         )}
       </div>
@@ -3899,7 +4028,7 @@ export default function Dashboard() {
           </p>
 
           {/* Cards grid */}
-          <div className="cards-grid">
+          <div className={`cards-grid${allCompact && compactNonce > 0 ? ' grid-all-compact' : ''}`}>
             {getTabData().length > 0 ? getTabData().map((alert, idx) => (
               <AlertCard
                 key={alert.id || idx}
@@ -3907,6 +4036,9 @@ export default function Dashboard() {
                 index={idx}
                 sectionPrefix={activeTab}
                 watchlist={watchlist}
+                sharedPrices={prices}
+                forceCompact={allCompact}
+                forceCompactNonce={compactNonce}
                 onToggleWatchlist={handleToggleWatchlist}
                 onRate={handleRate}
                 onDismiss={handleDismiss}
