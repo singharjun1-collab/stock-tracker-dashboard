@@ -582,6 +582,7 @@ function AlertCard({
   // Matches the pattern used by Portfolio/Leaderboard.
   const lastHist = alert.prices[alert.prices.length - 1];
   const sharedLive = sharedPrices?.[alert.ticker]?.price;
+  const sharedPrevClose = sharedPrices?.[alert.ticker]?.previous_close;
   const price = (sharedLive != null && !Number.isNaN(sharedLive))
     ? sharedLive
     : (lastHist?.price ?? (alert.price_at_alert != null ? parseFloat(alert.price_at_alert) : null));
@@ -592,6 +593,12 @@ function AlertCard({
   const pct = (price != null && entryPrice != null && entryPrice > 0)
     ? ((price - entryPrice) / entryPrice) * 100
     : (lastHist?.pct_change || 0);
+  // Today's % (day-over-day vs. the prior session's close). Null when the
+  // daily job hasn't written previous_close yet — the UI hides the chip in
+  // that case rather than showing a misleading zero.
+  const todayPct = (price != null && sharedPrevClose != null && sharedPrevClose > 0)
+    ? ((price - sharedPrevClose) / sharedPrevClose) * 100
+    : null;
   const latest = lastHist; // kept for downstream code that uses the full history row
   const isNew = alert.status === 'new';
   const isDropped = alert.status === 'dropped';
@@ -675,9 +682,12 @@ function AlertCard({
             {price != null && (
               <>
                 <span className="ac-live">${price.toFixed(2)}</span>
-                <span className={`ac-live-pct ${pct >= 0 ? 'pos' : 'neg'}`}>
-                  {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
-                </span>
+                {todayPct != null && (
+                  <span className={`ac-today-pct ${todayPct >= 0 ? 'pos' : 'neg'}`} title="Today vs. previous close">
+                    <span className="ac-today-lbl">Today</span>
+                    <span className="ac-today-val">{todayPct >= 0 ? '+' : ''}{todayPct.toFixed(1)}%</span>
+                  </span>
+                )}
               </>
             )}
             {isNew && <span className="ac-new-pill">NEW</span>}
@@ -710,12 +720,18 @@ function AlertCard({
         </div>
       </div>
 
-      {/* HERO — AI recommendation + since-alert */}
+      {/* HERO — AI recommendation + since-alert (with original entry price) */}
       <div className={`ac-hero ac-hero-${heroTone || recVariant}`}>
         <span className={`ac-rec-chip ac-rec-${recVariant}`}>{recDisplay}</span>
-        <span className={`ac-since ${pct >= 0 ? 'pos' : 'neg'}`}>
-          {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
-        </span>
+        <div className="ac-since-block">
+          {entryPrice != null && (
+            <span className="ac-since-from">From ${entryPrice.toFixed(2)}</span>
+          )}
+          <span className="ac-since-arrow" aria-hidden="true">→</span>
+          <span className={`ac-since ${pct >= 0 ? 'pos' : 'neg'}`}>
+            {pct >= 0 ? '+' : ''}{pct.toFixed(1)}%
+          </span>
+        </div>
         <span className="ac-since-lbl">since alert<br/>{daysLabel}</span>
       </div>
 
