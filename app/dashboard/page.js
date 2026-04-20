@@ -1192,6 +1192,116 @@ function ActiveAIFilterBanner({ settings, onClear, onOpenSettings }) {
   );
 }
 
+// ── Source Health Banner (admin-only) ──
+// Shows when one of the daily-scan data sources (Reddit/WSB, Yahoo, Stooq,
+// Google Finance, Polymarket, Kalshi, StockTwits) has been failing. Only
+// admins see it (the API returns 403 for everyone else — so on non-admin
+// accounts the fetch fails and the banner never renders).
+const SOURCE_LABELS = {
+  wsb: 'Reddit / r/wallstreetbets',
+  yahoo: 'Yahoo Finance',
+  stooq: 'Stooq (fallback prices)',
+  google_finance: 'Google Finance',
+  polymarket: 'Polymarket',
+  kalshi: 'Kalshi',
+  stocktwits: 'StockTwits',
+};
+
+function formatRelTime(iso) {
+  if (!iso) return 'never';
+  const d = new Date(iso);
+  const diffMs = Date.now() - d.getTime();
+  const mins = Math.floor(diffMs / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days}d ago`;
+}
+
+function SourceHealthBanner() {
+  const [data, setData] = useState(null);
+  const [dismissed, setDismissed] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch('/api/source-health', { cache: 'no-store' });
+        if (!res.ok) return; // 401/403 for non-admins — silently ignore
+        const json = await res.json();
+        if (!cancelled) setData(json);
+      } catch (_) { /* network noise — ignore */ }
+    };
+    load();
+    // Refresh every 5 minutes so a degraded source recovering is reflected live.
+    const id = setInterval(load, 5 * 60 * 1000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, []);
+
+  if (!data || dismissed) return null;
+  if (!data.anyDegraded && !data.anyDown) return null;
+
+  const tone = data.anyDown ? 'down' : 'degraded';
+  const badSources = (data.sources || []).filter(
+    (s) => s.status === 'down' || s.status === 'degraded'
+  );
+
+  return (
+    <div className={`source-health-banner source-health-${tone}`}>
+      <span className={`source-health-dot source-health-dot-${tone}`} />
+      <span className="source-health-label">
+        {tone === 'down' ? 'Data source issue' : 'Data source degraded'}
+      </span>
+      <span className="source-health-summary">{data.summary}</span>
+      <button
+        type="button"
+        className="source-health-expand"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+      >
+        {expanded ? 'Hide details' : 'Details'}
+      </button>
+      <button
+        type="button"
+        className="source-health-dismiss"
+        onClick={() => setDismissed(true)}
+        title="Dismiss for this session"
+        aria-label="Dismiss"
+      >
+        {'\u00D7'}
+      </button>
+      {expanded && (
+        <div className="source-health-details">
+          {badSources.map((s) => (
+            <div key={s.source} className={`source-health-row source-health-row-${s.status}`}>
+              <span className={`source-health-dot source-health-dot-${s.status}`} />
+              <span className="source-health-row-name">
+                {SOURCE_LABELS[s.source] || s.source}
+              </span>
+              <span className="source-health-row-status">
+                {s.status === 'down' ? 'DOWN' : 'DEGRADED'}
+              </span>
+              <span className="source-health-row-meta">
+                {s.consecutive_failures} fail{s.consecutive_failures === 1 ? '' : 's'} in a row
+                {' \u00B7 '}last ok {formatRelTime(s.last_success_at)}
+                {s.last_error_code ? ` \u00B7 ${s.last_error_code}` : ''}
+              </span>
+            </div>
+          ))}
+          <div className="source-health-note">
+            {'\u{1F4A1}'} The daily scan keeps running with remaining sources.
+            If this persists, the next pre-market scan may be missing fresh signals
+            from the affected source.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── AI Settings Panel ──
 function AISettingsPanel({ settings, onSave }) {
   const [localMin, setLocalMin] = useState(settings?.market_cap_range?.min ?? 0);
@@ -3977,6 +4087,11 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* SOURCE HEALTH BANNER - admin-only; silently no-ops for everyone else.
+          Flags degraded/down scan sources (Reddit, Yahoo, etc.) so we know
+          when the daily scan is running blind. */}
+      <SourceHealthBanner />
 
       {/* ACTIVE AI FILTER BANNER - shows when a non-default AI filter is applied */}
       <ActiveAIFilterBanner

@@ -1177,6 +1177,113 @@ footer span { color: #4fc3f7; }
   .ai-filter-banner-edit { margin-left: 0; }
 }
 
+/* ── Source Health Banner (admin-only) ──
+   Shows when one of the daily-scan data sources is degraded or down.
+   Robinhood-style: low-key amber for "degraded", red for "down",
+   dismissible, expandable for details. */
+.source-health-banner {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 10px;
+  margin: 8px 40px 0;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+  position: relative;
+}
+.source-health-degraded {
+  background: linear-gradient(90deg, rgba(245,158,11,0.12), rgba(245,158,11,0.04));
+  border: 1px solid rgba(245,158,11,0.45);
+}
+.source-health-down {
+  background: linear-gradient(90deg, rgba(239,68,68,0.14), rgba(239,68,68,0.05));
+  border: 1px solid rgba(239,68,68,0.55);
+}
+.source-health-dot {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-block; flex-shrink: 0;
+}
+.source-health-dot-degraded {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.25);
+  animation: shPulse 2s ease-in-out infinite;
+}
+.source-health-dot-down {
+  background: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.28);
+  animation: shPulse 1.3s ease-in-out infinite;
+}
+.source-health-dot-ok { background: #22c55e; }
+@keyframes shPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.55; transform: scale(0.85); }
+}
+.source-health-label {
+  font-weight: 700; letter-spacing: 0.2px;
+  color: #f59e0b;
+}
+.source-health-down .source-health-label { color: #ff8a8a; }
+.source-health-summary { color: #e6f1ff; opacity: 0.9; }
+.source-health-expand {
+  margin-left: auto;
+  padding: 5px 12px; border-radius: 6px;
+  background: transparent; color: #e6f1ff;
+  border: 1px solid rgba(255,255,255,0.2);
+  font-size: 0.78rem; font-weight: 600; cursor: pointer;
+}
+.source-health-expand:hover {
+  border-color: rgba(255,255,255,0.45); background: rgba(255,255,255,0.05);
+}
+.source-health-dismiss {
+  width: 26px; height: 26px; border-radius: 50%;
+  background: transparent; border: 1px solid rgba(255,255,255,0.2);
+  color: #e6f1ff; font-size: 1rem; line-height: 1; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0;
+}
+.source-health-dismiss:hover {
+  background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.4);
+}
+.source-health-details {
+  flex-basis: 100%;
+  margin-top: 8px;
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px 4px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.source-health-row {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 6px 10px;
+  background: rgba(10,14,26,0.6);
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+.source-health-row-name { color: #e6f1ff; font-weight: 600; }
+.source-health-row-status {
+  font-size: 0.7rem; font-weight: 800; letter-spacing: 0.5px;
+  padding: 2px 8px; border-radius: 999px;
+}
+.source-health-row-degraded .source-health-row-status {
+  color: #f59e0b; background: rgba(245,158,11,0.12);
+  border: 1px solid rgba(245,158,11,0.4);
+}
+.source-health-row-down .source-health-row-status {
+  color: #ff8a8a; background: rgba(239,68,68,0.14);
+  border: 1px solid rgba(239,68,68,0.5);
+}
+.source-health-row-meta {
+  color: #7a9bc0; font-size: 0.75rem; margin-left: auto;
+}
+.source-health-note {
+  margin-top: 6px;
+  font-size: 0.75rem; color: #9ab3cf;
+  padding: 6px 4px;
+}
+@media (max-width: 640px) {
+  .source-health-banner { margin: 8px 16px 0; padding: 10px 12px; font-size: 0.78rem; }
+  .source-health-expand { margin-left: 0; }
+  .source-health-row-meta { margin-left: 0; flex-basis: 100%; font-size: 0.72rem; }
+  .source-health-details { padding: 8px 4px 2px; }
+}
+
 /* ── Enhanced Market Cap Card Badges ── */
 .mcap-card-badge {
   font-size: 0.7rem; font-weight: 700;
