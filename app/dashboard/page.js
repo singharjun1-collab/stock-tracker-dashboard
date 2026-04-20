@@ -1291,7 +1291,7 @@ const SOURCE_LABELS = {
   google_finance: 'Google Finance',
   polymarket: 'Polymarket',
   kalshi: 'Kalshi',
-  stocktwits: 'StockTwits',
+  // stocktwits: retired 2026-04-20 (public API fully blocked)
 };
 
 function formatRelTime(iso) {
