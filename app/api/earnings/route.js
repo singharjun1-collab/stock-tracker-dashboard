@@ -71,7 +71,9 @@ export async function GET(request) {
         : null,
     };
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: { 'Cache-Control': 'private, max-age=300' },
+    });
   } catch (error) {
     console.error(`Error fetching earnings for ${ticker}:`, error);
     return NextResponse.json({

@@ -93,7 +93,9 @@ export async function GET(request) {
       result.averageRating = ratingMap[key] || key;
     }
 
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: { 'Cache-Control': 'private, max-age=300' },
+    });
   } catch (error) {
     console.error(`Error fetching analyst data for ${ticker}:`, error);
     return NextResponse.json({

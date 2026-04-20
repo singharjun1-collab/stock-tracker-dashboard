@@ -1,8 +1,66 @@
 'use client';
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, createContext, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import '../globals.css';
 import { SIGNAL_WEIGHTS, SIGNAL_BUCKETS, bucketFor } from '../lib/signalStrength';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Stock meta batch fetching.
+//
+// Historically each stock card fired THREE separate API calls per card
+// (analyst / earnings / history). With ~60 cards that's ~180 serverless
+// invocations per dashboard load — the main driver of our Vercel CPU usage.
+//
+// We now batch-fetch everything through /api/stock-meta once per load and
+// publish the result via a React context. The three card components still
+// render exactly the same data; they just read it from context instead of
+// each firing their own fetch. If a ticker is missing from the batch
+// response (edge case), the components transparently fall back to the
+// original per-ticker endpoints.
+// ─────────────────────────────────────────────────────────────────────────────
+const StockMetaCtx = createContext({ meta: null, loading: false });
+
+function StockMetaProvider({ tickers, children }) {
+  const [state, setState] = useState({ meta: null, loading: false });
+  // Stable join key so we only re-fetch when the ticker set actually changes.
+  const tickerKey = useMemo(
+    () => [...new Set((tickers || []).map(t => String(t || '').toUpperCase()).filter(Boolean))].sort().join(','),
+    [tickers]
+  );
+
+  useEffect(() => {
+    if (!tickerKey) { setState({ meta: {}, loading: false }); return; }
+    let cancelled = false;
+    setState(s => ({ meta: s.meta, loading: true }));
+    fetch('/api/stock-meta', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tickers: tickerKey.split(',') }),
+    })
+      .then(res => res.ok ? res.json() : Promise.reject(new Error(`stock-meta ${res.status}`)))
+      .then(data => { if (!cancelled) setState({ meta: data?.meta || {}, loading: false }); })
+      .catch(() => { if (!cancelled) setState({ meta: {}, loading: false }); });
+    return () => { cancelled = true; };
+  }, [tickerKey]);
+
+  return <StockMetaCtx.Provider value={state}>{children}</StockMetaCtx.Provider>;
+}
+
+// Returns { data, loading, fromBatch }. `fromBatch=true` means we have the
+// batched data and the component should NOT fire an individual fetch.
+function useStockMetaEntry(ticker, kind) {
+  const ctx = useContext(StockMetaCtx);
+  if (!ticker) return { data: null, loading: false, fromBatch: false };
+  const upper = String(ticker).toUpperCase();
+  if (!ctx.meta) return { data: null, loading: ctx.loading, fromBatch: false };
+  const entry = ctx.meta[upper];
+  if (entry && entry[kind] !== undefined) {
+    return { data: entry[kind], loading: false, fromBatch: true };
+  }
+  // Batch has loaded but this ticker wasn't included — fall through to
+  // individual fetch in the consuming component.
+  return { data: null, loading: ctx.loading, fromBatch: false };
+}
 
 // ── Signal Strength Bars (wifi-style) ──
 function SignalBars({ score, subScores, sourceCount, mentionCount }) {
@@ -145,18 +203,28 @@ function getRedditLinks(ticker) {
 }
 
 // ── Analyst Badge Component ──
+// Prefers batched data from StockMetaCtx; falls back to /api/analyst only if
+// this ticker wasn't part of the batch response (shouldn't normally happen).
 function AnalystBadge({ ticker }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const batched = useStockMetaEntry(ticker, 'analyst');
+  const [fallback, setFallback] = useState(null);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
 
   useEffect(() => {
+    if (batched.fromBatch) return;   // batch already has the data
+    if (batched.loading) return;     // batch still in flight — wait
+    // Batch finished without this ticker — individual fallback.
     let cancelled = false;
+    setFallbackLoading(true);
     fetch(`/api/analyst?ticker=${encodeURIComponent(ticker)}`)
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then(d => { if (!cancelled) { setData(d); setLoading(false); } })
-      .catch(() => { if (!cancelled) setLoading(false); });
+      .then(d => { if (!cancelled) { setFallback(d); setFallbackLoading(false); } })
+      .catch(() => { if (!cancelled) setFallbackLoading(false); });
     return () => { cancelled = true; };
-  }, [ticker]);
+  }, [ticker, batched.fromBatch, batched.loading]);
+
+  const data = batched.data ?? fallback;
+  const loading = batched.fromBatch ? false : (batched.loading || fallbackLoading);
 
   if (loading) return <div className="analyst-badge analyst-loading">Loading analyst data...</div>;
   if (!data || (!data.recommendationKey && !data.averageRating)) return null;
@@ -332,18 +400,26 @@ function NewsHeadlines({ ticker }) {
 }
 
 // ── Next Earnings Date ──
+// Prefers batched data; falls back to /api/earnings if ticker missing from batch.
 function EarningsDate({ ticker }) {
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const batched = useStockMetaEntry(ticker, 'earnings');
+  const [fallback, setFallback] = useState(null);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
 
   useEffect(() => {
+    if (batched.fromBatch) return;
+    if (batched.loading) return;
     let cancelled = false;
+    setFallbackLoading(true);
     fetch(`/api/earnings?ticker=${encodeURIComponent(ticker)}`)
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then(d => { if (!cancelled) { setData(d); setLoading(false); } })
-      .catch(() => { if (!cancelled) setLoading(false); });
+      .then(d => { if (!cancelled) { setFallback(d); setFallbackLoading(false); } })
+      .catch(() => { if (!cancelled) setFallbackLoading(false); });
     return () => { cancelled = true; };
-  }, [ticker]);
+  }, [ticker, batched.fromBatch, batched.loading]);
+
+  const data = batched.data ?? fallback;
+  const loading = batched.fromBatch ? false : (batched.loading || fallbackLoading);
 
   if (loading || !data || !data.earningsDate) return null;
 
@@ -376,20 +452,31 @@ function EarningsDate({ ticker }) {
 }
 
 // ── Historic Chart ──
+// Prefers batched history data; falls back to /api/history if ticker missing.
 function HistoricChart({ ticker, canvasId }) {
   const canvasRef = useRef(null);
-  const [histData, setHistData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const batched = useStockMetaEntry(ticker, 'history');
+  const [fallback, setFallback] = useState(null);
+  const [fallbackLoading, setFallbackLoading] = useState(false);
+  const [fallbackError, setFallbackError] = useState(false);
 
   useEffect(() => {
+    if (batched.fromBatch) return;
+    if (batched.loading) return;
     let cancelled = false;
+    setFallbackLoading(true);
     fetch(`/api/history?ticker=${encodeURIComponent(ticker)}`)
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => { if (!cancelled) { setHistData(data); setLoading(false); } })
-      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+      .then(data => { if (!cancelled) { setFallback(data); setFallbackLoading(false); } })
+      .catch(() => { if (!cancelled) { setFallbackError(true); setFallbackLoading(false); } });
     return () => { cancelled = true; };
-  }, [ticker]);
+  }, [ticker, batched.fromBatch, batched.loading]);
+
+  // Treat a batched history with an `error` field as a failure signal.
+  const batchedError = batched.fromBatch && batched.data && batched.data.error;
+  const histData = batchedError ? null : (batched.data ?? fallback);
+  const loading = batched.fromBatch ? false : (batched.loading || fallbackLoading);
+  const error = batchedError || fallbackError;
 
   useEffect(() => {
     if (!canvasRef.current || !window.Chart || !histData?.prices?.length) return;
@@ -3852,6 +3939,17 @@ export default function Dashboard() {
     }
   };
 
+  // Union of every ticker that might render a card on this page. Used by
+  // <StockMetaProvider> to batch-fetch analyst + earnings + history data in
+  // one round-trip instead of 3 per card.
+  const allTickers = useMemo(() => {
+    const set = new Set();
+    alerts.forEach(a => a?.ticker && set.add(String(a.ticker).toUpperCase()));
+    paperTrades.forEach(t => t?.ticker && set.add(String(t.ticker).toUpperCase()));
+    watchlist.forEach(t => t && set.add(String(t).toUpperCase()));
+    return [...set];
+  }, [alerts, paperTrades, watchlist]);
+
   if (loading) {
     return (
       <div className="loading-container">
@@ -3862,7 +3960,7 @@ export default function Dashboard() {
   }
 
   return (
-    <>
+    <StockMetaProvider tickers={allTickers}>
       <header className="header">
         <div className="header-main">
           <h1>{"\u{1F4C8}"} Social Stock <span>Intelligence Monitor</span></h1>
@@ -4544,6 +4642,6 @@ export default function Dashboard() {
           <span className="mb-nav-label">Leaders</span>
         </button>
       </nav>
-    </>
+    </StockMetaProvider>
   );
 }

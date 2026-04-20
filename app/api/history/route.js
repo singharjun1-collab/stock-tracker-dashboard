@@ -58,6 +58,8 @@ export async function GET(request) {
       change3mo,
       startPrice,
       endPrice,
+    }, {
+      headers: { 'Cache-Control': 'private, max-age=300' },
     });
   } catch (error) {
     console.error(`Error fetching history for ${ticker}:`, error);
