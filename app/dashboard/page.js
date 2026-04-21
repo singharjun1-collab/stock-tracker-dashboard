@@ -1191,52 +1191,45 @@ function MarketCapSlider({ range, onChange }) {
   );
 }
 
-// ── Signal Type Filter Dropdown ──
-// Replaces the old always-visible chip row (ALL / MOMENTUM / CATALYST / SQUEEZE /
-// POLYMARKET / MACRO) with a compact dropdown that sits next to the Market Cap
-// filter in the search row. Matches MarketCapSlider's styling for visual parity.
-function SignalTypeFilter({ value, options, onChange }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const wrapperRef = useRef(null);
-
-  // Close on outside click.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onDocClick = (e) => {
-      if (!wrapperRef.current?.contains(e.target)) setIsOpen(false);
-    };
-    document.addEventListener('click', onDocClick);
-    return () => document.removeEventListener('click', onDocClick);
-  }, [isOpen]);
-
-  const isFiltered = value && value !== 'ALL';
-  // Humanize the "POLYMARKET SIGNAL" etc. labels for the trigger button.
-  const labelOf = (v) => (!v || v === 'ALL') ? 'All' : v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()).replace(/Play|Setup|Signal/i, m => m.toLowerCase());
-
+// ── Recommendation Quick Filter (Robinhood-style chip row) ──
+// Replaces the old Signal-Type dropdown. Filters cards by the AI's action
+// recommendation (BUY / HOLD / TRIM / EXIT / SELL) — the dimension AJ actually
+// acts on. Lives in its own row under the tabs with live counts per pill, and
+// horizontally scrolls on narrow screens.
+function RecommendationFilter({ value, onChange, counts }) {
+  const options = [
+    { key: 'ALL',  label: 'All',  cls: 'rec-pill--all',  dot: null },
+    { key: 'BUY',  label: 'Buy',  cls: 'rec-pill--buy',  dot: '\u{1F7E2}' },
+    { key: 'HOLD', label: 'Hold', cls: 'rec-pill--hold', dot: '\u{1F7E1}' },
+    { key: 'TRIM', label: 'Trim', cls: 'rec-pill--trim', dot: '\u{1F7E0}' },
+    { key: 'EXIT', label: 'Exit', cls: 'rec-pill--exit', dot: '\u{1F535}' },
+    { key: 'SELL', label: 'Sell', cls: 'rec-pill--sell', dot: '\u{1F534}' },
+  ];
   return (
-    <div className="mcap-filter-wrapper" ref={wrapperRef}>
-      <button
-        className={`mcap-filter-toggle ${isFiltered ? 'active' : ''}`}
-        onClick={() => setIsOpen(v => !v)}
-        title="Filter by signal type"
-      >
-        {"\u{1F4E1}"} Signal {isFiltered ? `(${labelOf(value)})` : '(All)'}
-      </button>
-      {isOpen && (
-        <div className="mcap-filter-dropdown signal-filter-dropdown">
-          <div className="mcap-presets">
-            {options.map(opt => (
-              <button
-                key={opt}
-                className={`mcap-preset-btn ${value === opt ? 'active' : ''}`}
-                onClick={() => { onChange(opt); setIsOpen(false); }}
-              >
-                {opt === 'ALL' ? 'All' : opt}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+    <div
+      className="rec-filter-row"
+      role="tablist"
+      aria-label="Filter picks by recommendation"
+    >
+      {options.map(opt => {
+        const active = value === opt.key;
+        const count  = counts?.[opt.key] ?? 0;
+        return (
+          <button
+            key={opt.key}
+            type="button"
+            role="tab"
+            aria-selected={active}
+            className={`rec-pill ${opt.cls}${active ? ' rec-pill--active' : ''}`}
+            onClick={() => onChange(opt.key)}
+            title={opt.key === 'ALL' ? 'Show all picks' : `Show only ${opt.label.toUpperCase()} picks`}
+          >
+            {opt.dot && <span className="rec-pill-dot" aria-hidden="true">{opt.dot}</span>}
+            <span className="rec-pill-label">{opt.label}</span>
+            <span className="rec-pill-count">{count}</span>
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -3440,8 +3433,7 @@ function writeCookieFlag(name, val) {
 export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState('ALL');
-  const [recFilter, setRecFilter] = useState('ALL');   // 'ALL' | 'BUY' | 'SELL'
+  const [recFilter, setRecFilter] = useState('ALL');   // 'ALL' | 'BUY' | 'HOLD' | 'TRIM' | 'EXIT' | 'SELL'
   const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   const [mcapRange, setMcapRange] = useState([0, 5000]);
@@ -3834,7 +3826,7 @@ export default function Dashboard() {
       : alert.status === 'new' ? 'new' : 'active';
     setActiveTab(tab);
     setSearchQuery('');
-    setFilter('ALL');
+    setRecFilter('ALL');
     setTimeout(() => {
       const el = document.getElementById(`card-${alert.ticker}`);
       if (el) {
@@ -3878,12 +3870,11 @@ export default function Dashboard() {
     return pb - pa;
   });
 
-  // Apply all filters: search + signal type + market cap
+  // Apply all filters: search + recommendation + market cap
+  // (Old signal-type filter was removed 2026-04-21 — replaced by the
+  // quick Buy/Hold/Trim/Exit/Sell chip row under the tabs.)
   const applyAllFilters = useCallback((list) => {
     let filtered = list;
-
-    // Signal type filter
-    if (filter !== 'ALL') filtered = filtered.filter(a => a.signal_type === filter);
 
     // Search filter
     if (searchQuery.trim()) {
@@ -3894,7 +3885,7 @@ export default function Dashboard() {
       );
     }
 
-    // Recommendation filter (BUY / SELL)
+    // Recommendation filter (BUY / HOLD / TRIM / EXIT / SELL)
     if (recFilter !== 'ALL') filtered = filtered.filter(a => a.recommendation === recFilter);
 
     // Market cap filter
@@ -3906,7 +3897,7 @@ export default function Dashboard() {
     }
 
     return filtered;
-  }, [filter, recFilter, searchQuery, mcapRange]);
+  }, [recFilter, searchQuery, mcapRange]);
 
   // Dismissed rows drop out of the normal tabs (they reappear in the Archive section).
   const notDismissed = (a) => !a.dismissed_at;
@@ -3920,7 +3911,31 @@ export default function Dashboard() {
   const filteredDropped = useMemo(() => applyAllFilters(droppedPicks), [droppedPicks, applyAllFilters]);
   const filteredWatchlist = useMemo(() => applyAllFilters(watchlistPicks), [watchlistPicks, applyAllFilters]);
 
-  const signalTypes = useMemo(() => ['ALL', ...new Set(alerts.map(a => a.signal_type))], [alerts]);
+  // Which pick-list feeds the rec-filter chip counts — depends on active tab.
+  // Counts reflect what's available to filter in the current view so users
+  // never tap a pill that'd empty the grid.
+  const currentTabPicks = useMemo(() => {
+    switch (activeTab) {
+      case 'new':       return newPicks;
+      case 'watchlist': return watchlistPicks;
+      case 'dropped':   return droppedPicks;
+      case 'active':    return activePicks;
+      default:          return [];
+    }
+  }, [activeTab, newPicks, activePicks, watchlistPicks, droppedPicks]);
+
+  const recCounts = useMemo(() => {
+    const c = { ALL: 0, BUY: 0, HOLD: 0, TRIM: 0, EXIT: 0, SELL: 0 };
+    for (const a of currentTabPicks) {
+      c.ALL++;
+      const r = a.recommendation;
+      if (r && c[r] !== undefined) c[r]++;
+    }
+    return c;
+  }, [currentTabPicks]);
+
+  // Hide the rec-filter row on tabs that don't show pick cards.
+  const showRecFilter = ['new', 'active', 'watchlist', 'dropped'].includes(activeTab);
 
   const currentPicks = [...newPicks, ...activePicks];
   const totalCurrent = currentPicks.length;
@@ -4137,8 +4152,9 @@ export default function Dashboard() {
       </header>
 
       {/* ─── PRIMARY NAVIGATION: SEARCH + FILTERS + TABS (sticky) ─── */}
-      {/* Search + Signal filter + Market Cap + Collapse-all all live in
-          one row so we don't waste a whole row on signal-type chips. */}
+      {/* Search + Market Cap + Collapse-all. The old "Signal (All)" dropdown
+          was retired 2026-04-21 — replaced by the Buy/Hold/Trim/Exit/Sell
+          quick-chip row that appears below the tabs. */}
       <div className="search-bar-container">
         <div className="search-bar">
           <span className="search-icon">{"\u{1F50D}"}</span>
@@ -4153,9 +4169,6 @@ export default function Dashboard() {
             <button className="search-clear" onClick={() => setSearchQuery('')}>{"\u{2715}"}</button>
           )}
         </div>
-        {activeTab !== 'analytics' && (
-          <SignalTypeFilter value={filter} options={signalTypes} onChange={setFilter} />
-        )}
         <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
         {activeTab !== 'analytics' && (
           <button
@@ -4202,6 +4215,18 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Robinhood-style quick filter: one-tap filter by recommendation.
+          Hidden on tabs that don't show pick cards (portfolio, leaderboard,
+          analytics). Counts update live per tab so users see what's available
+          before tapping. */}
+      {showRecFilter && (
+        <RecommendationFilter
+          value={recFilter}
+          onChange={setRecFilter}
+          counts={recCounts}
+        />
+      )}
 
       {/* SOURCE HEALTH BANNER - admin-only; silently no-ops for everyone else.
           Flags degraded/down scan sources (Reddit, Yahoo, etc.) so we know

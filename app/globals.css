@@ -206,6 +206,160 @@ body {
   cursor: pointer; transition: background 0.15s ease;
 }
 .rec-filter-chip:hover { background: #264a70; }
+
+/* ─────────────────────────────────────────────────────────────────
+   RECOMMENDATION QUICK-FILTER ROW (Buy / Hold / Trim / Exit / Sell)
+   Robinhood-style chip row that lives under the tabs. One tap to
+   filter the card grid by recommendation. Colors mirror the hero
+   chips on the cards so the UI feels unified.
+   ───────────────────────────────────────────────────────────────── */
+.rec-filter-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 40px 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  scroll-snap-type: x proximity;
+}
+.rec-filter-row::-webkit-scrollbar { display: none; }
+
+.rec-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1px solid #1e3a5f;
+  background: rgba(15, 29, 48, 0.85);
+  color: #a7b9cf;
+  font-size: 0.82rem;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease,
+              color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+  scroll-snap-align: start;
+  flex-shrink: 0;
+  letter-spacing: 0.2px;
+}
+.rec-pill:hover {
+  border-color: #4fc3f7;
+  color: #e0e6f0;
+  transform: translateY(-1px);
+}
+.rec-pill:active  { transform: translateY(0); }
+.rec-pill:focus-visible {
+  outline: 2px solid #4fc3f7;
+  outline-offset: 2px;
+}
+
+.rec-pill-dot   { font-size: 0.72rem; line-height: 1; }
+.rec-pill-label { font-weight: 700; }
+.rec-pill-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  min-width: 22px;
+  text-align: center;
+  border-radius: 999px;
+  background: rgba(79, 195, 247, 0.10);
+  color: #7a9bc0;
+  border: 1px solid rgba(79, 195, 247, 0.18);
+}
+
+/* ---- Active states (filled + glow) per rec type ---- */
+.rec-pill--all.rec-pill--active {
+  border-color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.15);
+  color: #4fc3f7;
+  box-shadow: 0 0 12px rgba(79, 195, 247, 0.28);
+}
+.rec-pill--all.rec-pill--active .rec-pill-count {
+  background: rgba(79, 195, 247, 0.22);
+  color: #4fc3f7;
+  border-color: rgba(79, 195, 247, 0.40);
+}
+
+.rec-pill--buy.rec-pill--active {
+  border-color: #22c55e;
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+  box-shadow: 0 0 14px rgba(34, 197, 94, 0.32);
+}
+.rec-pill--buy.rec-pill--active .rec-pill-count {
+  background: rgba(34, 197, 94, 0.24);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, 0.40);
+}
+
+.rec-pill--hold.rec-pill--active {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.13);
+  color: #fbbf24;
+  box-shadow: 0 0 12px rgba(251, 191, 36, 0.28);
+}
+.rec-pill--hold.rec-pill--active .rec-pill-count {
+  background: rgba(251, 191, 36, 0.22);
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.40);
+}
+
+.rec-pill--trim.rec-pill--active {
+  border-color: #f59e0b;
+  background: rgba(245, 158, 11, 0.14);
+  color: #fbbf24;
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.28);
+}
+.rec-pill--trim.rec-pill--active .rec-pill-count {
+  background: rgba(245, 158, 11, 0.22);
+  color: #fbbf24;
+  border-color: rgba(245, 158, 11, 0.40);
+}
+
+.rec-pill--exit.rec-pill--active {
+  border-color: #22d3ee;
+  background: rgba(34, 211, 238, 0.14);
+  color: #22d3ee;
+  box-shadow: 0 0 12px rgba(34, 211, 238, 0.30);
+}
+.rec-pill--exit.rec-pill--active .rec-pill-count {
+  background: rgba(34, 211, 238, 0.22);
+  color: #22d3ee;
+  border-color: rgba(34, 211, 238, 0.40);
+}
+
+.rec-pill--sell.rec-pill--active {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.32);
+}
+.rec-pill--sell.rec-pill--active .rec-pill-count {
+  background: rgba(239, 68, 68, 0.24);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.40);
+}
+
+/* Mobile: tighter padding, edge-to-edge horizontal scroll */
+@media (max-width: 780px) {
+  .rec-filter-row {
+    padding: 8px 16px 4px;
+    gap: 6px;
+  }
+  .rec-pill {
+    padding: 6px 11px;
+    font-size: 0.78rem;
+  }
+  .rec-pill-count {
+    font-size: 0.68rem;
+    padding: 2px 6px;
+    min-width: 20px;
+  }
+}
 .stat-value { font-size: 1.8rem; font-weight: 800; color: #4fc3f7; }
 .stat-label {
   font-size: 0.75rem; color: #7a9bc0; margin-top: 4px;
