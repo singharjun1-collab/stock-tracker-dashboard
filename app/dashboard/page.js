@@ -140,9 +140,14 @@ function recClass(rec) {
 const SOURCE_META = {
   wsb: { label: 'WallStreetBets', emoji: '\u{1F7E0}', cls: 'src-wsb' },
   reddit: { label: 'Reddit', emoji: '\u{1F534}', cls: 'src-reddit' },
+  apewisdom: { label: 'ApeWisdom', emoji: '\u{1F435}', cls: 'src-ape' },
   polymarket: { label: 'Polymarket', emoji: '\u{1F535}', cls: 'src-poly' },
   kalshi: { label: 'Kalshi', emoji: '\u{1F537}', cls: 'src-kalshi' },
   yahoo: { label: 'Yahoo Finance', emoji: '\u{1F7E3}', cls: 'src-yahoo' },
+  yahoo_premarket: { label: 'Yahoo Pre-market', emoji: '\u{1F305}', cls: 'src-yahoo-pm' },
+  sec_edgar: { label: 'SEC 8-K', emoji: '\u{1F4C4}', cls: 'src-sec' },
+  biopharmcatalyst: { label: 'FDA Catalyst', emoji: '\u{1F489}', cls: 'src-fda' },
+  nasdaq_halt: { label: 'NASDAQ Halt', emoji: '\u{23F8}', cls: 'src-halt' },
   google: { label: 'Google Finance', emoji: '\u{1F7E2}', cls: 'src-google' },
   stocktwits: { label: 'StockTwits', emoji: '\u{1F534}', cls: 'src-st' },
   unknown: { label: 'Unknown', emoji: '\u{26AA}', cls: 'src-unknown' },
@@ -150,6 +155,12 @@ const SOURCE_META = {
 function getSourceMeta(source) {
   if (!source) return SOURCE_META.unknown;
   const key = source.toLowerCase().replace(/\s+/g, '');
+  // More specific matches first
+  if (key.includes('yahoo_premarket') || key.includes('yahoopm') || key.includes('yahoopremarket')) return SOURCE_META.yahoo_premarket;
+  if (key.includes('sec_edgar') || key.includes('secedgar') || key.includes('sec8k')) return SOURCE_META.sec_edgar;
+  if (key.includes('biopharm') || key.includes('fda') || key.includes('catalystalert')) return SOURCE_META.biopharmcatalyst;
+  if (key.includes('apewisdom') || key.includes('apewis')) return SOURCE_META.apewisdom;
+  if (key.includes('nasdaq_halt') || key.includes('halt')) return SOURCE_META.nasdaq_halt;
   if (key.includes('wsb') || key.includes('wallstreetbets')) return SOURCE_META.wsb;
   if (key.includes('reddit')) return SOURCE_META.reddit;
   if (key.includes('poly')) return SOURCE_META.polymarket;
@@ -1280,18 +1291,24 @@ function ActiveAIFilterBanner({ settings, onClear, onOpenSettings }) {
 }
 
 // ── Source Health Banner (admin-only) ──
-// Shows when one of the daily-scan data sources (Reddit/WSB, Yahoo, Stooq,
-// Google Finance, Polymarket, Kalshi, StockTwits) has been failing. Only
+// Shows when one of the daily-scan data sources has been failing. Only
 // admins see it (the API returns 403 for everyone else — so on non-admin
 // accounts the fetch fails and the banner never renders).
+// Current source set (post 2026-04-21 Tier 1 upgrade): 10 sources.
 const SOURCE_LABELS = {
   wsb: 'Reddit / r/wallstreetbets',
-  yahoo: 'Yahoo Finance',
+  apewisdom: 'ApeWisdom (broader Reddit + /biz)',
+  yahoo: 'Yahoo Finance (trending)',
+  yahoo_premarket: 'Yahoo Pre-market gainers',
   stooq: 'Stooq (fallback prices)',
-  google_finance: 'Google Finance',
   polymarket: 'Polymarket',
-  kalshi: 'Kalshi',
-  // stocktwits: retired 2026-04-20 (public API fully blocked)
+  kalshi: 'Kalshi (macro dial)',
+  sec_edgar: 'SEC EDGAR 8-K feed',
+  biopharmcatalyst: 'FDA / PDUFA catalyst calendar',
+  nasdaq_halt: 'NASDAQ trade-halt feed',
+  // Retired (not shown in banner, but documented here for history):
+  //   stocktwits — 2026-04-20, public API permanently 403s
+  //   google_finance — 2026-04-21, 0 picks / 14 days, duplicative with yahoo
 };
 
 function formatRelTime(iso) {

@@ -364,14 +364,19 @@ body {
   display: inline-block; padding: 2px 10px; border-radius: 12px;
   font-size: 0.68rem; font-weight: 600; white-space: nowrap;
 }
-.src-wsb    { background: #7c2d12; color: #fed7aa; border: 1px solid #c2410c; }
-.src-reddit { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
-.src-poly   { background: #1e3a6e; color: #bae6fd; border: 1px solid #2563eb; }
-.src-kalshi { background: #0c4a6e; color: #a5f3fc; border: 1px solid #0891b2; }
-.src-yahoo  { background: #4c1d95; color: #ddd6fe; border: 1px solid #7c3aed; }
-.src-google { background: #14532d; color: #bbf7d0; border: 1px solid #16a34a; }
-.src-st     { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
-.src-unknown { background: #1e293b; color: #94a3b8; border: 1px solid #475569; }
+.src-wsb       { background: #7c2d12; color: #fed7aa; border: 1px solid #c2410c; }
+.src-reddit    { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
+.src-ape       { background: #713f12; color: #fde68a; border: 1px solid #ca8a04; }
+.src-poly      { background: #1e3a6e; color: #bae6fd; border: 1px solid #2563eb; }
+.src-kalshi    { background: #0c4a6e; color: #a5f3fc; border: 1px solid #0891b2; }
+.src-yahoo     { background: #4c1d95; color: #ddd6fe; border: 1px solid #7c3aed; }
+.src-yahoo-pm  { background: #6b21a8; color: #e9d5ff; border: 1px solid #a855f7; }
+.src-sec       { background: #164e63; color: #cffafe; border: 1px solid #0e7490; }
+.src-fda       { background: #134e4a; color: #99f6e4; border: 1px solid #14b8a6; }
+.src-halt      { background: #7f1d1d; color: #fecaca; border: 1px solid #b91c1c; }
+.src-google    { background: #14532d; color: #bbf7d0; border: 1px solid #16a34a; }
+.src-st        { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
+.src-unknown   { background: #1e293b; color: #94a3b8; border: 1px solid #475569; }
 
 /* ── CARD SOURCE ROW ── */
 .card-source-row {
@@ -3096,9 +3101,14 @@ footer span { color: #4fc3f7; }
 }
 .ac-b-source.src-wsb { background: rgba(255,107,53,0.18); color: #ff6b35; }
 .ac-b-source.src-reddit { background: rgba(255,107,53,0.18); color: #ff6b35; }
+.ac-b-source.src-ape { background: rgba(251,191,36,0.18); color: #fbbf24; }
 .ac-b-source.src-poly { background: rgba(59,130,246,0.18); color: #60a5fa; }
 .ac-b-source.src-kalshi { background: rgba(34,211,238,0.15); color: #22d3ee; }
 .ac-b-source.src-yahoo { background: rgba(168,85,247,0.15); color: #c084fc; }
+.ac-b-source.src-yahoo-pm { background: rgba(192,132,252,0.22); color: #d8b4fe; }
+.ac-b-source.src-sec { background: rgba(14,116,144,0.22); color: #67e8f9; }
+.ac-b-source.src-fda { background: rgba(20,184,166,0.20); color: #5eead4; }
+.ac-b-source.src-halt { background: rgba(220,38,38,0.18); color: #fca5a5; }
 .ac-b-source.src-google { background: rgba(34,197,94,0.15); color: #22c55e; }
 .ac-b-source.src-st { background: rgba(251,191,36,0.15); color: #fbbf24; }
 .ac-b-source.src-unknown { background: rgba(122,155,192,0.15); color: #7a9bc0; }
