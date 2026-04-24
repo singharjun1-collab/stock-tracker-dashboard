@@ -4004,7 +4004,7 @@ export default function Dashboard() {
               Quick external link to Google Gemini. Opens in a new tab so it
               never disrupts an in-progress dashboard session. */}
           <a
-            href="https://gemini.google.com/?hl=en-GB"
+            href="https://gemini.google.com/gem-labs/1Ucp1CKUKNvlKbW49PgoY0rWAyj8_uuJp"
             target="_blank"
             rel="noopener noreferrer"
             className="header-tool-btn gemini-btn"
