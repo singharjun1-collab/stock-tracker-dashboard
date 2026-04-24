@@ -4015,6 +4015,21 @@ export default function Dashboard() {
             <span className="gemini-btn-label">Ask Gemini</span>
           </a>
 
+          {/* ─── THE SURGE SCOUT ───
+              Quick external link to a specialized Gemini gem tuned for
+              spotting pre-surge momentum. Opens in a new tab. */}
+          <a
+            href="https://gemini.google.com/gem/1W9hF1pMpn8nE2mWzgix83jK6OC6PAkn9?usp=sharing"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-tool-btn scout-btn"
+            title="The Surge Scout (opens in a new tab)"
+            aria-label="The Surge Scout"
+          >
+            <span className="scout-btn-ic" aria-hidden="true">{"\u{1F680}"}</span>
+            <span className="scout-btn-label">The Surge Scout</span>
+          </a>
+
           {/* ─── MORE MENU (kebab) ───
               Single entry point for less-frequent destinations. Keeps the
               header uncluttered while still exposing Archive, AI Settings,
