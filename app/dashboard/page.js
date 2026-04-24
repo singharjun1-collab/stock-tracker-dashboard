@@ -4000,6 +4000,21 @@ export default function Dashboard() {
           <MarketClock />
         </div>
         <div className="header-tools">
+          {/* ─── ASK GEMINI AI ───
+              Quick external link to Google Gemini. Opens in a new tab so it
+              never disrupts an in-progress dashboard session. */}
+          <a
+            href="https://gemini.google.com/?hl=en-GB"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="header-tool-btn gemini-btn"
+            title="Ask Gemini AI (opens in a new tab)"
+            aria-label="Ask Gemini AI"
+          >
+            <span className="gemini-btn-ic" aria-hidden="true">{"\u2728"}</span>
+            <span className="gemini-btn-label">Ask Gemini</span>
+          </a>
+
           {/* ─── MORE MENU (kebab) ───
               Single entry point for less-frequent destinations. Keeps the
               header uncluttered while still exposing Archive, AI Settings,
