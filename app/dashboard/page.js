@@ -2263,6 +2263,35 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
     return new Date(iso).toLocaleString();
   };
 
+  // Are US markets open right now? Mon-Fri 9:30 AM - 4:00 PM ET.
+  // We don't bother with US holidays — the worst case is we show an
+  // amber "stale" badge on, say, July 4, which is harmless.
+  const isUSMarketOpen = () => {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      weekday: 'short',
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    });
+    const parts = Object.fromEntries(fmt.formatToParts(new Date()).map(p => [p.type, p.value]));
+    const wd = parts.weekday;
+    if (wd === 'Sat' || wd === 'Sun') return false;
+    const minutes = Number(parts.hour) * 60 + Number(parts.minute);
+    return minutes >= (9 * 60 + 30) && minutes < (16 * 60);
+  };
+
+  // Stale = freshest update more than 30 min ago during market hours,
+  // OR more than 24h ago at any time. Either way, the user should see
+  // an amber chip and consider clicking Refresh.
+  const stalenessMs = pricesFreshestAt
+    ? Date.now() - new Date(pricesFreshestAt).getTime()
+    : null;
+  const isStale =
+    stalenessMs != null &&
+    ((isUSMarketOpen() && stalenessMs > 30 * 60 * 1000) ||
+      stalenessMs > 24 * 60 * 60 * 1000);
+
   return (
     <div className="portfolio-tab">
       {/* Prices refresh bar */}
@@ -2275,11 +2304,29 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
             gap: 12,
             margin: '0 0 12px',
             fontSize: '0.85rem',
-            color: '#7a9bc0',
+            color: isStale ? '#f5a623' : '#7a9bc0',
           }}
         >
-          <span title={pricesFreshestAt || ''}>
-            Prices updated {fmtAgo(pricesFreshestAt)}
+          <span
+            title={
+              isStale
+                ? `Prices last updated ${fmtAgo(pricesFreshestAt)} — click Refresh to fetch the latest from Yahoo Finance.`
+                : pricesFreshestAt || ''
+            }
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: isStale ? '4px 10px' : 0,
+              borderRadius: 6,
+              background: isStale ? 'rgba(245, 166, 35, 0.12)' : 'transparent',
+              border: isStale ? '1px solid rgba(245, 166, 35, 0.4)' : 'none',
+              fontWeight: isStale ? 600 : 400,
+            }}
+          >
+            {isStale && <span aria-hidden="true">{'⚠️'}</span>}
+            {isStale ? 'Prices may be stale — last updated' : 'Prices updated'}{' '}
+            {fmtAgo(pricesFreshestAt)}
           </span>
           <button
             type="button"
@@ -3562,9 +3609,26 @@ export default function Dashboard() {
   // Fetches the shared current_prices map from /api/prices. Called on
   // mount, every 2 minutes while the tab is visible, whenever the user
   // switches back to the tab, and on-demand via the Refresh button.
-  const refreshPrices = useCallback(async () => {
+  // refreshPrices(forceRefetch?) — by default just rereads /api/prices
+  // (cheap, fires on a 2-minute timer). When `forceRefetch` is true (the
+  // user clicked the Refresh button), POST /api/refresh-prices first to
+  // actually go fetch from Yahoo, then re-read.
+  const refreshPrices = useCallback(async (forceRefetch = false) => {
     try {
       setPricesRefreshing(true);
+      if (forceRefetch) {
+        // Don't block on the response body — the timeout is generous and
+        // we want to show the user fresh data ASAP. If it fails, the read
+        // below still returns whatever we had.
+        try {
+          await fetch('/api/refresh-prices', {
+            method: 'POST',
+            cache: 'no-store',
+          });
+        } catch {
+          // ignore — fall through to the read
+        }
+      }
       const res = await fetch('/api/prices', { cache: 'no-store' });
       if (!res.ok) return;
       const data = await res.json();
@@ -4455,7 +4519,7 @@ export default function Dashboard() {
           prices={prices}
           pricesAsOf={pricesAsOf}
           pricesRefreshing={pricesRefreshing}
-          onRefreshPrices={() => { refreshPrices(); refreshPaperTrades(); }}
+          onRefreshPrices={() => { refreshPrices(true); refreshPaperTrades(); }}
           onSell={handleOpenSellModal}
           onDelete={handleDeleteTrade}
           onUpdateReview={handleUpdateReview}

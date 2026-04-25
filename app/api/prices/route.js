@@ -38,6 +38,7 @@ export async function GET() {
   }
 
   const prices = {};
+  let freshest = null;
   for (const row of data || []) {
     prices[row.ticker] = {
       price: parseFloat(row.price),
@@ -45,10 +46,25 @@ export async function GET() {
       price_date: row.price_date,
       updated_at: row.updated_at,
     };
+    if (row.updated_at && (!freshest || new Date(row.updated_at) > new Date(freshest))) {
+      freshest = row.updated_at;
+    }
   }
+
+  // Staleness signal so the dashboard can warn the user when the cron
+  // is failing. "Stale" = the freshest row in current_prices is older
+  // than the threshold below. We keep the threshold permissive (3h)
+  // to avoid false alarms over lunch breaks; the dashboard itself
+  // adds a tighter "during market hours" check.
+  const STALE_THRESHOLD_MS = 3 * 60 * 60 * 1000;
+  const staleMs = freshest ? Date.now() - new Date(freshest).getTime() : null;
+  const stale = staleMs != null && staleMs > STALE_THRESHOLD_MS;
 
   return NextResponse.json({
     prices,
     as_of: new Date().toISOString(),
+    freshest_at: freshest,
+    stale,
+    stale_ms: staleMs,
   });
 }
