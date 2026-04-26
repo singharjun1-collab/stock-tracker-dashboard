@@ -2475,6 +2475,37 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
   const totalPnl = realizedPnl + unrealizedPnl;
   const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
 
+  // ── Time-on-market + annualized return ────────────────────────
+  // Days from the earliest entry to today gives us a denominator for
+  // converting the all-time ROI into an annualized rate. We use CAGR
+  // (compound) rather than simple linear extrapolation because that's
+  // the industry-standard apples-to-apples metric — same formula a
+  // brokerage would quote for "annualized return".
+  // Short windows (<7 days) produce silly numbers like "+1,400%
+  // annualized" off a 2% gain, so we suppress the annualized chip in
+  // that case and just show "too early to annualize".
+  const earliestEntryMs = trades.length > 0
+    ? Math.min(...trades.map(t => new Date(t.entry_date).getTime()))
+    : null;
+  const daysTrading = earliestEntryMs != null
+    ? Math.max(1, Math.floor((Date.now() - earliestEntryMs) / 86400000))
+    : 0;
+  const formatTimeSpan = (d) => {
+    if (d < 14) return `${d} day${d === 1 ? '' : 's'}`;
+    if (d < 60) return `${Math.round(d / 7)} weeks`;
+    if (d < 365) return `${Math.round(d / 30)} months`;
+    const years = (d / 365).toFixed(1);
+    return `${years} year${years === '1.0' ? '' : 's'}`;
+  };
+  // CAGR: (1 + r)^(365/days) - 1.  Cap inputs to avoid Math.pow blowing
+  // up on -100%+ losses (you can't lose more than your basis).
+  const annualizedPct = (() => {
+    if (daysTrading < 7 || totalInvested <= 0) return null;
+    const r = Math.max(-0.9999, totalPnlPct / 100);
+    const annualized = Math.pow(1 + r, 365 / daysTrading) - 1;
+    return annualized * 100;
+  })();
+
   const wins = closedTrades.filter(t => parseFloat(t.exit_amount) > parseFloat(t.entry_amount)).length;
   const winRate = closedTrades.length > 0 ? (wins / closedTrades.length) * 100 : 0;
 
@@ -2613,6 +2644,32 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
           {fmt$(totalPnl)}
           <span className="pt-hero-pct"> ({totalPnl >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%)</span>
         </div>
+        {/* Annualized chip — only shown once we have at least a week of data.
+            CAGR-based number: what this ROI would be if you sustained the
+            same pace for a full year. Short-window output is suppressed
+            because (e.g.) +5% in 4 days extrapolates to silly numbers. */}
+        {daysTrading > 0 && (
+          <div className="pt-hero-annualized">
+            {annualizedPct != null ? (
+              <span
+                className={`pt-hero-annualized-chip ${annualizedPct >= 0 ? 'pct-pos' : 'pct-neg'}`}
+                title={`Annualized return = (1 + ${totalPnlPct.toFixed(2)}%)^(365/${daysTrading}) − 1.\nThis is what your current pace would compound to over a full year (CAGR). Treat it as a directional estimate, not a guarantee — short windows can be noisy.`}
+              >
+                {"\u{1F4C8}"} Annualized: {annualizedPct >= 0 ? '+' : ''}{Math.abs(annualizedPct) >= 1000 ? annualizedPct.toFixed(0) : annualizedPct.toFixed(1)}%
+              </span>
+            ) : (
+              <span className="pt-hero-annualized-chip pt-hero-annualized-pending" title="Need at least 7 days of trading history before an annualized rate becomes meaningful.">
+                {"\u{23F1}"} Too early to annualize
+              </span>
+            )}
+            <span className="pt-hero-annualized-sub">
+              over {formatTimeSpan(daysTrading)} of trading
+              {earliestEntryMs != null && (
+                <> {"·"} since {new Date(earliestEntryMs).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</>
+              )}
+            </span>
+          </div>
+        )}
         <div className="pt-hero-meta">
           on ${totalInvested.toFixed(0)} deployed across {trades.length} trade{trades.length === 1 ? '' : 's'}
           {closedTrades.length > 0 && (

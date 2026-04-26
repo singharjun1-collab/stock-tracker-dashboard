@@ -2386,6 +2386,43 @@ footer span { color: #4fc3f7; }
   line-height: 1.1;
 }
 .pt-hero-pct { font-size: 1.3rem; font-weight: 600; opacity: 0.85; }
+.pt-hero-annualized {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.pt-hero-annualized-chip {
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  cursor: help;
+}
+.pt-hero-annualized-chip.pct-pos {
+  background: rgba(34, 197, 94, 0.12);
+  border-color: rgba(34, 197, 94, 0.4);
+}
+.pt-hero-annualized-chip.pct-neg {
+  background: rgba(239, 68, 68, 0.12);
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.pt-hero-annualized-pending {
+  color: #a0c0dc;
+  background: rgba(122, 155, 192, 0.1);
+  border-color: rgba(122, 155, 192, 0.3);
+  font-weight: 600;
+}
+.pt-hero-annualized-sub {
+  color: #7a9bc0;
+  font-size: 0.82rem;
+}
 .pt-hero-meta {
   margin-top: 8px;
   color: #7a9bc0;
@@ -2471,6 +2508,9 @@ footer span { color: #4fc3f7; }
   .pt-hero-value { font-size: 2rem; }
   .pt-hero-pct { font-size: 1.1rem; }
   .pt-hero-card { padding: 18px 16px; }
+  .pt-hero-annualized { flex-direction: column; gap: 4px; }
+  .pt-hero-annualized-chip { font-size: 0.85rem; padding: 4px 10px; }
+  .pt-hero-annualized-sub { font-size: 0.78rem; }
   .pt-roi-card  { padding: 14px 14px; }
   .pt-roi-foot-value { font-size: 1.4rem; }
 }
