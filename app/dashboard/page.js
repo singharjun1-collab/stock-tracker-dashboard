@@ -2219,17 +2219,25 @@ function ClosedTradeChart({ entryPrice, entryDate, exitPrice, exitDate, todayPri
             </div>
           </div>
         )}
-        {heldPct != null && (
-          <div className="ct-chart-stat">
-            <div className="ct-chart-stat-label">
-              {heldPct > realizedPct ? 'Sold too early?' : heldPct < realizedPct ? 'Good exit' : 'Even'}
             </div>
-            <div className={`ct-chart-stat-value ${(heldPct - realizedPct) >= 0 ? 'pct-pos' : 'pct-neg'}`}>
-              {(heldPct - realizedPct) >= 0 ? '+' : ''}{(heldPct - realizedPct).toFixed(2)}%
-              <span className="ct-chart-stat-sub"> vs. realized</span>
+        {heldPct != null && (() => {
+          // Positive = exit was a win (selling beat holding by X points).
+          // Flipping the sign so the number's color/sign matches the label.
+          const exitEdge = realizedPct - heldPct;
+          const isGoodExit = exitEdge > 0;
+          const isEven = exitEdge === 0;
+          return (
+            <div className="ct-chart-stat">
+              <div className="ct-chart-stat-label">
+                {isEven ? 'Even' : isGoodExit ? 'Good exit — saved you' : 'Sold too early — missed'}
+              </div>
+              <div className={`ct-chart-stat-value ${exitEdge >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+                {exitEdge >= 0 ? '+' : ''}{exitEdge.toFixed(2)}%
+                <span className="ct-chart-stat-sub"> {isGoodExit ? 'vs. holding' : 'in upside'}</span>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </div>
     </div>
   );
