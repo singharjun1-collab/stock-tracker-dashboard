@@ -2219,9 +2219,9 @@ function ClosedTradeChart({ entryPrice, entryDate, exitPrice, exitDate, todayPri
             </div>
           </div>
         )}
-            </div>
         {heldPct != null && (() => {
           // Positive = exit was a win (selling beat holding by X points).
+          // Negative = sold too early (holding would've beat selling).
           // Flipping the sign so the number's color/sign matches the label.
           const exitEdge = realizedPct - heldPct;
           const isGoodExit = exitEdge > 0;
