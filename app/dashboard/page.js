@@ -1994,6 +1994,78 @@ function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
   );
 }
 
+// ── Stock Card Modal ─────────────────────────────────────────
+// Pops the live AlertCard for a ticker over the Portfolio tab so the user
+// can review the latest AI recommendation for a position without losing
+// their place. Falls back to a graceful "no live data" message if the AI
+// no longer tracks this ticker (e.g. closed trade in a stock that's been
+// dropped from the daily scan).
+function StockCardModal({
+  ticker, alerts, prices, watchlist, userNote, openPosition, onClose,
+  onToggleWatchlist, onRate, onDismiss, onSaveNote, onOpenBuyModal, onOpenSellModal,
+}) {
+  // Close on Escape key.
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
+
+  const alert = alerts.find(a => a.ticker === ticker) || null;
+  const livePrice = prices?.[ticker]?.price;
+
+  return (
+    <div className="card-modal-backdrop" onClick={onClose}>
+      <div className="card-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="card-modal-header">
+          <div className="card-modal-title">
+            <span className="card-modal-icon">{"\u{1F4C7}"}</span>
+            <span>Live AI card</span>
+            <span className="card-modal-ticker">{ticker}</span>
+            {livePrice != null && (
+              <span className="card-modal-price">${livePrice.toFixed(2)}</span>
+            )}
+          </div>
+          <button className="card-modal-close" onClick={onClose} aria-label="Close">
+            {"\u{2715}"}
+          </button>
+        </div>
+        <div className="card-modal-body">
+          {alert ? (
+            <AlertCard
+              alert={alert}
+              index={0}
+              sectionPrefix={`portfolio-modal-${ticker}`}
+              watchlist={watchlist}
+              sharedPrices={prices}
+              forceCompact={false}
+              forceCompactNonce={0}
+              onToggleWatchlist={onToggleWatchlist}
+              onRate={onRate}
+              onDismiss={onDismiss}
+              onSaveNote={onSaveNote}
+              userNote={userNote}
+              openPosition={openPosition}
+              onOpenBuyModal={onOpenBuyModal}
+              onOpenSellModal={onOpenSellModal}
+            />
+          ) : (
+            <div className="card-modal-empty">
+              <p>
+                {"\u{1F4ED}"} The AI doesn't have an active card for <strong>{ticker}</strong> right now.
+              </p>
+              <p style={{ marginTop: 8, color: '#7a9bc0', fontSize: '0.88rem' }}>
+                This usually means the stock has been dropped from the daily scan.
+                Closed trades in dropped tickers won't show a live card.
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Post-trade review verdict helpers ──
 function verdictEmoji(v) {
   return v === 'right' ? '\u2705'
@@ -2011,7 +2083,159 @@ function verdictLabel(v) {
 }
 
 // ── Expandable row drawer shown under a portfolio position ──
-function TradeDetailDrawer({ trade, onUpdateReview }) {
+// ── Closed Trade 3-Point Chart ─────────────────────────────────
+// Three connected points: Entry → Exit → Today. The Entry→Exit segment
+// is colored by realized P/L (green if you made money, red if not).
+// The Exit→Today segment is muted grey — it's the "had I held" tail
+// so you can reflect on whether you sold too early or just in time.
+// `today` may be null (price not in current_prices map for this ticker);
+// in that case we render a 2-point chart and skip the muted tail.
+function ClosedTradeChart({ entryPrice, entryDate, exitPrice, exitDate, todayPrice, todayDate }) {
+  const fmtDate = (d) => {
+    if (!d) return '—';
+    try {
+      const parsed = typeof d === 'string' ? new Date(d.length <= 10 ? d + 'T00:00:00' : d) : new Date(d);
+      return parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    } catch { return String(d); }
+  };
+
+  const points = [
+    { label: 'Entry', date: entryDate, price: entryPrice },
+    { label: 'Exit',  date: exitDate,  price: exitPrice  },
+  ];
+  if (todayPrice != null && !Number.isNaN(todayPrice)) {
+    points.push({ label: 'Today', date: todayDate || new Date().toISOString(), price: todayPrice });
+  }
+
+  const W = 560, H = 160;
+  const PAD_X = 56, PAD_TOP = 22, PAD_BOTTOM = 38;
+  const innerW = W - PAD_X * 2;
+  const innerH = H - PAD_TOP - PAD_BOTTOM;
+
+  const prices = points.map(p => p.price);
+  const min = Math.min(...prices);
+  const max = Math.max(...prices);
+  // Pad min/max by 6% so points don't kiss the top/bottom of the chart.
+  const range = (max - min) || Math.max(1, max * 0.05);
+  const lo = min - range * 0.12;
+  const hi = max + range * 0.12;
+  const span = hi - lo || 1;
+
+  const xAt = (i) => PAD_X + (points.length === 1 ? innerW / 2 : (innerW / (points.length - 1)) * i);
+  const yAt = (price) => PAD_TOP + innerH - ((price - lo) / span) * innerH;
+
+  const realizedPct = entryPrice > 0 ? ((exitPrice - entryPrice) / entryPrice) * 100 : 0;
+  const realizedPos = realizedPct >= 0;
+  const realizedColor = realizedPos ? '#22c55e' : '#ef4444';
+
+  const heldPct = (todayPrice != null && entryPrice > 0)
+    ? ((todayPrice - entryPrice) / entryPrice) * 100
+    : null;
+
+  return (
+    <div className="ct-chart-wrap">
+      <svg viewBox={`0 0 ${W} ${H}`} className="ct-chart-svg" preserveAspectRatio="xMidYMid meet">
+        {/* Faint baseline at entry price for visual reference */}
+        <line
+          x1={PAD_X} x2={W - PAD_X}
+          y1={yAt(entryPrice)} y2={yAt(entryPrice)}
+          stroke="rgba(122,155,192,0.18)" strokeWidth="1" strokeDasharray="3,4"
+        />
+
+        {/* Entry → Exit segment (colored) */}
+        <line
+          x1={xAt(0)} y1={yAt(points[0].price)}
+          x2={xAt(1)} y2={yAt(points[1].price)}
+          stroke={realizedColor} strokeWidth="2.5" strokeLinecap="round"
+        />
+
+        {/* Exit → Today segment (muted) */}
+        {points.length === 3 && (
+          <line
+            x1={xAt(1)} y1={yAt(points[1].price)}
+            x2={xAt(2)} y2={yAt(points[2].price)}
+            stroke="rgba(122,155,192,0.55)"
+            strokeWidth="1.8"
+            strokeDasharray="4,3"
+            strokeLinecap="round"
+          />
+        )}
+
+        {/* Points */}
+        {points.map((p, i) => {
+          const isExit = i === 1;
+          const isToday = i === 2;
+          const fill = isToday ? '#7a9bc0' : (isExit ? realizedColor : '#9fc5f0');
+          const stroke = '#0a1728';
+          return (
+            <g key={p.label}>
+              <circle cx={xAt(i)} cy={yAt(p.price)} r="6" fill={fill} stroke={stroke} strokeWidth="2.5" />
+              {/* Price label above the point */}
+              <text
+                x={xAt(i)}
+                y={yAt(p.price) - 12}
+                textAnchor="middle"
+                fontSize="12"
+                fontWeight="700"
+                fill="#e6f3ff"
+                fontFamily="'SF Mono', Consolas, monospace"
+              >${p.price.toFixed(2)}</text>
+              {/* Stage label below */}
+              <text
+                x={xAt(i)}
+                y={H - 18}
+                textAnchor="middle"
+                fontSize="11"
+                fontWeight="700"
+                fill={isToday ? '#7a9bc0' : '#a0c0dc'}
+                letterSpacing="0.5"
+              >{p.label.toUpperCase()}</text>
+              {/* Date below stage */}
+              <text
+                x={xAt(i)}
+                y={H - 4}
+                textAnchor="middle"
+                fontSize="10"
+                fill="#6a89a8"
+              >{fmtDate(p.date)}</text>
+            </g>
+          );
+        })}
+      </svg>
+
+      {/* Pct readout strip — keeps the math front-and-center */}
+      <div className="ct-chart-stats">
+        <div className="ct-chart-stat">
+          <div className="ct-chart-stat-label">Realized (Entry → Exit)</div>
+          <div className={`ct-chart-stat-value ${realizedPos ? 'pct-pos' : 'pct-neg'}`}>
+            {realizedPos ? '+' : ''}{realizedPct.toFixed(2)}%
+          </div>
+        </div>
+        {heldPct != null && (
+          <div className="ct-chart-stat">
+            <div className="ct-chart-stat-label">Had I held (Entry → Today)</div>
+            <div className={`ct-chart-stat-value ${heldPct >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+              {heldPct >= 0 ? '+' : ''}{heldPct.toFixed(2)}%
+            </div>
+          </div>
+        )}
+        {heldPct != null && (
+          <div className="ct-chart-stat">
+            <div className="ct-chart-stat-label">
+              {heldPct > realizedPct ? 'Sold too early?' : heldPct < realizedPct ? 'Good exit' : 'Even'}
+            </div>
+            <div className={`ct-chart-stat-value ${(heldPct - realizedPct) >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+              {(heldPct - realizedPct) >= 0 ? '+' : ''}{(heldPct - realizedPct).toFixed(2)}%
+              <span className="ct-chart-stat-sub"> vs. realized</span>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TradeDetailDrawer({ trade, onUpdateReview, currentPrice, currentPriceDate }) {
   const isClosed = trade.status === 'closed';
 
   // Editable review state (for closed trades only).
@@ -2062,6 +2286,29 @@ function TradeDetailDrawer({ trade, onUpdateReview }) {
 
   return (
     <div className="pt-drawer">
+      {/* Closed-trade-only: Entry → Exit → Today price chart */}
+      {isClosed && (
+        <section className="pt-drawer-section pt-drawer-chart">
+          <div className="pt-drawer-heading">
+            {"\u{1F4CA}"} Price journey
+            <span className="pt-drawer-frozen">entry &#8594; exit &#8594; today</span>
+          </div>
+          <ClosedTradeChart
+            entryPrice={parseFloat(trade.entry_price)}
+            entryDate={trade.entry_date}
+            exitPrice={parseFloat(trade.exit_price)}
+            exitDate={trade.exit_date}
+            todayPrice={currentPrice != null && !Number.isNaN(currentPrice) ? currentPrice : null}
+            todayDate={currentPriceDate || new Date().toISOString()}
+          />
+          {currentPrice == null && (
+            <p className="pt-drawer-empty" style={{ marginTop: 8 }}>
+              Today's price isn't available for {trade.ticker} yet — chart shows entry vs. exit only.
+            </p>
+          )}
+        </section>
+      )}
+
       <div className="pt-drawer-grid">
         {/* 1. Your notes */}
         <section className="pt-drawer-section">
@@ -2160,7 +2407,7 @@ function TradeDetailDrawer({ trade, onUpdateReview }) {
 }
 
 // ── Portfolio Tab ──
-function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, onRefreshPrices, onSell, onDelete, onBuyFromWatchlist, onUpdateReview }) {
+function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, onRefreshPrices, onSell, onDelete, onBuyFromWatchlist, onUpdateReview, onOpenCard }) {
   const [expandedId, setExpandedId] = useState(null);
   const toggleExpand = (id) => setExpandedId(prev => prev === id ? null : id);
 
@@ -2201,6 +2448,11 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
   const closedTrades = trades.filter(t => t.status === 'closed');
 
   // Summary: realized + unrealized
+  // We split capital into two buckets so ROI is honest:
+  //   - "Open" bucket   = currently deployed (open positions' entry amounts)
+  //   - "Closed" bucket = capital that's been recycled out via sells
+  // Lumping them together (the old "$22k Total Invested" stat) misled the
+  // user because the same $2k slot was double-counted across multiple trades.
   const realizedPnl = closedTrades.reduce((sum, t) =>
     sum + (parseFloat(t.exit_amount) - parseFloat(t.entry_amount)), 0);
   const unrealizedPnl = openTrades.reduce((sum, t) => {
@@ -2208,11 +2460,18 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
     if (latest == null) return sum;
     return sum + (latest * parseFloat(t.shares) - parseFloat(t.entry_amount));
   }, 0);
-  const totalInvested = trades.reduce((s, t) => s + parseFloat(t.entry_amount), 0);
+  const openInvested = openTrades.reduce((s, t) => s + parseFloat(t.entry_amount), 0);
+  const closedInvested = closedTrades.reduce((s, t) => s + parseFloat(t.entry_amount), 0);
+  const closedProceeds = closedTrades.reduce((s, t) => s + parseFloat(t.exit_amount), 0);
+  const totalInvested = openInvested + closedInvested;
   const currentOpenValue = openTrades.reduce((s, t) => {
     const latest = getLatest(t.ticker);
     return s + (latest != null ? latest * parseFloat(t.shares) : parseFloat(t.entry_amount));
   }, 0);
+  // ROI on each bucket, computed against THAT bucket's deployed capital
+  // (not against the all-time sum). This is the apples-to-apples number.
+  const openRoiPct = openInvested > 0 ? (unrealizedPnl / openInvested) * 100 : 0;
+  const closedRoiPct = closedInvested > 0 ? (realizedPnl / closedInvested) * 100 : 0;
   const totalPnl = realizedPnl + unrealizedPnl;
   const totalPnlPct = totalInvested > 0 ? (totalPnl / totalInvested) * 100 : 0;
 
@@ -2347,33 +2606,59 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
         </div>
       )}
 
-      {/* Summary */}
-      <div className="pt-summary-grid">
-        <div className="pt-stat">
-          <div className="pt-stat-label">Total Invested</div>
-          <div className="pt-stat-value">${totalInvested.toFixed(2)}</div>
+      {/* All-time P/L hero */}
+      <div className="pt-hero-card">
+        <div className="pt-hero-label">{"\u{1F4B0}"} All-time P/L</div>
+        <div className={`pt-hero-value ${totalPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+          {fmt$(totalPnl)}
+          <span className="pt-hero-pct"> ({totalPnl >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%)</span>
         </div>
-        <div className="pt-stat">
-          <div className="pt-stat-label">Current Value (Open)</div>
-          <div className="pt-stat-value">${currentOpenValue.toFixed(2)}</div>
+        <div className="pt-hero-meta">
+          on ${totalInvested.toFixed(0)} deployed across {trades.length} trade{trades.length === 1 ? '' : 's'}
+          {closedTrades.length > 0 && (
+            <> {"·"} {winRate.toFixed(0)}% win rate ({closedTrades.length} closed)</>
+          )}
         </div>
-        <div className="pt-stat">
-          <div className="pt-stat-label">Realized P/L</div>
-          <div className={`pt-stat-value ${realizedPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmt$(realizedPnl)}</div>
-        </div>
-        <div className="pt-stat">
-          <div className="pt-stat-label">Unrealized P/L</div>
-          <div className={`pt-stat-value ${unrealizedPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>{fmt$(unrealizedPnl)}</div>
-        </div>
-        <div className="pt-stat pt-stat-hero">
-          <div className="pt-stat-label">Total P/L</div>
-          <div className={`pt-stat-value pt-stat-hero-value ${totalPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
-            {fmt$(totalPnl)} <span className="pt-stat-pct">({totalPnl >= 0 ? '+' : ''}{totalPnlPct.toFixed(2)}%)</span>
+      </div>
+
+      {/* ROI breakdown — Open (unrealized) vs Closed (realized) */}
+      <div className="pt-roi-grid">
+        <div className="pt-roi-card pt-roi-open">
+          <div className="pt-roi-head">
+            <span className="pt-roi-icon">{"\u{1F4C8}"}</span>
+            <span className="pt-roi-title">Open Positions</span>
+            <span className="pt-roi-count">{openTrades.length}</span>
+          </div>
+          <div className="pt-roi-rows">
+            <div className="pt-roi-row"><span>Deployed</span><span>${openInvested.toFixed(2)}</span></div>
+            <div className="pt-roi-row"><span>Now worth</span><span>${currentOpenValue.toFixed(2)}</span></div>
+            <div className="pt-roi-row"><span>Unrealized P/L</span><span className={unrealizedPnl >= 0 ? 'pct-pos' : 'pct-neg'}>{fmt$(unrealizedPnl)}</span></div>
+          </div>
+          <div className="pt-roi-foot">
+            <div className="pt-roi-foot-label">Open ROI</div>
+            <div className={`pt-roi-foot-value ${openRoiPct >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+              {openInvested > 0 ? `${openRoiPct >= 0 ? '+' : ''}${openRoiPct.toFixed(2)}%` : '—'}
+            </div>
           </div>
         </div>
-        <div className="pt-stat">
-          <div className="pt-stat-label">Win Rate {"("}{closedTrades.length} closed{")"}</div>
-          <div className="pt-stat-value">{closedTrades.length > 0 ? winRate.toFixed(0) + '%' : '\u{2014}'}</div>
+
+        <div className="pt-roi-card pt-roi-closed">
+          <div className="pt-roi-head">
+            <span className="pt-roi-icon">{"\u{1F4CB}"}</span>
+            <span className="pt-roi-title">Closed Trades</span>
+            <span className="pt-roi-count">{closedTrades.length}</span>
+          </div>
+          <div className="pt-roi-rows">
+            <div className="pt-roi-row"><span>Recycled capital</span><span>${closedInvested.toFixed(2)}</span></div>
+            <div className="pt-roi-row"><span>Proceeds</span><span>${closedProceeds.toFixed(2)}</span></div>
+            <div className="pt-roi-row"><span>Realized P/L</span><span className={realizedPnl >= 0 ? 'pct-pos' : 'pct-neg'}>{fmt$(realizedPnl)}</span></div>
+          </div>
+          <div className="pt-roi-foot">
+            <div className="pt-roi-foot-label">Closed ROI</div>
+            <div className={`pt-roi-foot-value ${closedRoiPct >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+              {closedInvested > 0 ? `${closedRoiPct >= 0 ? '+' : ''}${closedRoiPct.toFixed(2)}%` : '—'}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -2444,15 +2729,28 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                     <React.Fragment key={t.id}>
                       <tr className={`pt-row ${isOpen ? 'pt-row-expanded' : ''}`}>
                         <td className="pt-table-ticker">
-                          <button
-                            type="button"
-                            className="pt-expand-btn"
-                            onClick={() => toggleExpand(t.id)}
-                            aria-expanded={isOpen}
-                            title={hasNote ? t.notes : 'View details'}
-                          >
-                            <span className={`pt-chevron ${isOpen ? 'open' : ''}`}>{"\u25B8"}</span>
-                            {t.ticker}
+                          <div className="pt-ticker-cell">
+                            <button
+                              type="button"
+                              className="pt-expand-btn"
+                              onClick={() => toggleExpand(t.id)}
+                              aria-expanded={isOpen}
+                              title={hasNote ? t.notes : 'View notes / AI snapshot'}
+                            >
+                              <span className={`pt-chevron ${isOpen ? 'open' : ''}`}>{"\u25B8"}</span>
+                              {t.ticker}
+                            </button>
+                            {onOpenCard && (
+                              <button
+                                type="button"
+                                className="pt-view-card-btn"
+                                onClick={() => onOpenCard(t.ticker)}
+                                title={`See live AI card for ${t.ticker}`}
+                                aria-label={`View live AI card for ${t.ticker}`}
+                              >
+                                {"\u{1F4C7}"}
+                              </button>
+                            )}
                             {hasNote && <span className="pt-note-dot" title="Has notes">{"\u{1F4DD}"}</span>}
                             {stopHit && (
                               <span
@@ -2462,7 +2760,7 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                                 {"\u{1F6D1}"} STOP HIT
                               </span>
                             )}
-                          </button>
+                          </div>
                         </td>
                         <td>{fmtDate(t.entry_date)}</td>
                         <td>{daysHeld(t)}d</td>
@@ -2498,7 +2796,12 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                       {isOpen && (
                         <tr className="pt-drawer-row">
                           <td colSpan={11}>
-                            <TradeDetailDrawer trade={t} onUpdateReview={onUpdateReview} />
+                            <TradeDetailDrawer
+                              trade={t}
+                              onUpdateReview={onUpdateReview}
+                              currentPrice={latest}
+                              currentPriceDate={prices?.[t.ticker]?.price_date || prices?.[t.ticker]?.updated_at}
+                            />
                           </td>
                         </tr>
                       )}
@@ -2546,18 +2849,31 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                     <React.Fragment key={t.id}>
                       <tr className={`pt-row ${isOpen ? 'pt-row-expanded' : ''}`}>
                         <td className="pt-table-ticker">
-                          <button
-                            type="button"
-                            className="pt-expand-btn"
-                            onClick={() => toggleExpand(t.id)}
-                            aria-expanded={isOpen}
-                            title={hasNote ? t.notes : 'View details'}
-                          >
-                            <span className={`pt-chevron ${isOpen ? 'open' : ''}`}>{"\u25B8"}</span>
-                            {t.ticker}
+                          <div className="pt-ticker-cell">
+                            <button
+                              type="button"
+                              className="pt-expand-btn"
+                              onClick={() => toggleExpand(t.id)}
+                              aria-expanded={isOpen}
+                              title={hasNote ? t.notes : 'View notes / AI snapshot'}
+                            >
+                              <span className={`pt-chevron ${isOpen ? 'open' : ''}`}>{"\u25B8"}</span>
+                              {t.ticker}
+                            </button>
+                            {onOpenCard && (
+                              <button
+                                type="button"
+                                className="pt-view-card-btn"
+                                onClick={() => onOpenCard(t.ticker)}
+                                title={`See live AI card for ${t.ticker}`}
+                                aria-label={`View live AI card for ${t.ticker}`}
+                              >
+                                {"\u{1F4C7}"}
+                              </button>
+                            )}
                             {hasNote && <span className="pt-note-dot">{"\u{1F4DD}"}</span>}
                             {t.ai_review_verdict && <span className={`pt-verdict-dot pt-verdict-${t.ai_review_verdict}`} title={`Reviewed: ${t.ai_review_verdict}`}>{verdictEmoji(t.ai_review_verdict)}</span>}
-                          </button>
+                          </div>
                         </td>
                         <td>{fmtDate(t.entry_date)} {"\u{2192}"} {fmtDate(t.exit_date)}</td>
                         <td>{daysHeld(t)}d</td>
@@ -2579,7 +2895,12 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                       {isOpen && (
                         <tr className="pt-drawer-row">
                           <td colSpan={10}>
-                            <TradeDetailDrawer trade={t} onUpdateReview={onUpdateReview} />
+                            <TradeDetailDrawer
+                              trade={t}
+                              onUpdateReview={onUpdateReview}
+                              currentPrice={getLatest(t.ticker)}
+                              currentPriceDate={prices?.[t.ticker]?.price_date || prices?.[t.ticker]?.updated_at}
+                            />
                           </td>
                         </tr>
                       )}
@@ -3520,6 +3841,10 @@ export default function Dashboard() {
   const [pricesRefreshing, setPricesRefreshing] = useState(false);
   const [buyModalState, setBuyModalState] = useState(null);   // { alert, currentPrice }
   const [sellModalState, setSellModalState] = useState(null); // { trade, currentPrice }
+  // ticker (string) when the user clicks "view card" inside the Portfolio tab.
+  // The modal renders the live AlertCard for that ticker so they can review
+  // current AI rec / entry / target / stop without leaving Portfolio.
+  const [cardModalTicker, setCardModalTicker] = useState(null);
   const [profile, setProfile] = useState(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -4523,6 +4848,7 @@ export default function Dashboard() {
           onSell={handleOpenSellModal}
           onDelete={handleDeleteTrade}
           onUpdateReview={handleUpdateReview}
+          onOpenCard={(ticker) => setCardModalTicker(ticker)}
         />
       ) : activeTab === 'leaderboard' ? (
         <LeaderboardTab alerts={alerts} prices={prices} currentUserId={profile?.id} />
@@ -4583,6 +4909,26 @@ export default function Dashboard() {
           currentPrice={sellModalState.currentPrice}
           onClose={() => setSellModalState(null)}
           onConfirm={handleConfirmSell}
+        />
+      )}
+
+      {/* STOCK CARD MODAL — opened from Portfolio tab so users can pop open
+          the live AI card for a position without leaving Portfolio. */}
+      {cardModalTicker && (
+        <StockCardModal
+          ticker={cardModalTicker}
+          alerts={alerts}
+          prices={prices}
+          watchlist={watchlist}
+          userNote={userNotes[cardModalTicker]}
+          openPosition={openTradeFor(cardModalTicker)}
+          onClose={() => setCardModalTicker(null)}
+          onToggleWatchlist={handleToggleWatchlist}
+          onRate={handleRate}
+          onDismiss={handleDismiss}
+          onSaveNote={handleSaveNote}
+          onOpenBuyModal={handleOpenBuyModal}
+          onOpenSellModal={handleOpenSellModal}
         />
       )}
 

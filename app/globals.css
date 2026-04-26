@@ -2356,6 +2356,125 @@ footer span { color: #4fc3f7; }
 .pt-stat-hero-value { font-size: 2rem; }
 .pt-stat-pct { font-size: 1rem; font-weight: 500; }
 
+/* ── New ROI hero + breakdown cards ─────────────────────────────
+   Replaces the old 6-stat row with: one big "All-time P/L" hero,
+   then two side-by-side cards that split deployed capital into
+   "Open" (unrealized) and "Closed" (realized) ROI buckets so the
+   user can see both numbers cleanly.
+   Mobile: stack vertically. */
+.pt-hero-card {
+  background: linear-gradient(135deg, rgba(15, 28, 45, 0.95), rgba(20, 40, 70, 0.85));
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 14px;
+  padding: 22px 26px;
+  margin-bottom: 14px;
+  text-align: center;
+  box-shadow: 0 4px 20px rgba(0, 229, 255, 0.06);
+}
+.pt-hero-label {
+  color: #7a9bc0;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 6px;
+}
+.pt-hero-value {
+  font-size: 2.4rem;
+  font-weight: 800;
+  font-family: 'SF Mono', Consolas, monospace;
+  letter-spacing: -0.5px;
+  line-height: 1.1;
+}
+.pt-hero-pct { font-size: 1.3rem; font-weight: 600; opacity: 0.85; }
+.pt-hero-meta {
+  margin-top: 8px;
+  color: #7a9bc0;
+  font-size: 0.85rem;
+}
+.pt-roi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.pt-roi-card {
+  background: linear-gradient(180deg, rgba(15, 28, 45, 0.85), rgba(10, 20, 35, 0.85));
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 12px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pt-roi-open   { border-color: rgba(0, 229, 255, 0.25); }
+.pt-roi-closed { border-color: rgba(34, 197, 94, 0.22); }
+.pt-roi-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 8px;
+}
+.pt-roi-icon { font-size: 1rem; }
+.pt-roi-title {
+  color: #e6f3ff;
+  font-weight: 700;
+  font-size: 0.92rem;
+  flex: 1;
+}
+.pt-roi-count {
+  background: rgba(0, 229, 255, 0.12);
+  color: #00e5ff;
+  padding: 2px 9px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.pt-roi-rows { display: flex; flex-direction: column; gap: 6px; }
+.pt-roi-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-family: 'SF Mono', Consolas, monospace;
+}
+.pt-roi-row > span:first-child {
+  color: #7a9bc0;
+  font-family: inherit;
+  font-size: 0.8rem;
+}
+.pt-roi-row > span:last-child {
+  color: #e6f3ff;
+  font-weight: 600;
+}
+.pt-roi-foot {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.pt-roi-foot-label {
+  color: #a0c0dc;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  font-weight: 700;
+}
+.pt-roi-foot-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  font-family: 'SF Mono', Consolas, monospace;
+}
+@media (max-width: 640px) {
+  .pt-roi-grid { grid-template-columns: 1fr; }
+  .pt-hero-value { font-size: 2rem; }
+  .pt-hero-pct { font-size: 1.1rem; }
+  .pt-hero-card { padding: 18px 16px; }
+  .pt-roi-card  { padding: 14px 14px; }
+  .pt-roi-foot-value { font-size: 1.4rem; }
+}
+
 .pt-ai-accuracy {
   background: rgba(15, 28, 45, 0.6);
   border: 1px solid rgba(0, 229, 255, 0.15);
@@ -3132,6 +3251,193 @@ footer span { color: #4fc3f7; }
   outline: none;
   border-color: #38bdf8;
 }
+/* ── Portfolio ticker cell + view-card button ──────────────── */
+.pt-ticker-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pt-view-card-btn {
+  background: rgba(0, 229, 255, 0.1);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: #00e5ff;
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  cursor: pointer;
+  font-family: inherit;
+  line-height: 1;
+  transition: background 0.15s, border-color 0.15s;
+}
+.pt-view-card-btn:hover {
+  background: rgba(0, 229, 255, 0.2);
+  border-color: rgba(0, 229, 255, 0.6);
+}
+.pt-view-card-btn:active { transform: scale(0.96); }
+
+/* ── Stock Card Modal (Robinhood-style sheet over the Portfolio tab) ── */
+.card-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 8, 16, 0.78);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  z-index: 1100;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 56px 16px 16px;
+  overflow-y: auto;
+  animation: cardModalFadeIn 0.18s ease-out;
+}
+@keyframes cardModalFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.card-modal {
+  background: linear-gradient(180deg, #0d1f33, #08152a);
+  border: 1px solid rgba(0, 229, 255, 0.25);
+  border-radius: 14px;
+  width: 100%;
+  max-width: 540px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(0, 229, 255, 0.12);
+  overflow: hidden;
+  animation: cardModalSlide 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes cardModalSlide {
+  from { transform: translateY(12px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.card-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  background: rgba(0, 229, 255, 0.06);
+  border-bottom: 1px solid rgba(0, 229, 255, 0.2);
+}
+.card-modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #e6f3ff;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.card-modal-icon { font-size: 1.1rem; }
+.card-modal-ticker {
+  background: rgba(0, 229, 255, 0.18);
+  color: #00e5ff;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-family: 'SF Mono', Consolas, monospace;
+  letter-spacing: 0.4px;
+}
+.card-modal-price {
+  color: #9fc5f0;
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+.card-modal-close {
+  background: none;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #a0c0dc;
+  font-size: 1rem;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-modal-close:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border-color: rgba(239, 68, 68, 0.4);
+}
+.card-modal-body {
+  padding: 14px;
+  max-height: calc(100vh - 130px);
+  overflow-y: auto;
+}
+/* Make the AlertCard inside the modal fill the available width cleanly. */
+.card-modal-body .ac,
+.card-modal-body .card {
+  margin: 0;
+  width: 100%;
+}
+.card-modal-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #e6f3ff;
+}
+@media (max-width: 640px) {
+  .card-modal-backdrop {
+    padding: 0;
+    align-items: stretch;
+  }
+  .card-modal {
+    max-width: 100%;
+    min-height: 100vh;
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+  }
+  .card-modal-body {
+    max-height: none;
+  }
+}
+
+/* ── Closed-trade Entry → Exit → Today chart ─────────────────── */
+.pt-drawer-chart {
+  margin-bottom: 14px;
+}
+.ct-chart-wrap {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  padding: 8px 8px 4px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+.ct-chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+.ct-chart-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  padding: 10px 14px 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.06);
+  margin-top: 4px;
+}
+.ct-chart-stat { flex: 1 1 140px; }
+.ct-chart-stat-label {
+  color: #7a9bc0;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 2px;
+}
+.ct-chart-stat-value {
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.ct-chart-stat-sub {
+  color: #6a89a8;
+  font-weight: 400;
+  font-size: 0.72rem;
+  margin-left: 4px;
+}
+@media (max-width: 640px) {
+  .ct-chart-stats { gap: 10px; padding: 10px 6px 4px; }
+  .ct-chart-stat-value { font-size: 0.95rem; }
+}
+
 .pt-drawer-review-actions {
   display: flex;
   align-items: center;
