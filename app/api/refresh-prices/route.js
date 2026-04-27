@@ -24,7 +24,10 @@ export const maxDuration = 60;
 //
 // What it does
 //   1. Build the ticker set = (paper_trades.open distinct tickers)
-//      ∪ (stock_alerts where status in ('new','active') distinct tickers)
+//      ∪ (stock_alerts where status in ('new','active','dropped') distinct tickers)
+//      Note: 'dropped' alerts are included so the card's headline price,
+//      "since alert" %, and chart all stay in sync after a stock is dropped
+//      (a dropped pick may still rebound, and we want the UI to reflect that).
 //   2. Fetch each ticker's latest quote from Yahoo (with stagger + backoff)
 //   3. Upsert price + previous_close into `current_prices` using the
 //      service role (current_prices RLS only allows writes from service)
@@ -58,7 +61,7 @@ async function refresh() {
     admin
       .from('stock_alerts')
       .select('ticker')
-      .in('status', ['new', 'active']),
+      .in('status', ['new', 'active', 'dropped']),
   ]);
 
   if (tradesRes.error) {
