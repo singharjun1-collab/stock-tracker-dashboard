@@ -60,7 +60,7 @@ function LoginInner() {
   return (
     <div className="login-container">
       <div className="login-box">
-        <div className="login-lock-icon">&#x1f4ac;</div>
+        <img src="/logo.png" alt="Stock Chatter" className="login-logo" width="72" height="72" />
         <h1>Stock <span>Chatter</span></h1>
         <p className="login-subtitle">Sign in to access your AI watchlist, daily signals, and the leaderboard.</p>
 

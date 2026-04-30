@@ -58,7 +58,7 @@ export default function LandingPage() {
       {/* ───────────────────────── Top nav ───────────────────────── */}
       <header className="lp-nav">
         <a className="lp-logo" href="/">
-          <span className="lp-logo-mark">S</span>
+          <img src="/logo-sm.png" alt="Stock Chatter" className="lp-logo-mark" width="32" height="32" />
           <span className="lp-logo-text">Stock <span>Chatter</span></span>
         </a>
         <nav className="lp-nav-links">

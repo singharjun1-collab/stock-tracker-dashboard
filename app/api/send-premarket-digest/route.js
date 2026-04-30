@@ -228,8 +228,17 @@ function buildHtml({ data, recipientEmail }) {
   <tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#111827;border-radius:16px;overflow:hidden;">
       <tr><td style="padding:24px 24px 8px 24px;">
-        <div style="font-size:13px;letter-spacing:.08em;color:#4fc3f7;text-transform:uppercase;font-weight:600;">Stock Chatter · Pre-market digest</div>
-        <div style="font-size:22px;font-weight:700;color:#fff;margin-top:4px;">${shortET()}</div>
+        <table role="presentation" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+          <tr>
+            <td style="vertical-align:middle;padding-right:12px;">
+              <img src="${APP_URL}/logo-email.png" alt="Stock Chatter" width="40" height="40" style="display:block;border:0;outline:none;" />
+            </td>
+            <td style="vertical-align:middle;">
+              <div style="font-size:13px;letter-spacing:.08em;color:#4fc3f7;text-transform:uppercase;font-weight:600;">Stock Chatter · Pre-market digest</div>
+              <div style="font-size:22px;font-weight:700;color:#fff;margin-top:4px;">${shortET()}</div>
+            </td>
+          </tr>
+        </table>
       </td></tr>
 
       <tr><td style="padding:16px 24px 8px 24px;">
@@ -376,7 +385,7 @@ async function send({ dryRun = false }) {
     return { ok: true, sent_to: 0, note: 'no active recipients' };
   }
 
-  const subject = `Stock Tracker — Pre-market digest · ${shortET()}`;
+  const subject = `Stock Chatter — Pre-market digest · ${shortET()}`;
   const sendResults = [];
 
   for (const r of recipients) {

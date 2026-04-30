@@ -4449,7 +4449,10 @@ export default function Dashboard() {
     <StockMetaProvider tickers={allTickers}>
       <header className="header">
         <div className="header-main">
-          <h1>{"\u{1F4AC}"} Stock <span>Chatter</span></h1>
+          <h1>
+            <img src="/logo-sm.png" alt="" className="header-logo" width="36" height="36" />
+            Stock <span>Chatter</span>
+          </h1>
           <div className="subtitle">Last updated: {dateStr} {"\u{B7}"} Auto-scan complete</div>
           <MarketClock />
         </div>

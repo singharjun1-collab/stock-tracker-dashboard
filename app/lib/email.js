@@ -91,6 +91,7 @@ Approve them here: ${approveUrl}
 
   const html = `
 <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1a2332;">
+  <img src="${appUrl}/logo-email.png" alt="Stock Chatter" width="48" height="48" style="display:block;margin-bottom:16px;border:0;outline:none;" />
   <h2 style="margin-top:0; color:#0b2540;">New Stock Chatter signup</h2>
   <p>A new user has requested access and is waiting for your approval.</p>
   <table style="border-collapse: collapse; margin: 16px 0;">
@@ -127,6 +128,7 @@ Welcome aboard.`;
 
   const html = `
 <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1a2332;">
+  <img src="${appUrl}/logo-email.png" alt="Stock Chatter" width="48" height="48" style="display:block;margin-bottom:16px;border:0;outline:none;" />
   <h2 style="margin-top:0; color:#0b2540;">You're in! 🎉</h2>
   <p>Hi ${escapeHtml(firstName)},</p>
   <p>Good news — your access to <strong>Stock Chatter</strong> has just been approved.</p>
