@@ -1038,7 +1038,26 @@
 .lp-pricing-currency { font-size: 1.5rem; color: #b8cce0; font-weight: 600; }
 .lp-pricing-num { font-size: 4rem; font-weight: 800; color: #fff; letter-spacing: -2px; line-height: 1; }
 .lp-pricing-period { font-size: 1rem; color: #b8cce0; margin-left: 4px; }
-.lp-pricing-monthly { font-size: 0.85rem; color: #7a9bc0; margin-bottom: 26px; }
+.lp-pricing-monthly { font-size: 0.85rem; color: #7a9bc0; margin-bottom: 14px; }
+.lp-pricing-fx {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+.lp-fx-pill {
+  display: inline-block;
+  padding: 4px 10px;
+  background: rgba(79, 195, 247, 0.08);
+  border: 1px solid rgba(79, 195, 247, 0.22);
+  border-radius: 999px;
+  font-size: 0.78rem;
+  color: #b8cce0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 .lp-pricing-list {
   list-style: none;
   padding: 0;

@@ -47,7 +47,7 @@ export default function LandingPage() {
   const ctaLabel = !CHECKOUT_URL ? 'Get notified at launch' :
     authState.status === 'approved' ? 'Go to your dashboard →' :
     authState.status === 'pending' ? 'Check your approval status' :
-    'Start — $199/year';
+    'Start — AUD $199/year';
   const ctaTarget = authState.status === 'approved' ? '/dashboard'
     : authState.status === 'pending' ? '/pending'
     : ctaHref;
@@ -327,11 +327,16 @@ export default function LandingPage() {
         <div className="lp-pricing-card">
           <div className="lp-pricing-badge">Annual</div>
           <div className="lp-pricing-amount">
-            <span className="lp-pricing-currency">$</span>
+            <span className="lp-pricing-currency">AUD&nbsp;$</span>
             <span className="lp-pricing-num">199</span>
             <span className="lp-pricing-period">/ year</span>
           </div>
-          <div className="lp-pricing-monthly">≈ $16.58 / month</div>
+          <div className="lp-pricing-monthly">≈ AUD $16.58 / month</div>
+          <div className="lp-pricing-fx">
+            <span className="lp-fx-pill">≈ USD $130</span>
+            <span className="lp-fx-pill">≈ GBP £105</span>
+            <span className="lp-fx-pill">≈ EUR €122</span>
+          </div>
 
           <ul className="lp-pricing-list">
             <li><span className="lp-check">✓</span> Daily AI watchlist with BUY/HOLD/TRIM/EXIT/SELL</li>

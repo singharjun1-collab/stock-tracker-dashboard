@@ -79,7 +79,7 @@ function LoginInner() {
         )}
 
         <p className="login-footer-note">
-          New here? <a href="/" style={{ color: '#4fc3f7' }}>Start your $199/yr subscription</a> &mdash;
+          New here? <a href="/" style={{ color: '#4fc3f7' }}>Start your AUD $199/yr subscription</a> &mdash;
           you&rsquo;ll be auto-approved on payment.
         </p>
 

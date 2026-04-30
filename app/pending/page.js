@@ -71,7 +71,7 @@ export default function PendingPage() {
   } else if (!subscription) {
     title = 'One step away';
     body = `Hi ${name}! You're signed in. To unlock your daily AI watchlist, complete your subscription below — you'll be auto-approved instantly on payment.`;
-    primaryCta = { label: 'Complete subscription — $199/yr', href: '/' };
+    primaryCta = { label: 'Complete subscription — AUD $199/yr', href: '/' };
   } else if (!hasPaidSub) {
     title = 'Subscription not active';
     body = `Hi ${name}! We see your account but no active subscription is on file (status: ${subscription.status}). Reactivate to regain access.`;

@@ -6,14 +6,14 @@ export const metadata = {
   openGraph: {
     title: 'Stock Chatter — Catch the move before it happens',
     description:
-      'AI-first stock signals from 10 leading-indicator sources. Daily pre-market digest, mobile dashboard, $199/yr.',
+      'AI-first stock signals from 10 leading-indicator sources. Daily pre-market digest, mobile dashboard, AUD $199/yr.',
     type: 'website',
     siteName: 'Stock Chatter',
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Stock Chatter — AI-first stock signals',
-    description: 'Catch the move before it happens. $199/yr. AI-first stock signals from 10 leading-indicator sources.',
+    description: 'Catch the move before it happens. AUD $199/yr. AI-first stock signals from 10 leading-indicator sources.',
   },
 };
 

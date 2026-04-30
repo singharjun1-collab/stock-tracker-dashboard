@@ -93,7 +93,7 @@ export default function TermsPage() {
 
         <h2>5. Subscription &amp; billing</h2>
         <p>
-          Stock Chatter is offered on an annual subscription of <strong>USD $199 per year</strong>{' '}
+          Stock Chatter is offered on an annual subscription of <strong>AUD $199 per year</strong>{' '}
           (or the equivalent in your local currency, plus any taxes required by your jurisdiction).
           Payments are processed by <strong>Lemon Squeezy</strong> as our merchant of record. By
           subscribing you authorise us, via Lemon Squeezy, to charge the payment method you
@@ -167,7 +167,7 @@ export default function TermsPage() {
           <p>
             Our total aggregate liability for all claims relating to the Service, regardless of
             the cause of action, is capped at <strong>the lesser of (a) the amount you paid us
-            in the 12 months immediately before the event giving rise to the claim, or (b) USD
+            in the 12 months immediately before the event giving rise to the claim, or (b) AUD
             $199</strong>.
           </p>
           <p>

@@ -55,7 +55,7 @@ export default function PrivacyPage() {
             or store your Google password.
           </li>
           <li>
-            <strong>Subscription and billing information.</strong> Payment for our $199/year
+            <strong>Subscription and billing information.</strong> Payment for our AUD $199/year
             subscription is processed by <strong>Lemon Squeezy</strong>, an independent merchant of
             record. We never see or store your credit card number, CVV, or full bank details. We
             receive only a subscription status (active / cancelled), the email used at checkout, and
