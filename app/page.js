@@ -415,7 +415,7 @@ export default function LandingPage() {
               <a href="/privacy">Privacy Policy</a>
               <a href="/terms">Terms of Service</a>
               <a href="#disclosures">Disclosures</a>
-              <a href="mailto:singh.arjun1@gmail.com">Contact</a>
+              <a href="mailto:hello@getfamilyfinance.com">Contact</a>
             </div>
           </div>
         </div>

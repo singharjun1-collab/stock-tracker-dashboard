@@ -223,7 +223,7 @@ export default function TermsPage() {
         <h2>15. Contact</h2>
         <p>
           Questions about these Terms?{' '}
-          <a href="mailto:singh.arjun1@gmail.com">singh.arjun1@gmail.com</a>.
+          <a href="mailto:hello@getfamilyfinance.com">hello@getfamilyfinance.com</a>.
         </p>
 
         <div className="legal-footer-nav">

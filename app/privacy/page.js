@@ -43,7 +43,7 @@ export default function PrivacyPage() {
         <p>
           Stock Chatter is an AI-first stock-signal information service operated as a product of
           FamilyFinance. You can contact us any time at{' '}
-          <a href="mailto:singh.arjun1@gmail.com">singh.arjun1@gmail.com</a>.
+          <a href="mailto:hello@getfamilyfinance.com">hello@getfamilyfinance.com</a>.
         </p>
 
         <h2>2. Information we collect</h2>
@@ -152,7 +152,7 @@ export default function PrivacyPage() {
           Depending on where you live, you may have rights to access, correct, export, or delete
           your personal information, to object to or restrict certain processing, and to withdraw
           consent. To exercise any of these rights, email{' '}
-          <a href="mailto:singh.arjun1@gmail.com">singh.arjun1@gmail.com</a>. We will respond within
+          <a href="mailto:hello@getfamilyfinance.com">hello@getfamilyfinance.com</a>. We will respond within
           30 days.
         </p>
         <p>
@@ -185,7 +185,7 @@ export default function PrivacyPage() {
         <h2>12. Contact us</h2>
         <p>
           Questions or requests regarding privacy?{' '}
-          <a href="mailto:singh.arjun1@gmail.com">singh.arjun1@gmail.com</a>.
+          <a href="mailto:hello@getfamilyfinance.com">hello@getfamilyfinance.com</a>.
         </p>
 
         <div className="legal-footer-nav">

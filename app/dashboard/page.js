@@ -5148,7 +5148,7 @@ export default function Dashboard() {
           <span aria-hidden="true"> &middot; </span>
           <a href="/terms">Terms of Service</a>
           <span aria-hidden="true"> &middot; </span>
-          <a href="mailto:singh.arjun1@gmail.com">Contact</a>
+          <a href="mailto:hello@getfamilyfinance.com">Contact</a>
         </div>
       </footer>
 
