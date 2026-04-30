@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { sendNewSignupAlert } from '@/app/lib/email';
+import { createSupabaseAdminClient } from '@/app/lib/supabase/admin';
+
+// States that grant access via Lemon Squeezy. Mirror webhook APPROVED_STATES.
+const PAID_STATES = new Set(['active', 'on_trial', 'past_due']);
 
 // Force Node.js runtime so nodemailer (which uses `net`/`tls`) works.
 export const runtime = 'nodejs';
@@ -14,7 +18,7 @@ export async function GET(request) {
   const next = searchParams.get('next') || '/dashboard';
 
   if (!code) {
-    return NextResponse.redirect(`${origin}/?error=no_code`);
+    return NextResponse.redirect(`${origin}/login?error=no_code`);
   }
 
   // Start with a placeholder redirect — we'll attach cookies to THIS response
@@ -46,7 +50,7 @@ export async function GET(request) {
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
-    const errResp = NextResponse.redirect(`${origin}/?error=${encodeURIComponent(error.message)}`);
+    const errResp = NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
     // Carry over any cookies supabase set (it sometimes clears stale ones on failure)
     response.cookies.getAll().forEach(c => errResp.cookies.set(c.name, c.value, c));
     return errResp;
@@ -54,16 +58,37 @@ export async function GET(request) {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    const errResp = NextResponse.redirect(`${origin}/?error=no_user`);
+    const errResp = NextResponse.redirect(`${origin}/login?error=no_user`);
     response.cookies.getAll().forEach(c => errResp.cookies.set(c.name, c.value, c));
     return errResp;
   }
 
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from('profiles')
     .select('status, is_admin, signup_notified_at, display_name, email')
     .eq('id', user.id)
     .single();
+
+  // ── Lemon Squeezy auto-approval ──────────────────────────────────
+  // If this user has an active subscription on file (paid before signing in,
+  // or paid after but webhook arrived first), promote them to 'approved'
+  // immediately so they don't sit on the /pending page.
+  if (profile && profile.status === 'pending' && user.email) {
+    try {
+      const admin = createSupabaseAdminClient();
+      const { data: sub } = await admin
+        .from('subscriptions')
+        .select('status')
+        .eq('email', user.email.toLowerCase())
+        .maybeSingle();
+      if (sub && PAID_STATES.has((sub.status || '').toLowerCase())) {
+        await admin.from('profiles').update({ status: 'approved' }).eq('id', user.id);
+        profile = { ...profile, status: 'approved' };
+      }
+    } catch (e) {
+      console.error('[auth/callback] subscription check failed:', e);
+    }
+  }
 
   // Fire off a one-time "new signup" email to the admin.
   // `signup_notified_at` is null until we've sent the alert, so we never

@@ -1,11 +1,32 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient, getCurrentProfile } from '@/app/lib/supabase/server';
+import { createSupabaseAdminClient } from '@/app/lib/supabase/admin';
 
-// GET the current user's profile (used by dashboard to render avatar + display name)
+// GET the current user's profile (used by dashboard + /pending to render
+// avatar, display name, and Lemon Squeezy subscription state).
 export async function GET() {
   const profile = await getCurrentProfile();
   if (!profile) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  return NextResponse.json({ profile });
+
+  // Look up Lemon Squeezy subscription for this user's email so /pending
+  // can show a "Complete subscription" CTA when there's no payment on file.
+  let subscription = null;
+  if (profile.email) {
+    try {
+      const admin = createSupabaseAdminClient();
+      const { data: sub } = await admin
+        .from('subscriptions')
+        .select('status, renews_at, ends_at')
+        .eq('email', profile.email.toLowerCase())
+        .maybeSingle();
+      subscription = sub || null;
+    } catch (e) {
+      // Don't break the profile response if subscriptions lookup fails.
+      console.error('[api/profile] subscription lookup failed:', e);
+    }
+  }
+
+  return NextResponse.json({ profile, subscription });
 }
 
 // PATCH the current user's profile. Accepts:

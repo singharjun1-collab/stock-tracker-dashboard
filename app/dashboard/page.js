@@ -1030,7 +1030,7 @@ function DistributionListManager() {
   useEffect(() => {
     fetch('/api/distribution-list', { credentials: 'same-origin' })
       .then(res => {
-        if (res.status === 401) { router.replace('/'); return null; }
+        if (res.status === 401) { router.replace('/login'); return null; }
         if (!res.ok) throw new Error();
         return res.json();
       })
@@ -1048,7 +1048,7 @@ function DistributionListManager() {
         credentials: 'same-origin',
         body: JSON.stringify({ email: newEmail, name: newName }),
       });
-      if (res.status === 401) { router.replace('/'); return; }
+      if (res.status === 401) { router.replace('/login'); return; }
       if (res.status === 409) { setMessage('Email already exists'); return; }
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -1064,7 +1064,7 @@ function DistributionListManager() {
   const removeMember = async (id) => {
     try {
       const res = await fetch(`/api/distribution-list?id=${id}`, { method: 'DELETE', credentials: 'same-origin' });
-      if (res.status === 401) { router.replace('/'); return; }
+      if (res.status === 401) { router.replace('/login'); return; }
       setMembers(members.filter(m => m.id !== id));
     } catch { /* silently fail */ }
   };
@@ -3941,7 +3941,7 @@ export default function Dashboard() {
     // Load the logged-in user's profile (Google-auth). If none, send to /
     fetch('/api/profile')
       .then(res => {
-        if (res.status === 401) { router.replace('/'); return null; }
+        if (res.status === 401) { router.replace('/login'); return null; }
         return res.json();
       })
       .then(data => {
@@ -3962,14 +3962,14 @@ export default function Dashboard() {
 
     fetch('/api/alerts')
       .then(res => {
-        if (res.status === 401) { router.replace('/'); return null; }
+        if (res.status === 401) { router.replace('/login'); return null; }
         return res.json();
       })
       .then(data => {
         if (data?.alerts) setAlerts(data.alerts);
         setLoading(false);
       })
-      .catch(() => router.replace('/'));
+      .catch(() => router.replace('/login'));
 
     // Fetch paper trades
     fetch('/api/paper-trades')
@@ -4092,9 +4092,9 @@ export default function Dashboard() {
       await supabase.auth.signOut();
       // Also clear the legacy cookie
       document.cookie = 'stock_auth=; Path=/; Max-Age=0; SameSite=Lax';
-      router.replace('/');
+      router.replace('/login');
     } catch {
-      router.replace('/');
+      router.replace('/login');
     }
   }, [router]);
 
@@ -4449,7 +4449,7 @@ export default function Dashboard() {
     <StockMetaProvider tickers={allTickers}>
       <header className="header">
         <div className="header-main">
-          <h1>{"\u{1F4C8}"} Social Stock <span>Intelligence Monitor</span></h1>
+          <h1>{"\u{1F4AC}"} Stock <span>Chatter</span></h1>
           <div className="subtitle">Last updated: {dateStr} {"\u{B7}"} Auto-scan complete</div>
           <MarketClock />
         </div>
@@ -5138,7 +5138,7 @@ export default function Dashboard() {
       </div>
 
       <footer>
-        {"\u{26A1}"} Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Social Stock Intelligence Monitor</span> &nbsp;|&nbsp; Sources: <span>WSB {"\u{B7}"} Reddit {"\u{B7}"} Polymarket {"\u{B7}"} Kalshi {"\u{B7}"} Yahoo Finance {"\u{B7}"} Google Finance {"\u{B7}"} StockTwits</span>
+        {"\u{26A1}"} Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Stock Chatter</span> &nbsp;|&nbsp; Sources: <span>SEC 8-K {"\u{B7}"} FDA Catalysts {"\u{B7}"} Yahoo Pre-Market {"\u{B7}"} ApeWisdom {"\u{B7}"} NASDAQ Halts {"\u{B7}"} WSB {"\u{B7}"} Yahoo Trending {"\u{B7}"} Polymarket {"\u{B7}"} Kalshi {"\u{B7}"} Stooq</span>
         <div className="disclaimer">{"\u{26A0}"}{"\u{FE0F}"} AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
       </footer>
 
