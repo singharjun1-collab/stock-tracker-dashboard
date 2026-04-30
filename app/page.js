@@ -390,7 +390,7 @@ export default function LandingPage() {
         <div className="lp-footer-top">
           <div className="lp-footer-brand">
             <a className="lp-logo" href="/">
-              <span className="lp-logo-mark">S</span>
+              <img src="/logo-sm.png" alt="Stock Chatter" className="lp-logo-mark" width="32" height="32" />
               <span className="lp-logo-text">Stock <span>Chatter</span></span>
             </a>
             <p className="lp-footer-tagline">
@@ -412,6 +412,8 @@ export default function LandingPage() {
             </div>
             <div>
               <h4>Legal</h4>
+              <a href="/privacy">Privacy Policy</a>
+              <a href="/terms">Terms of Service</a>
               <a href="#disclosures">Disclosures</a>
               <a href="mailto:singh.arjun1@gmail.com">Contact</a>
             </div>

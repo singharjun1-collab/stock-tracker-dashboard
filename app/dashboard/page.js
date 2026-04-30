@@ -5143,6 +5143,13 @@ export default function Dashboard() {
       <footer>
         {"\u{26A1}"} Auto-updated daily at 9am &nbsp;|&nbsp; Powered by <span>Stock Chatter</span> &nbsp;|&nbsp; Sources: <span>SEC 8-K {"\u{B7}"} FDA Catalysts {"\u{B7}"} Yahoo Pre-Market {"\u{B7}"} ApeWisdom {"\u{B7}"} NASDAQ Halts {"\u{B7}"} WSB {"\u{B7}"} Yahoo Trending {"\u{B7}"} Polymarket {"\u{B7}"} Kalshi {"\u{B7}"} Stooq</span>
         <div className="disclaimer">{"\u{26A0}"}{"\u{FE0F}"} AI recommendations are based on momentum, timing &amp; price action analysis. This is NOT financial advice. Always do your own research before investing.</div>
+        <div className="dashboard-legal-links">
+          <a href="/privacy">Privacy Policy</a>
+          <span aria-hidden="true"> &middot; </span>
+          <a href="/terms">Terms of Service</a>
+          <span aria-hidden="true"> &middot; </span>
+          <a href="mailto:singh.arjun1@gmail.com">Contact</a>
+        </div>
       </footer>
 
       {/* ─── MOBILE BOTTOM NAV BAR ───

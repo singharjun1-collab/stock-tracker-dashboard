@@ -341,7 +341,11 @@ function buildHtml({ data, recipientEmail }) {
         <div style="font-size:11px;color:#64748b;line-height:1.6;text-align:center;">
           You're receiving this because you're on the Stock Chatter alert list.<br>
           <a href="${unsubUrl}" style="color:#4fc3f7;text-decoration:none;">Unsubscribe</a> ·
-          <a href="${APP_URL}" style="color:#4fc3f7;text-decoration:none;">Open dashboard</a>
+          <a href="${APP_URL}" style="color:#4fc3f7;text-decoration:none;">Open dashboard</a> ·
+          <a href="${APP_URL}/privacy" style="color:#4fc3f7;text-decoration:none;">Privacy</a> ·
+          <a href="${APP_URL}/terms" style="color:#4fc3f7;text-decoration:none;">Terms</a>
+          <br><br>
+          <span style="color:#475569;">Stock Chatter is an information service. Not financial advice. You can lose money. See Terms for full disclaimers.</span>
         </div>
       </td></tr>
     </table>

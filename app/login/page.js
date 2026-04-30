@@ -82,6 +82,12 @@ function LoginInner() {
           New here? <a href="/" style={{ color: '#4fc3f7' }}>Start your $199/yr subscription</a> &mdash;
           you&rsquo;ll be auto-approved on payment.
         </p>
+
+        <p className="login-legal-links">
+          <a href="/privacy">Privacy</a>
+          <span aria-hidden="true"> &middot; </span>
+          <a href="/terms">Terms</a>
+        </p>
       </div>
     </div>
   );

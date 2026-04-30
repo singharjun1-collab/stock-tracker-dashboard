@@ -1183,6 +1183,13 @@ footer {
   padding: 28px 40px; border-top: 1px solid #0f1d30; margin-top: 40px;
 }
 footer span { color: #4fc3f7; }
+.dashboard-legal-links { margin-top: 14px; font-size: 0.72rem; color: #4a6a88; }
+.dashboard-legal-links a { color: #6a89a6; text-decoration: none; border-bottom: 1px solid transparent; transition: border-color 0.15s ease; }
+.dashboard-legal-links a:hover { border-bottom-color: #6a89a6; }
+@media (max-width: 640px) {
+  .dashboard-legal-links { margin-top: 12px; padding: 0 8px; line-height: 1.8; }
+  footer { padding: 22px 16px 88px; }
+}
 
 /* ── LOADING ── */
 .loading-container {
@@ -2676,6 +2683,20 @@ footer span { color: #4fc3f7; }
   color: #7a9bc0;
   text-align: center;
 }
+
+.login-legal-links {
+  margin-top: 20px;
+  font-size: 0.78rem;
+  color: #5a7793;
+  text-align: center;
+}
+.login-legal-links a {
+  color: #7a9bc0;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.15s ease;
+}
+.login-legal-links a:hover { border-bottom-color: #7a9bc0; }
 
 .pending-avatar {
   width: 72px;

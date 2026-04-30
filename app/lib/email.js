@@ -104,6 +104,10 @@ Approve them here: ${approveUrl}
   <p style="color:#7a9bc0; font-size:13px; margin-top:24px;">
     Sign in as an admin, click the <strong>Users</strong> tab, then click <strong>Approve</strong> next to their row.
   </p>
+  <p style="color:#9ca3af; font-size:11px; margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb;">
+    <a href="${appUrl}/privacy" style="color:#6b7280; text-decoration:none;">Privacy</a> &middot;
+    <a href="${appUrl}/terms" style="color:#6b7280; text-decoration:none;">Terms</a>
+  </p>
 </div>`;
 
   return sendEmail({ to: adminEmail, subject, html, text });
@@ -137,6 +141,11 @@ Welcome aboard.`;
   </p>
   <p style="color:#7a9bc0; font-size:13px; margin-top:24px;">
     Just sign in with the same Google account and you'll land on your dashboard. Welcome aboard!
+  </p>
+  <p style="color:#9ca3af; font-size:11px; margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb; line-height:1.6;">
+    Stock Chatter is an information service. Not financial advice &mdash; you can lose money.<br>
+    <a href="${appUrl}/privacy" style="color:#6b7280; text-decoration:none;">Privacy</a> &middot;
+    <a href="${appUrl}/terms" style="color:#6b7280; text-decoration:none;">Terms</a>
   </p>
 </div>`;
 
