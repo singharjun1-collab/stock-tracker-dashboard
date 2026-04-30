@@ -1,10 +1,13 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createSupabaseBrowserClient } from '../lib/supabase/browser';
 import '../globals.css';
 
-export default function LoginPage() {
+// Wrap useSearchParams() in a Suspense boundary — Next.js 14 requires it
+// to enable static prerendering of /login. Without this, `next build` fails
+// with "useSearchParams() should be wrapped in a suspense boundary".
+function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -81,5 +84,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="login-container"><div className="spinner"></div></div>}>
+      <LoginInner />
+    </Suspense>
   );
 }
