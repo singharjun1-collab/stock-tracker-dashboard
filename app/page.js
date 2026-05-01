@@ -31,19 +31,13 @@ export default function LandingPage() {
       .catch(() => setAuthState({ loading: false, status: null }));
   }, []);
 
-  // Inject the Lemon Squeezy overlay script once the page mounts.
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    if (document.getElementById('lemonsqueezy-script')) return;
-    const s = document.createElement('script');
-    s.id = 'lemonsqueezy-script';
-    s.src = 'https://app.lemonsqueezy.com/js/lemon.js';
-    s.defer = true;
-    s.onload = () => { try { window.createLemonSqueezy?.(); } catch {} };
-    document.body.appendChild(s);
-  }, []);
+  // Full-page checkout — clicking the CTA navigates to the LS-hosted page.
+  // (We previously injected lemon.js to render an overlay modal, but the
+  // overlay is fixed-width ~600px and looks cramped on desktop. The full-page
+  // checkout is responsive 2-column on desktop / single-column on mobile and
+  // matches the visual weight of a serious SaaS purchase.)
 
-  const ctaHref = CHECKOUT_URL ? `${CHECKOUT_URL}${CHECKOUT_URL.includes('?') ? '&' : '?'}embed=1` : '#waitlist';
+  const ctaHref = CHECKOUT_URL || '#waitlist';
   const ctaLabel = !CHECKOUT_URL ? 'Get notified at launch' :
     authState.status === 'approved' ? 'Go to your dashboard →' :
     authState.status === 'pending' ? 'Check your approval status' :
@@ -90,7 +84,7 @@ export default function LandingPage() {
 
             <div className="lp-cta-row">
               <a
-                className={`lp-btn lp-btn-primary ${ctaIsCheckout ? 'lemonsqueezy-button' : ''}`}
+                className="lp-btn lp-btn-primary"
                 href={ctaTarget}
                 rel={ctaIsCheckout ? 'nofollow' : undefined}
               >
@@ -348,7 +342,7 @@ export default function LandingPage() {
           </ul>
 
           <a
-            className={`lp-btn lp-btn-primary lp-btn-lg ${ctaIsCheckout ? 'lemonsqueezy-button' : ''}`}
+            className="lp-btn lp-btn-primary lp-btn-lg"
             href={ctaTarget}
             rel={ctaIsCheckout ? 'nofollow' : undefined}
           >
@@ -382,7 +376,7 @@ export default function LandingPage() {
           morning before the market opens.
         </p>
         <a
-          className={`lp-btn lp-btn-primary lp-btn-lg ${ctaIsCheckout ? 'lemonsqueezy-button' : ''}`}
+          className="lp-btn lp-btn-primary lp-btn-lg"
           href={ctaTarget}
           rel={ctaIsCheckout ? 'nofollow' : undefined}
         >
