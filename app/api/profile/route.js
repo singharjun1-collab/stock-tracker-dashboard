@@ -16,7 +16,7 @@ export async function GET() {
       const admin = createSupabaseAdminClient();
       const { data: sub } = await admin
         .from('subscriptions')
-        .select('status, renews_at, ends_at')
+        .select('status, renews_at, ends_at, customer_portal_url, update_payment_method_url')
         .eq('email', profile.email.toLowerCase())
         .maybeSingle();
       subscription = sub || null;

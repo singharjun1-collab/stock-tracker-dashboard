@@ -2837,6 +2837,37 @@ footer span { color: #4fc3f7; }
   cursor: pointer;
 }
 
+/* Manage subscription — deep-links to LS-hosted customer portal where
+   the user can update card or cancel auto-renew. Sits above Sign Out
+   in the profile menu dropdown. */
+.profile-menu-manage-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: rgba(79, 195, 247, 0.08);
+  border: 1px solid rgba(79, 195, 247, 0.25);
+  border-radius: 8px;
+  color: #4fc3f7;
+  font-weight: 600;
+  font-size: 0.9rem;
+  text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.profile-menu-manage-sub:hover {
+  background: rgba(79, 195, 247, 0.14);
+  border-color: rgba(79, 195, 247, 0.45);
+}
+.profile-menu-manage-sub-meta {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #7a9bc0;
+  white-space: nowrap;
+}
+
 .profile-menu-signout {
   width: 100%;
   padding: 10px;

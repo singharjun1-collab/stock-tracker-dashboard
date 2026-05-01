@@ -3911,6 +3911,10 @@ export default function Dashboard() {
   // current AI rec / entry / target / stop without leaving Portfolio.
   const [cardModalTicker, setCardModalTicker] = useState(null);
   const [profile, setProfile] = useState(null);
+  // Lemon Squeezy subscription (status, renews_at, ends_at, customer_portal_url, ...)
+  // Used to render a "Manage subscription" link in the profile menu when the
+  // user has an active LS sub — deep-links to LS's hosted customer portal.
+  const [subscription, setSubscription] = useState(null);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -3948,6 +3952,7 @@ export default function Dashboard() {
         if (data?.profile) {
           if (data.profile.status !== 'approved') { router.replace('/pending'); return; }
           setProfile(data.profile);
+          setSubscription(data.subscription || null);
           // Apply the user's saved card-expand preference. 'compact' means
           // every card starts collapsed; 'expanded' (default) means every
           // card starts fully expanded. Still respects per-card toggles
@@ -4630,6 +4635,28 @@ export default function Dashboard() {
                       )}
                     </div>
                   </div>
+                  {/* Manage subscription — deep-links to LS-hosted customer
+                      portal where the user can update card or cancel
+                      auto-renew. Only render when LS has supplied the URL
+                      (it does on every subscription_* event). Opens in a
+                      new tab so they don't lose their dashboard state. */}
+                  {subscription?.customer_portal_url && (
+                    <a
+                      className="profile-menu-manage-sub"
+                      href={subscription.customer_portal_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <span>Manage subscription</span>
+                      <span className="profile-menu-manage-sub-meta">
+                        {subscription.status === 'cancelled'
+                          ? `Ends ${new Date(subscription.ends_at).toLocaleDateString()}`
+                          : subscription.status === 'active' && subscription.renews_at
+                            ? `Renews ${new Date(subscription.renews_at).toLocaleDateString()}`
+                            : subscription.status}
+                      </span>
+                    </a>
+                  )}
                   <button className="profile-menu-signout" onClick={handleSignOut}>Sign out</button>
                 </div>
               )}

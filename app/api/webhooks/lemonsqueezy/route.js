@@ -83,6 +83,14 @@ export async function POST(request) {
 
   // Build subscription row.
   const status = (attrs.status || (eventName.startsWith('order_') ? 'active' : 'pending')).toLowerCase();
+
+  // LS sends per-subscription deep-links on every subscription_* event so
+  // we can offer "Manage subscription" / "Update card" links without
+  // building any custom UI ourselves. Pull them off the payload here.
+  // (order_* events don't carry these; preserve any prior values.)
+  const portalUrl = attrs.urls?.customer_portal || null;
+  const updateCardUrl = attrs.urls?.update_payment_method || null;
+
   const subRow = {
     email,
     customer_id: String(attrs.customer_id ?? ''),
@@ -98,6 +106,10 @@ export async function POST(request) {
     last_event_name: eventName,
     raw_payload: payload,
   };
+  // Only set these if LS supplied them — don't blank out an existing
+  // good URL when handling an order_created event.
+  if (portalUrl) subRow.customer_portal_url = portalUrl;
+  if (updateCardUrl) subRow.update_payment_method_url = updateCardUrl;
 
   const { error: upsertErr } = await supabase
     .from('subscriptions')
