@@ -22,6 +22,8 @@ export async function GET(request) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
       next: { revalidate: 86400 }, // Cache for 24 hours
+      // Fail fast if Yahoo hangs — Vercel middleware has a 25s wall.
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {

@@ -22,6 +22,8 @@ export async function GET(request) {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
       next: { revalidate: 3600 },
+      // Fail fast if Yahoo hangs — Vercel middleware has a 25s wall.
+      signal: AbortSignal.timeout(10000),
     });
 
     if (!res.ok) {
@@ -32,6 +34,7 @@ export async function GET(request) {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
         },
         next: { revalidate: 3600 },
+        signal: AbortSignal.timeout(8000),
       });
 
       if (fallbackRes.ok) {
