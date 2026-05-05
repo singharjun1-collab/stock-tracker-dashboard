@@ -36,6 +36,7 @@ export async function GET(request) {
 
     const data = await res.json();
     const calendarEvents = data?.quoteSummary?.result?.[0]?.calendarEvents;
+    const earningsHistory = data?.quoteSummary?.result?.[0]?.earningsHistory?.history;
 
     // Next earnings date
     const earningsDates = calendarEvents?.earnings?.earningsDate;
@@ -53,6 +54,29 @@ export async function GET(request) {
       }
     }
 
+    // ── Past-date filter ───────────────────────────────────────────────
+    // Yahoo's `earningsDate` field returns the *most recent* earnings event,
+    // which can be in the PAST if no future date is scheduled yet. If we
+    // pass that to the AI, it cheerfully says "pre-position before the EPS
+    // catalyst" for an event that already happened (DUOL 2026-05-05 incident).
+    // Strip past dates and surface them as `lastReportedDate` instead.
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const isFuture = (s) => s && new Date(s + 'T00:00:00') >= todayStart;
+
+    let lastReportedDate = null;
+    if (earningsDate && !isFuture(earningsDate)) {
+      lastReportedDate = earningsDate;
+      earningsDate = null;
+      earningsDateEnd = null;
+    }
+    // Cross-check against earningsHistory for the most recent ACTUAL print
+    if (!lastReportedDate && Array.isArray(earningsHistory) && earningsHistory.length > 0) {
+      const latest = earningsHistory[earningsHistory.length - 1];
+      const ts = latest?.quarter?.raw;
+      if (ts) lastReportedDate = new Date(ts * 1000).toISOString().split('T')[0];
+    }
+
     // Format nicely
     const formatDate = (d) => {
       if (!d) return null;
@@ -67,7 +91,9 @@ export async function GET(request) {
       earningsDateEnd,
       earningsDateFormatted: formatDate(earningsDate),
       earningsDateEndFormatted: formatDate(earningsDateEnd),
-      // Days until earnings
+      lastReportedDate,
+      lastReportedDateFormatted: formatDate(lastReportedDate),
+      // Days until earnings — guaranteed non-negative now (null if no future date)
       daysUntilEarnings: earningsDate
         ? Math.ceil((new Date(earningsDate) - new Date()) / (1000 * 60 * 60 * 24))
         : null,

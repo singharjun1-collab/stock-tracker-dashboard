@@ -120,6 +120,7 @@ async function fetchEarnings(ticker) {
 
     const data = await res.json();
     const calendarEvents = data?.quoteSummary?.result?.[0]?.calendarEvents;
+    const earningsHistory = data?.quoteSummary?.result?.[0]?.earningsHistory?.history;
     const earningsDates = calendarEvents?.earnings?.earningsDate;
 
     let earningsDate = null;
@@ -136,6 +137,28 @@ async function fetchEarnings(ticker) {
       }
     }
 
+    // ── Past-date filter ───────────────────────────────────────────────
+    // Yahoo returns the *most recent* earnings event in `earningsDate`,
+    // which can be in the past. Pass that through and the AI ends up
+    // recommending "pre-position before the EPS catalyst" for an event
+    // that already printed (see DUOL 2026-05-05). Strip past dates and
+    // expose the historical print as `lastReportedDate` instead.
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const isFuture = (s) => s && new Date(s + 'T00:00:00') >= todayStart;
+
+    let lastReportedDate = null;
+    if (earningsDate && !isFuture(earningsDate)) {
+      lastReportedDate = earningsDate;
+      earningsDate = null;
+      earningsDateEnd = null;
+    }
+    if (!lastReportedDate && Array.isArray(earningsHistory) && earningsHistory.length > 0) {
+      const latest = earningsHistory[earningsHistory.length - 1];
+      const ts = latest?.quarter?.raw;
+      if (ts) lastReportedDate = new Date(ts * 1000).toISOString().split('T')[0];
+    }
+
     const formatDate = (d) => {
       if (!d) return null;
       return new Date(d + 'T00:00:00').toLocaleDateString('en-US', {
@@ -149,6 +172,9 @@ async function fetchEarnings(ticker) {
       earningsDateEnd,
       earningsDateFormatted: formatDate(earningsDate),
       earningsDateEndFormatted: formatDate(earningsDateEnd),
+      lastReportedDate,
+      lastReportedDateFormatted: formatDate(lastReportedDate),
+      // Guaranteed non-negative now (null if no future date known)
       daysUntilEarnings: earningsDate
         ? Math.ceil((new Date(earningsDate) - new Date()) / (1000 * 60 * 60 * 24))
         : null,

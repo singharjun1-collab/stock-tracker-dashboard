@@ -30,12 +30,19 @@ export async function GET() {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from('current_prices')
-    .select('ticker, price, previous_close, price_date, updated_at');
+    .select('ticker, price, previous_close, price_date, updated_at, post_market_price, post_market_change_pct, post_market_time, pre_market_price, pre_market_change_pct, pre_market_time');
 
   if (error) {
     console.error('Error fetching current_prices:', error);
     return NextResponse.json({ error: 'Failed to fetch prices' }, { status: 500 });
   }
+
+  // Extended-hours staleness — only show AH/PM chip when the post/pre data
+  // is recent enough to still be meaningful. 6h cap covers the full
+  // post-market window (4pm–8pm ET) plus a buffer; anything older almost
+  // certainly belongs to a previous session.
+  const EXT_HOURS_FRESH_MS = 6 * 60 * 60 * 1000;
+  const isFresh = (iso) => iso && (Date.now() - new Date(iso).getTime()) < EXT_HOURS_FRESH_MS;
 
   const prices = {};
   let freshest = null;
@@ -45,6 +52,16 @@ export async function GET() {
       previous_close: row.previous_close != null ? parseFloat(row.previous_close) : null,
       price_date: row.price_date,
       updated_at: row.updated_at,
+      post_market_price: isFresh(row.post_market_time) && row.post_market_price != null
+        ? parseFloat(row.post_market_price) : null,
+      post_market_change_pct: isFresh(row.post_market_time) && row.post_market_change_pct != null
+        ? parseFloat(row.post_market_change_pct) : null,
+      post_market_time: isFresh(row.post_market_time) ? row.post_market_time : null,
+      pre_market_price: isFresh(row.pre_market_time) && row.pre_market_price != null
+        ? parseFloat(row.pre_market_price) : null,
+      pre_market_change_pct: isFresh(row.pre_market_time) && row.pre_market_change_pct != null
+        ? parseFloat(row.pre_market_change_pct) : null,
+      pre_market_time: isFresh(row.pre_market_time) ? row.pre_market_time : null,
     };
     if (row.updated_at && (!freshest || new Date(row.updated_at) > new Date(freshest))) {
       freshest = row.updated_at;

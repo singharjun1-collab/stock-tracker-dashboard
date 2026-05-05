@@ -679,8 +679,26 @@ function AlertCard({
   // the alert's entry price so the header never goes blank.
   // Matches the pattern used by Portfolio/Leaderboard.
   const lastHist = alert.prices[alert.prices.length - 1];
-  const sharedLive = sharedPrices?.[alert.ticker]?.price;
-  const sharedPrevClose = sharedPrices?.[alert.ticker]?.previous_close;
+  const sharedRow = sharedPrices?.[alert.ticker];
+  const sharedLive = sharedRow?.price;
+  const sharedPrevClose = sharedRow?.previous_close;
+
+  // Extended-hours data — Robinhood-style "AH $X.XX  ±Y%" chip below the
+  // main price. Prefer post-market when both are present; whichever has
+  // the more recent timestamp wins. /api/prices already strips data older
+  // than 6 hours, so anything we see here is "fresh enough to display".
+  const postT = sharedRow?.post_market_time ? new Date(sharedRow.post_market_time).getTime() : 0;
+  const preT  = sharedRow?.pre_market_time  ? new Date(sharedRow.pre_market_time).getTime()  : 0;
+  let extLabel = null, extPrice = null, extPct = null;
+  if (sharedRow?.post_market_price != null && postT >= preT) {
+    extLabel = 'After Hours';
+    extPrice = sharedRow.post_market_price;
+    extPct   = sharedRow.post_market_change_pct;
+  } else if (sharedRow?.pre_market_price != null) {
+    extLabel = 'Pre-Market';
+    extPrice = sharedRow.pre_market_price;
+    extPct   = sharedRow.pre_market_change_pct;
+  }
   const price = (sharedLive != null && !Number.isNaN(sharedLive))
     ? sharedLive
     : (lastHist?.price ?? (alert.price_at_alert != null ? parseFloat(alert.price_at_alert) : null));
@@ -794,6 +812,21 @@ function AlertCard({
           <div className="ac-company-row">
             <span className="ac-company">{alert.company}</span>
           </div>
+          {extPrice != null && (
+            <div
+              className={`ac-ext-hours ${extPct != null ? (extPct >= 0 ? 'pos' : 'neg') : ''}`}
+              title={`${extLabel} price from Yahoo`}
+            >
+              <span className="ac-ext-dot" aria-hidden="true">●</span>
+              <span className="ac-ext-lbl">{extLabel}</span>
+              <span className="ac-ext-price">${Number(extPrice).toFixed(2)}</span>
+              {extPct != null && (
+                <span className="ac-ext-pct">
+                  {extPct >= 0 ? '+' : ''}{Number(extPct).toFixed(2)}%
+                </span>
+              )}
+            </div>
+          )}
         </div>
         <div className="ac-right">
           <div className="ac-right-top">

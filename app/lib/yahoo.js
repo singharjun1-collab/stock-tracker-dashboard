@@ -23,76 +23,137 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  *
  * Retries up to 3x with exponential backoff on 429.
  */
-export async function fetchYahooQuote(ticker, { range = '5d' } = {}) {
-  const url = `${YAHOO_BASE}/${encodeURIComponent(ticker)}?interval=1d&range=${range}`;
+/**
+ * Internal: do one chart fetch with retries & 429 backoff.
+ * Returns the parsed JSON or null on hard failure.
+ */
+async function fetchChart(url) {
   const backoffs = [0, 2000, 8000];
-  let lastErr = null;
-
   for (const wait of backoffs) {
     if (wait > 0) await sleep(wait);
     try {
       const res = await fetch(url, {
         headers: { 'User-Agent': UA, Accept: 'application/json' },
-        // 15s ceiling so a single slow ticker can't hang the cron
         signal: AbortSignal.timeout(15_000),
       });
-      if (res.status === 429) {
-        lastErr = { code: '429', message: 'rate limited' };
-        continue;
-      }
-      if (!res.ok) {
-        return {
-          ok: false,
-          ticker,
-          error_code: String(res.status),
-          error_message: `HTTP ${res.status}`,
-        };
-      }
-      const json = await res.json();
-      const result = json?.chart?.result?.[0];
-      if (!result) {
-        return { ok: false, ticker, error_code: 'PARSE', error_message: 'no chart result' };
-      }
-      const meta = result.meta || {};
-      const price = meta.regularMarketPrice;
-      if (price == null || Number.isNaN(price)) {
-        return { ok: false, ticker, error_code: 'NO_PRICE', error_message: 'meta missing regularMarketPrice' };
-      }
-
-      // Compute previous close from the timeseries: penultimate non-null
-      // close from the daily candles. More reliable than meta fields,
-      // which sometimes return chartPreviousClose (start-of-range close)
-      // instead of the prior session's close.
-      const ts = result.timestamp || [];
-      const closes = result.indicators?.quote?.[0]?.close || [];
-      const pairs = ts
-        .map((t, i) => [t, closes[i]])
-        .filter(([, c]) => c != null && !Number.isNaN(c));
-      const lastPair = pairs[pairs.length - 1];
-      const prevPair = pairs.length >= 2 ? pairs[pairs.length - 2] : null;
-
-      const lastTs = lastPair ? lastPair[0] : meta.regularMarketTime;
-      const priceDate = lastTs
-        ? new Date(lastTs * 1000).toISOString().slice(0, 10)
-        : new Date().toISOString().slice(0, 10);
-
-      return {
-        ok: true,
-        ticker,
-        price: Number(price),
-        previous_close: prevPair ? Number(prevPair[1]) : (meta.regularMarketPreviousClose ?? null),
-        price_date: priceDate,
-      };
+      if (res.status === 429) continue;
+      if (!res.ok) return { error: { code: String(res.status), message: `HTTP ${res.status}` } };
+      return { json: await res.json() };
     } catch (e) {
-      lastErr = { code: 'FETCH', message: e?.message || String(e) };
+      if (wait === backoffs[backoffs.length - 1]) {
+        return { error: { code: 'FETCH', message: e?.message || String(e) } };
+      }
+    }
+  }
+  return { error: { code: 'RATE_LIMITED', message: '429 after retries' } };
+}
+
+export async function fetchYahooQuote(ticker, { range = '5d' } = {}) {
+  // We do TWO fetches in parallel:
+  //   - daily   : interval=1d, range=5d. Daily candle closes are the OFFICIAL
+  //               4pm auction prints, which we need for `previous_close`.
+  //               NASDAQ's closing cross can differ from the last continuous
+  //               trade by several percent; the 15m candle would mislead.
+  //   - intraday: interval=15m, range=1d, includePrePost=true. This is the
+  //               only response that includes pre/post-market candles, so it
+  //               is our source for after-hours and pre-market last-trade.
+  // Total ~25KB per ticker. Two fetches in parallel = no extra wall-clock time.
+  const dailyUrl = `${YAHOO_BASE}/${encodeURIComponent(ticker)}?interval=1d&range=${range}`;
+  const intraUrl = `${YAHOO_BASE}/${encodeURIComponent(ticker)}?interval=15m&range=1d&includePrePost=true`;
+
+  const [dailyRes, intraRes] = await Promise.all([fetchChart(dailyUrl), fetchChart(intraUrl)]);
+
+  // Daily is the source of truth for price + previous_close. Hard-fail if it errors.
+  if (dailyRes.error) {
+    return { ok: false, ticker, error_code: dailyRes.error.code, error_message: dailyRes.error.message };
+  }
+  const dailyResult = dailyRes.json?.chart?.result?.[0];
+  if (!dailyResult) {
+    return { ok: false, ticker, error_code: 'PARSE', error_message: 'no chart result (daily)' };
+  }
+  const dMeta = dailyResult.meta || {};
+  const price = dMeta.regularMarketPrice;
+  if (price == null || Number.isNaN(price)) {
+    return { ok: false, ticker, error_code: 'NO_PRICE', error_message: 'meta missing regularMarketPrice' };
+  }
+
+  // Daily candle closes ARE the official auction prints — what we want for previous_close.
+  const dTs = dailyResult.timestamp || [];
+  const dCloses = dailyResult.indicators?.quote?.[0]?.close || [];
+  const dPairs = dTs.map((t, i) => [t, dCloses[i]]).filter(([, c]) => c != null && !Number.isNaN(c));
+  const lastDailyPair = dPairs[dPairs.length - 1];
+  const prevDailyPair = dPairs.length >= 2 ? dPairs[dPairs.length - 2] : null;
+
+  const previous_close = prevDailyPair
+    ? Number(prevDailyPair[1])
+    : (dMeta.regularMarketPreviousClose ?? null);
+
+  const lastTs = lastDailyPair ? lastDailyPair[0] : dMeta.regularMarketTime;
+  const priceDate = lastTs
+    ? new Date(lastTs * 1000).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+
+  // Intraday is best-effort for AH/PM. If it fails, still return daily data.
+  let post_market_price = null, post_market_change_pct = null, post_market_time = null;
+  let pre_market_price = null,  pre_market_change_pct = null,  pre_market_time = null;
+
+  if (!intraRes.error && intraRes.json) {
+    const iResult = intraRes.json.chart?.result?.[0];
+    if (iResult) {
+      const iMeta = iResult.meta || {};
+      const period = iMeta.currentTradingPeriod || {};
+      const offsetSec = period.regular?.gmtoffset ?? -14400; // EDT default
+
+      const iTs = iResult.timestamp || [];
+      const iCloses = iResult.indicators?.quote?.[0]?.close || [];
+      const iPairs = iTs.map((t, i) => [t, iCloses[i]]).filter(([, c]) => c != null && !Number.isNaN(c));
+      const lastIntraPair = iPairs[iPairs.length - 1];
+
+      // Use the *intraday* meta's current-day regular price as the AH baseline:
+      // if the AH candle exists, the % is vs the regular-session close, not the
+      // daily-feed `regularMarketPrice` (which can lag during fast-moving days).
+      const intraPrice = iMeta.regularMarketPrice ?? price;
+
+      // Classify by the candle's wall-clock time in ET, not by Yahoo's
+      // `currentTradingPeriod` (which after 8pm ET points to TOMORROW's session
+      // and would mis-classify yesterday's post-market candles as today's
+      // pre-market). Pre-market = 04:00–09:30 ET, post-market = 16:00–20:00 ET.
+      if (lastIntraPair && intraPrice > 0) {
+        const [lastT, lastC] = lastIntraPair;
+        const etMs = (lastT + offsetSec) * 1000;
+        const etDate = new Date(etMs);
+        const minOfDay = etDate.getUTCHours() * 60 + etDate.getUTCMinutes();
+        const POST_START = 16 * 60;       // 16:00 ET
+        const POST_END   = 20 * 60;       // 20:00 ET
+        const PRE_START  = 4 * 60;        // 04:00 ET
+        const PRE_END    = 9 * 60 + 30;   // 09:30 ET
+
+        if (minOfDay >= POST_START && minOfDay <= POST_END) {
+          post_market_price = Number(lastC);
+          post_market_change_pct = ((lastC - intraPrice) / intraPrice) * 100;
+          post_market_time = new Date(lastT * 1000).toISOString();
+        } else if (minOfDay >= PRE_START && minOfDay < PRE_END) {
+          pre_market_price = Number(lastC);
+          pre_market_change_pct = ((lastC - intraPrice) / intraPrice) * 100;
+          pre_market_time = new Date(lastT * 1000).toISOString();
+        }
+        // Else: regular-hours candle → no AH/PM data this run.
+      }
     }
   }
 
   return {
-    ok: false,
+    ok: true,
     ticker,
-    error_code: lastErr?.code || 'UNKNOWN',
-    error_message: lastErr?.message || 'fetch failed after retries',
+    price: Number(price),
+    previous_close,
+    price_date: priceDate,
+    post_market_price,
+    post_market_change_pct,
+    post_market_time,
+    pre_market_price,
+    pre_market_change_pct,
+    pre_market_time,
   };
 }
 

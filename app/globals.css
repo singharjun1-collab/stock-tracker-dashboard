@@ -3645,6 +3645,37 @@ footer span { color: #4fc3f7; }
 }
 .ac-company { overflow: hidden; text-overflow: ellipsis; }
 .ac-dot-sep { color: #4a6a85; }
+
+/* Extended-hours chip — Robinhood-style "● After Hours $96.37  -12.57%"
+   sits below the company name. Subtle by default, colored by direction.
+   Hidden when no fresh post/pre-market data exists. Mobile-first sizing. */
+.ac-ext-hours {
+  display: inline-flex; align-items: baseline; gap: 5px;
+  margin-top: 2px;
+  font-size: 0.74rem; font-weight: 600;
+  color: #7a9bc0;
+  font-variant-numeric: tabular-nums;
+}
+.ac-ext-hours .ac-ext-dot {
+  font-size: 0.6rem; line-height: 1;
+  color: #7a9bc0;
+  margin-right: 1px;
+}
+.ac-ext-hours .ac-ext-lbl {
+  font-size: 0.66rem; font-weight: 700;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: #7a9bc0;
+}
+.ac-ext-hours .ac-ext-price { color: #c9d4e3; font-weight: 700; }
+.ac-ext-hours .ac-ext-pct { font-weight: 700; }
+.ac-ext-hours.pos .ac-ext-dot,
+.ac-ext-hours.pos .ac-ext-pct { color: #22c55e; }
+.ac-ext-hours.neg .ac-ext-dot,
+.ac-ext-hours.neg .ac-ext-pct { color: #ef4444; }
+@media (max-width: 480px) {
+  .ac-ext-hours { font-size: 0.7rem; gap: 4px; }
+  .ac-ext-hours .ac-ext-lbl { font-size: 0.6rem; }
+}
 .ac-mkt-dot {
   width: 6px; height: 6px; border-radius: 50%;
   background: #22c55e; display: inline-block;

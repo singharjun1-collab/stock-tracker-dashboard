@@ -102,6 +102,15 @@ async function refresh() {
       price: r.price,
       previous_close: r.previous_close ?? null,
       price_date: r.price_date,
+      // Extended-hours fields (added 2026-05-05). Yahoo only returns these
+      // during pre/post-market windows; outside those windows they're null
+      // and the card just hides the AH chip.
+      post_market_price: r.post_market_price ?? null,
+      post_market_change_pct: r.post_market_change_pct ?? null,
+      post_market_time: r.post_market_time ?? null,
+      pre_market_price: r.pre_market_price ?? null,
+      pre_market_change_pct: r.pre_market_change_pct ?? null,
+      pre_market_time: r.pre_market_time ?? null,
       updated_at: new Date().toISOString(),
     }));
 
