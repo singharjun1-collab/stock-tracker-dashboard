@@ -79,8 +79,8 @@ function LoginInner() {
         )}
 
         <p className="login-footer-note">
-          New here? <a href="/" style={{ color: '#4fc3f7' }}>Start your AUD $199/yr subscription</a> &mdash;
-          you&rsquo;ll be auto-approved on payment.
+          New here? <a href="/" style={{ color: '#4fc3f7' }}>Start your free 7-day trial</a> &mdash;
+          no credit card required.
         </p>
 
         <p className="login-legal-links">

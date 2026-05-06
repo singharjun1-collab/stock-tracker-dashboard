@@ -37,15 +37,20 @@ export default function LandingPage() {
   // checkout is responsive 2-column on desktop / single-column on mobile and
   // matches the visual weight of a serious SaaS purchase.)
 
-  const ctaHref = CHECKOUT_URL || '#waitlist';
-  const ctaLabel = !CHECKOUT_URL ? 'Get notified at launch' :
-    authState.status === 'approved' ? 'Go to your dashboard →' :
+  // CTA copy: prioritise the FREE 7-DAY TRIAL hook for new visitors. Once
+  // the user has signed in (status set), we adapt to whatever state they're
+  // in. A logged-out visitor's CTA goes straight to /login (Google OAuth)
+  // because the trial doesn't require Lemon Squeezy at all — the free 7
+  // days are unlocked just by signing in.
+  const ctaHref = '/login';
+  const ctaLabel = authState.status === 'approved' ? 'Go to your dashboard →' :
     authState.status === 'pending' ? 'Check your approval status' :
-    'Start — AUD $199/year';
+    'Start your free 7-day trial';
   const ctaTarget = authState.status === 'approved' ? '/dashboard'
     : authState.status === 'pending' ? '/pending'
     : ctaHref;
-  const ctaIsCheckout = CHECKOUT_URL && !authState.status;
+  // Trial signup is a regular auth link — no `nofollow` needed.
+  const ctaIsCheckout = false;
 
   return (
     <div className="lp-root">
@@ -92,6 +97,16 @@ export default function LandingPage() {
               </a>
               <a className="lp-btn lp-btn-ghost" href="#how">See how it works</a>
             </div>
+            {!authState.status && (
+              <p style={{
+                color: '#7a9bc0',
+                fontSize: 13,
+                marginTop: 8,
+                marginBottom: 0,
+              }}>
+                ✓ No credit card required &nbsp;·&nbsp; ✓ Cancel anytime &nbsp;·&nbsp; AUD $199/year after the trial
+              </p>
+            )}
 
             <div className="lp-trust-row">
               <div className="lp-trust-item"><strong>10</strong><span>signal sources</span></div>
@@ -315,17 +330,20 @@ export default function LandingPage() {
 
       {/* ─────────────────── Pricing ─────────────────── */}
       <section id="pricing" className="lp-section lp-pricing-section">
-        <h2 className="lp-section-title">Simple pricing</h2>
-        <p className="lp-section-sub">One plan. Cancel anytime.</p>
+        <h2 className="lp-section-title">Try it free for 7 days</h2>
+        <p className="lp-section-sub">No credit card required. Cancel anytime during the trial and pay nothing.</p>
 
         <div className="lp-pricing-card">
-          <div className="lp-pricing-badge">Annual</div>
+          <div className="lp-pricing-badge" style={{
+            background: 'linear-gradient(135deg,#22c55e,#16a34a)',
+            color: '#fff',
+          }}>7-day free trial</div>
           <div className="lp-pricing-amount">
             <span className="lp-pricing-currency">AUD&nbsp;$</span>
             <span className="lp-pricing-num">199</span>
             <span className="lp-pricing-period">/ year</span>
           </div>
-          <div className="lp-pricing-monthly">≈ AUD $16.58 / month</div>
+          <div className="lp-pricing-monthly">≈ AUD $16.58 / month — only after your 7-day trial</div>
           <div className="lp-pricing-fx">
             <span className="lp-fx-pill">≈ USD $130</span>
             <span className="lp-fx-pill">≈ GBP £105</span>
@@ -349,8 +367,9 @@ export default function LandingPage() {
             {ctaLabel}
           </a>
           <p className="lp-pricing-fineprint">
-            Auto-approved on payment via Google sign-in. No free trial &mdash; one
-            full year of signals, period. <strong>All sales are final &mdash; no refunds.</strong>
+            Sign in with Google &mdash; your <strong>7-day free trial</strong> starts immediately, no credit
+            card required. Cancel any time during the trial and you&rsquo;ll never be charged. After the trial,
+            it&rsquo;s AUD $199 for one full year. <strong>All sales are final &mdash; no refunds after payment.</strong>
           </p>
         </div>
       </section>
@@ -372,8 +391,8 @@ export default function LandingPage() {
       <section className="lp-section lp-final-cta">
         <h2>Stop chasing the move. Start catching it.</h2>
         <p>
-          Subscribe today and your AI watchlist arrives in your inbox tomorrow
-          morning before the market opens.
+          Start your 7-day free trial today and your AI watchlist arrives in your
+          inbox tomorrow morning before the market opens. No credit card required.
         </p>
         <a
           className="lp-btn lp-btn-primary lp-btn-lg"
@@ -382,6 +401,15 @@ export default function LandingPage() {
         >
           {ctaLabel}
         </a>
+        {!authState.status && (
+          <p style={{
+            color: '#7a9bc0',
+            fontSize: 13,
+            marginTop: 12,
+          }}>
+            ✓ Free for 7 days &nbsp;·&nbsp; ✓ Cancel anytime &nbsp;·&nbsp; AUD $199/year after
+          </p>
+        )}
       </section>
 
       {/* ─────────────────── Footer ─────────────────── */}
@@ -407,7 +435,7 @@ export default function LandingPage() {
             <div>
               <h4>Account</h4>
               <a href="/login">Sign in</a>
-              <a href={ctaHref}>Subscribe</a>
+              <a href={ctaHref}>Start free trial</a>
             </div>
             <div>
               <h4>Legal</h4>
@@ -810,12 +838,16 @@ const FAQ = [
     a: 'We track a virtual portfolio that buys every BUY signal at the recommended entry, exits on TRIM/EXIT/SELL signals, and sizes each position at 1% of equity. It is paper-traded — no real money, no slippage, no taxes — and is meant to demonstrate the engine&rsquo;s edge under ideal conditions, not to predict your real-world returns.',
   },
   {
+    q: 'How does the 7-day free trial work?',
+    a: 'Sign in with Google and your 7-day trial starts immediately — no credit card required. You get full access to the daily AI watchlist, the pre-market email digest, and the mobile dashboard for the full 7 days. On day 8, the dashboard locks until you subscribe (AUD $199/year). If Stock Chatter isn’t for you, just walk away — you’ll never be charged.',
+  },
+  {
     q: 'How fast do I get access after subscribing?',
-    a: 'Instantly. Lemon Squeezy notifies our system the moment your payment clears, your account is auto-approved, and the next time you sign in with Google you go straight to the dashboard.',
+    a: 'During the trial: instantly — sign in with Google and you’re straight in. After the trial: Lemon Squeezy notifies our system the moment your payment clears, your account is auto-approved, and the dashboard unlocks within seconds.',
   },
   {
     q: 'Can I cancel? Are there refunds?',
-    a: 'You can cancel future renewals at any time from your subscriber portal — once cancelled, your subscription will not auto-renew at the end of the year. To keep things simple and fair to all members, all sales are final and we do not offer pro-rated refunds for the current term. You keep full access through the end of your paid year.',
+    a: 'During your 7-day trial: just walk away. No card on file, no charge, nothing to cancel. After you subscribe: you can cancel future renewals at any time from your subscriber portal — once cancelled, your subscription will not auto-renew at the end of the year. To keep things simple and fair to all members, all sales are final and we do not offer pro-rated refunds for the current term. You keep full access through the end of your paid year.',
   },
   {
     q: 'What kind of stocks do you cover?',

@@ -3984,6 +3984,24 @@ export default function Dashboard() {
       .then(data => {
         if (data?.profile) {
           if (data.profile.status !== 'approved') { router.replace('/pending'); return; }
+
+          // ─── 7-DAY NO-CC TRIAL GATE ─────────────────────────────
+          // If the user is on the auto-approved trial path AND the trial
+          // has expired AND they don't have an active LS subscription,
+          // bounce them to /upgrade. Existing approved users have
+          // trial_ends_at = NULL → this check is skipped for them.
+          const trialEndsAt = data.profile.trial_ends_at
+            ? new Date(data.profile.trial_ends_at)
+            : null;
+          const subStatus = (data.subscription?.status || '').toLowerCase();
+          const hasActiveSub = subStatus === 'active'
+            || subStatus === 'on_trial'
+            || subStatus === 'past_due';
+          if (trialEndsAt && trialEndsAt.getTime() <= Date.now() && !hasActiveSub) {
+            router.replace('/upgrade');
+            return;
+          }
+
           setProfile(data.profile);
           setSubscription(data.subscription || null);
           // Apply the user's saved card-expand preference. 'compact' means
@@ -4483,8 +4501,72 @@ export default function Dashboard() {
     );
   }
 
+  // ─── Trial banner state ─────────────────────────────────────────────
+  // Show an always-visible "X days left in your trial — Subscribe" banner
+  // for users on the no-CC trial path who don't yet have an active LS sub.
+  // Hidden for legacy approved users (trial_ends_at = NULL) and active subs.
+  const trialEndsAt = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null;
+  const subStatusForBanner = (subscription?.status || '').toLowerCase();
+  const hasActiveSubForBanner = subStatusForBanner === 'active'
+    || subStatusForBanner === 'on_trial'
+    || subStatusForBanner === 'past_due';
+  const trialDaysLeft = trialEndsAt
+    ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : null;
+  const showTrialBanner = !!trialEndsAt && !hasActiveSubForBanner && trialDaysLeft !== null;
+  const trialCheckoutUrl = process.env.NEXT_PUBLIC_LEMONSQUEEZY_CHECKOUT_URL || '/upgrade';
+
   return (
     <StockMetaProvider tickers={allTickers}>
+      {showTrialBanner && (
+        <div
+          className="trial-banner"
+          role="status"
+          aria-live="polite"
+          style={{
+            background: trialDaysLeft <= 2
+              ? 'linear-gradient(90deg,#b91c1c,#ef4444)'
+              : 'linear-gradient(90deg,#0b2540,#1565c0)',
+            color: '#fff',
+            padding: '10px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            fontSize: 14,
+            fontWeight: 600,
+            position: 'sticky',
+            top: 0,
+            zIndex: 100,
+            boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+          }}
+        >
+          <span>
+            {trialDaysLeft === 0
+              ? '⏰ Your free trial ends today'
+              : trialDaysLeft === 1
+              ? '⏰ 1 day left in your free trial'
+              : `🎁 ${trialDaysLeft} days left in your free trial`}
+          </span>
+          <a
+            href={trialCheckoutUrl}
+            rel="nofollow"
+            style={{
+              background: '#fff',
+              color: '#0b2540',
+              padding: '6px 14px',
+              borderRadius: 999,
+              fontWeight: 700,
+              fontSize: 13,
+              textDecoration: 'none',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Subscribe — AUD&nbsp;$199/yr
+          </a>
+        </div>
+      )}
       <header className="header">
         <div className="header-main">
           <h1>

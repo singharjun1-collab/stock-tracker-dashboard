@@ -10,6 +10,10 @@
     {
       "path": "/api/refresh-prices",
       "schedule": "*/30 0-1 * * 2-6"
+    },
+    {
+      "path": "/api/send-trial-reminders",
+      "schedule": "0 14 * * *"
     }
   ]
 }

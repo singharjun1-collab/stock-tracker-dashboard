@@ -120,11 +120,14 @@ export async function POST(request) {
   }
 
   // If subscription is active (or has a grace state), promote any matching
-  // profile to 'approved' so the user gets straight into the dashboard.
+  // profile to 'approved' so the user gets straight into the dashboard,
+  // AND auto-add them to the alert_distribution_list so they receive the
+  // pre-market digest. (Previously AJ had to add paying customers to the
+  // distribution list manually — that step is now automated.)
   if (APPROVED_STATES.has(status)) {
     const { data: profile, error: profileErr } = await supabase
       .from('profiles')
-      .select('id, status')
+      .select('id, status, display_name, trial_ends_at')
       .eq('email', email)
       .maybeSingle();
 
@@ -134,11 +137,41 @@ export async function POST(request) {
         .update({ status: 'approved' })
         .eq('id', profile.id);
     }
+
+    // Auto-add to the pre-market digest distribution list.
+    // Idempotent: if the email already exists we just clear unsubscribed_at +
+    // re-activate (in case they cancelled previously, then resubscribed).
+    try {
+      const customerName = profile?.display_name
+        || attrs.user_name
+        || attrs.customer_name
+        || null;
+      // Use upsert keyed by email. The table has a UNIQUE(email) constraint.
+      const { error: distErr } = await supabase
+        .from('alert_distribution_list')
+        .upsert(
+          {
+            email,
+            name: customerName,
+            active: true,
+            unsubscribed_at: null,
+          },
+          { onConflict: 'email' }
+        );
+      if (distErr) {
+        // Non-fatal — log and continue. We never want a digest-list hiccup
+        // to fail a payment webhook (LS would retry indefinitely).
+        console.error('[lemonsqueezy webhook] distribution list upsert failed', distErr);
+      }
+    } catch (e) {
+      console.error('[lemonsqueezy webhook] distribution list error', e);
+    }
   }
 
-  // If subscription has fully ended, demote.
+  // If subscription has fully ended, demote AND remove from the distribution
+  // list so we don't keep emailing customers who no longer pay.
   if (status === 'cancelled' || status === 'expired') {
-    // Only flip back to 'pending' if the subscription has actually expired
+    // Only flip back to 'disabled' if the subscription has actually expired
     // past the grace period. cancelled-but-still-renewed-until-X stays active.
     const endsAt = attrs.ends_at ? new Date(attrs.ends_at) : null;
     if (status === 'expired' || (endsAt && endsAt < new Date())) {
@@ -147,6 +180,19 @@ export async function POST(request) {
         .update({ status: 'disabled' })
         .eq('email', email)
         .eq('status', 'approved');
+
+      // Soft-remove from the distribution list (mark inactive + stamp
+      // unsubscribed_at) so the digest sender skips them. We don't hard
+      // delete — keeping the row preserves analytics + lets a re-subscribe
+      // re-activate it.
+      try {
+        await supabase
+          .from('alert_distribution_list')
+          .update({ active: false, unsubscribed_at: new Date().toISOString() })
+          .eq('email', email);
+      } catch (e) {
+        console.error('[lemonsqueezy webhook] distribution list deactivate failed', e);
+      }
     }
   }
 
