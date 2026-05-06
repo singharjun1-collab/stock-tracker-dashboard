@@ -3638,6 +3638,97 @@ footer span { color: #4fc3f7; }
 .ac-new-pill { background: rgba(79,195,247,0.2); color: #4fc3f7; }
 .ac-dropped-pill { background: rgba(122,155,192,0.15); color: #7a9bc0; }
 
+/* FRESH SIGNAL — orange pulsing chip on cards whose ticker was re-detected
+   by the daily scan within the 18h window. See AlertCard.isFreshSignal. */
+.ac-fresh-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.6rem; font-weight: 700;
+  padding: 2px 7px; border-radius: 999px;
+  background: rgba(239,159,39,0.15);
+  color: #fac775;
+  border: 0.5px solid rgba(239,159,39,0.45);
+  letter-spacing: 0.02em; line-height: 1.3;
+  white-space: nowrap;
+}
+.ac-fresh-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #ef9f27;
+  box-shadow: 0 0 0 0 rgba(239,159,39,0.6);
+  animation: ac-fresh-pulse 1.8s ease-out infinite;
+  flex-shrink: 0;
+}
+@keyframes ac-fresh-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239,159,39,0.6); }
+  60%  { box-shadow: 0 0 0 6px rgba(239,159,39,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,159,39,0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ac-fresh-dot { animation: none; }
+}
+
+/* SIGNAL HISTORY — collapsible audit trail of past detections. Mobile-first:
+   full-width 36px tap target on the toggle, comfortable row spacing. */
+.ac-sig-history {
+  margin-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  padding-top: 8px;
+}
+.ac-sig-history-toggle {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; min-height: 36px;
+  background: transparent; border: 0;
+  padding: 6px 2px;
+  font-size: 0.72rem; font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.ac-sig-history-toggle:hover { background: rgba(255,255,255,0.04); color: rgba(255,255,255,0.8); }
+.ac-sig-history-toggle:active { transform: scale(0.99); }
+.ac-sig-history-count { color: rgba(255,255,255,0.4); font-weight: 500; margin-left: 2px; }
+.ac-sig-history-chev { font-size: 0.65rem; color: rgba(255,255,255,0.4); transition: color 0.15s; }
+.ac-sig-history.open .ac-sig-history-chev { color: rgba(255,255,255,0.7); }
+.ac-sig-history-list {
+  list-style: none; margin: 4px 0 2px; padding: 0;
+  animation: ac-sig-fade 0.18s ease-out;
+}
+@keyframes ac-sig-fade { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: translateY(0); } }
+.ac-sig-history-row {
+  display: grid;
+  grid-template-columns: 70px auto 1fr;
+  gap: 8px; align-items: center;
+  padding: 6px 2px;
+  font-size: 0.72rem;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.ac-sig-history-row:last-child { border-bottom: 0; }
+.ac-sig-history-date { color: rgba(255,255,255,0.55); font-weight: 500; }
+.ac-sig-history-src {
+  background: rgba(127,119,221,0.18);
+  color: #afa9ec;
+  font-size: 0.62rem; font-weight: 600;
+  padding: 1px 6px; border-radius: 4px;
+  text-transform: lowercase;
+  letter-spacing: 0.02em;
+  justify-self: start;
+}
+.ac-sig-history-note {
+  color: rgba(255,255,255,0.78);
+  line-height: 1.45;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.ac-sig-history-score { color: rgba(255,255,255,0.45); font-weight: 500; }
+@media (max-width: 520px) {
+  .ac-sig-history-row {
+    grid-template-columns: 60px auto;
+    grid-template-rows: auto auto;
+    row-gap: 2px;
+  }
+  .ac-sig-history-note { grid-column: 1 / -1; padding-left: 0; font-size: 0.7rem; }
+}
+
 .ac-company-row {
   display: flex; align-items: center; gap: 6px;
   color: #7a9bc0; font-size: 0.78rem; margin-top: 2px;

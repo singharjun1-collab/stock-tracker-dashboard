@@ -651,6 +651,58 @@ function RatingButtons({ alertId, currentRating, onRate }) {
 //   52-WEEK BAR · 3-month chart · alert reason · analyst · signal change · notes
 // Fields that come from the AI/daily-job (entry/target/stop/ai_read/volume_ratio/
 // week52/wsb_trend/TRIM/EXIT) gracefully hide if null so the card always renders.
+// Robinhood-style audit trail of every time the daily scan flagged this
+// ticker. Collapsed by default (just shows count + chevron); tap to expand
+// to a 5-row list of date / source / one-line reason. Mobile-first: full
+// width tap target, 44px row height.
+function SignalHistoryAccordion({ entries, totalCount }) {
+  const [open, setOpen] = useState(false);
+  if (!entries || entries.length === 0) return null;
+  const fmtDate = (s) => {
+    if (!s) return '';
+    const d = new Date(s + 'T00:00:00');
+    if (Number.isNaN(d.getTime())) return s;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const yest  = new Date(today.getTime() - 86400000);
+    if (d.getTime() === today.getTime()) return 'Today';
+    if (d.getTime() === yest.getTime())  return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+  return (
+    <div className={`ac-sig-history${open ? ' open' : ''}`}>
+      <button
+        type="button"
+        className="ac-sig-history-toggle"
+        aria-expanded={open}
+        onClick={() => setOpen(o => !o)}
+      >
+        <span className="ac-sig-history-lbl">
+          Signal history <span className="ac-sig-history-count">({totalCount})</span>
+        </span>
+        <span className="ac-sig-history-chev" aria-hidden="true">{open ? '▴' : '▾'}</span>
+      </button>
+      {open && (
+        <ul className="ac-sig-history-list">
+          {entries.map((e, i) => (
+            <li key={i} className="ac-sig-history-row">
+              <span className="ac-sig-history-date">{fmtDate(e?.date)}</span>
+              {e?.source && (
+                <span className="ac-sig-history-src">{e.source}</span>
+              )}
+              <span className="ac-sig-history-note">
+                {e?.ai_read || e?.signal_type || '—'}
+                {typeof e?.score === 'number' && (
+                  <span className="ac-sig-history-score"> · score {Math.round(e.score)}</span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function AlertCard({
   alert, index, sectionPrefix, watchlist, sharedPrices,
   forceCompact, forceCompactNonce,
@@ -719,6 +771,26 @@ function AlertCard({
   const isNew = alert.status === 'new';
   const isDropped = alert.status === 'dropped';
   const isWatched = watchlist.includes(alert.ticker);
+
+  // Re-signal — a stock that was already in the user's stock_alerts as
+  // active/new and got re-detected by the daily scan within RESIGNAL_WINDOW_HOURS.
+  // Triggers the orange "Fresh signal" chip + the Signal History accordion.
+  // Write side: SKILL.md Section 3.95.
+  const RESIGNAL_WINDOW_MS = 18 * 60 * 60 * 1000;
+  const isFreshSignal = !!(
+    alert.last_resignal_at &&
+    (Date.now() - new Date(alert.last_resignal_at).getTime()) < RESIGNAL_WINDOW_MS
+  );
+  const signalHistory = Array.isArray(alert.signal_history) ? alert.signal_history : [];
+  const visibleSignalHistory = signalHistory.slice(-5).reverse(); // newest first, cap 5
+  const resignalCountThisWeek = signalHistory.filter(s => {
+    if (!s?.date) return false;
+    const t = new Date(s.date + 'T00:00:00').getTime();
+    return !Number.isNaN(t) && t >= Date.now() - 7 * 24 * 60 * 60 * 1000;
+  }).length;
+  const freshSignalLabel = resignalCountThisWeek >= 2
+    ? `Fresh signal · ${resignalCountThisWeek}× this week`
+    : 'Fresh signal';
   const sourceMeta = getSourceMeta(alert.source);
   const rec = (alert.recommendation || 'HOLD').toUpperCase();
 
@@ -807,6 +879,15 @@ function AlertCard({
               </>
             )}
             {isNew && <span className="ac-new-pill">NEW</span>}
+            {!isNew && isFreshSignal && (
+              <span
+                className="ac-fresh-pill"
+                title="The daily scan re-detected this ticker — see signal history below."
+              >
+                <span className="ac-fresh-dot" aria-hidden="true"></span>
+                {freshSignalLabel}
+              </span>
+            )}
             {isDropped && <span className="ac-dropped-pill">DROPPED</span>}
           </div>
           <div className="ac-company-row">
@@ -923,6 +1004,14 @@ function AlertCard({
           <span className="ac-ai-icon">🧠</span>
           <span><b>AI read:</b> {alert.ai_read || alert.recommendation_reason}</span>
         </div>
+      )}
+
+      {/* SIGNAL HISTORY — Robinhood-style collapsible audit trail of every
+          time the daily scan flagged this ticker. Shows last 5 entries from
+          stock_alerts.signal_history JSONB. Only renders if there's at least
+          one re-signal worth surfacing. */}
+      {signalHistory.length > 1 && (
+        <SignalHistoryAccordion entries={visibleSignalHistory} totalCount={signalHistory.length} />
       )}
 
       {/* 52-WEEK RANGE */}
@@ -4411,8 +4500,29 @@ export default function Dashboard() {
 
   // Dismissed rows drop out of the normal tabs (they reappear in the Archive section).
   const notDismissed = (a) => !a.dismissed_at;
-  const newPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'new' && notDismissed(a))), [alerts]);
-  const activePicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'active' && notDismissed(a))), [alerts]);
+
+  // Re-signal window — when the daily scan re-detects an already-active ticker,
+  // we set `last_resignal_at` on its row. For RESIGNAL_WINDOW_HOURS the card
+  // surfaces in the "New" tab with a Fresh Signal chip. After the window it
+  // returns to "Active" automatically — keeps each pick in exactly one tab.
+  // See SKILL.md Section 3.95 for the write side and Section 3 of this file
+  // for the matching email-digest split.
+  const RESIGNAL_WINDOW_HOURS = 18;
+  const isRecentResignal = (a) => {
+    if (!a.last_resignal_at) return false;
+    const cutoffMs = Date.now() - RESIGNAL_WINDOW_HOURS * 60 * 60 * 1000;
+    return new Date(a.last_resignal_at).getTime() >= cutoffMs;
+  };
+
+  const newPicks = useMemo(() => sortByPerf(alerts.filter(a =>
+    notDismissed(a) && (
+      a.status === 'new' ||
+      (a.status === 'active' && isRecentResignal(a))
+    )
+  )), [alerts]);
+  const activePicks = useMemo(() => sortByPerf(alerts.filter(a =>
+    a.status === 'active' && notDismissed(a) && !isRecentResignal(a)
+  )), [alerts]);
   const droppedPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'dropped' && notDismissed(a))), [alerts]);
   const watchlistPicks = useMemo(() => sortByPerf(alerts.filter(a => watchlist.includes(a.ticker) && notDismissed(a))), [alerts, watchlist]);
 

@@ -76,47 +76,89 @@ async function loadDigestData() {
 
   // Last 24h of recommendation flips
   const sinceIso = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  // Re-signal window — keep in sync with dashboard `RESIGNAL_WINDOW_HOURS`
+  // in app/dashboard/page.js so email and dashboard show the same picks.
+  const RESIGNAL_WINDOW_HOURS = 18;
+  const resignalCutoffIso = new Date(
+    Date.now() - RESIGNAL_WINDOW_HOURS * 60 * 60 * 1000,
+  ).toISOString();
 
-  const [recipientsRes, recChangesRes, newPicksRes, activePicksRes, openTradesRes] =
-    await Promise.all([
-      admin
-        .from('alert_distribution_list')
-        .select('email, name')
-        .eq('active', true)
-        .is('unsubscribed_at', null),
-      admin
-        .from('signal_changes')
-        .select('ticker, old_recommendation, new_recommendation, change_date, created_at')
-        .gte('created_at', sinceIso)
-        .order('created_at', { ascending: false }),
-      admin
-        .from('stock_alerts')
-        .select(
-          'ticker, company, signal_type, recommendation, ai_read, entry_low, entry_high, target_low, target_high, stop_loss, market_cap, alert_reason, price_at_alert',
-        )
-        .eq('status', 'new')
-        .order('created_at', { ascending: false })
-        .limit(20),
-      admin
-        .from('stock_alerts')
-        .select(
-          'ticker, company, recommendation, ai_read, price_at_alert, target_high, stop_loss',
-        )
-        .eq('status', 'active')
-        .limit(50),
-      admin
-        .from('paper_trades')
-        .select('ticker, qty, entry_price, status')
-        .eq('status', 'open'),
-    ]);
+  const [
+    recipientsRes,
+    profilesRes,
+    recChangesRes,
+    newPicksRes,
+    freshSignalPicksRes,
+    activePicksRes,
+    openTradesRes,
+  ] = await Promise.all([
+    admin
+      .from('alert_distribution_list')
+      .select('email, name')
+      .eq('active', true)
+      .is('unsubscribed_at', null),
+    // Email -> user_id mapping so each recipient gets their own picks. The
+    // distribution list keys on email; stock_alerts keys on user_id; this
+    // join bridges them. (alert_distribution_list does not directly carry
+    // user_id, so we look it up from profiles at send time.)
+    admin
+      .from('profiles')
+      .select('id, email')
+      .eq('status', 'approved'),
+    admin
+      .from('signal_changes')
+      .select('ticker, old_recommendation, new_recommendation, change_date, created_at')
+      .gte('created_at', sinceIso)
+      .order('created_at', { ascending: false }),
+    // Brand-new picks — created overnight, status still 'new'.
+    admin
+      .from('stock_alerts')
+      .select(
+        'user_id, ticker, company, signal_type, recommendation, ai_read, entry_low, entry_high, target_low, target_high, stop_loss, market_cap, alert_reason, price_at_alert',
+      )
+      .eq('status', 'new')
+      .order('created_at', { ascending: false })
+      .limit(80), // 20/user × 4 active users — plenty of headroom
+    // Fresh signals on existing picks — status='active' but the daily scan
+    // re-detected them within RESIGNAL_WINDOW_HOURS. These would otherwise
+    // be invisible to the user (the original alert was days/weeks ago).
+    admin
+      .from('stock_alerts')
+      .select(
+        'user_id, ticker, company, signal_type, recommendation, ai_read, entry_low, entry_high, target_low, target_high, stop_loss, market_cap, alert_reason, price_at_alert, last_resignal_at, signal_history',
+      )
+      .eq('status', 'active')
+      .gte('last_resignal_at', resignalCutoffIso)
+      .is('dismissed_at', null)
+      .order('last_resignal_at', { ascending: false })
+      .limit(80),
+    admin
+      .from('stock_alerts')
+      .select(
+        'user_id, ticker, company, recommendation, ai_read, price_at_alert, target_high, stop_loss',
+      )
+      .eq('status', 'active')
+      .limit(500),
+    admin
+      .from('paper_trades')
+      .select('user_id, ticker, qty, entry_price, status')
+      .eq('status', 'open'),
+  ]);
 
   if (recipientsRes.error) throw new Error(`recipients: ${recipientsRes.error.message}`);
+
+  // Build email -> user_id lookup (lowercased to be tolerant of case mismatch)
+  const emailToUserId = {};
+  for (const p of profilesRes.data || []) {
+    if (p.email) emailToUserId[p.email.toLowerCase()] = p.id;
+  }
 
   // Latest current_prices for portfolio P/L + active-pick valuations
   const tickersOfInterest = new Set();
   for (const t of openTradesRes.data || []) tickersOfInterest.add(t.ticker);
   for (const a of activePicksRes.data || []) tickersOfInterest.add(a.ticker);
   for (const a of newPicksRes.data || []) tickersOfInterest.add(a.ticker);
+  for (const a of freshSignalPicksRes.data || []) tickersOfInterest.add(a.ticker);
 
   let pricesByTicker = {};
   if (tickersOfInterest.size > 0) {
@@ -131,8 +173,10 @@ async function loadDigestData() {
 
   return {
     recipients: recipientsRes.data || [],
+    emailToUserId,
     recChanges: recChangesRes.data || [],
     newPicks: newPicksRes.data || [],
+    freshSignalPicks: freshSignalPicksRes.data || [],
     activePicks: activePicksRes.data || [],
     openTrades: openTradesRes.data || [],
     prices: pricesByTicker,
@@ -168,7 +212,27 @@ function recColor(rec) {
 }
 
 function buildHtml({ data, recipientEmail }) {
-  const { recChanges, newPicks, activePicks, openTrades, prices } = data;
+  const {
+    recChanges,
+    newPicks: allNewPicks,
+    freshSignalPicks: allFreshSignalPicks,
+    activePicks: allActivePicks,
+    openTrades: allOpenTrades,
+    prices,
+    emailToUserId,
+  } = data;
+
+  // Per-recipient personalization. Each user only sees picks the AI scored
+  // for them (their user_id). If we don't have a profiles row for this
+  // email yet (e.g. an old distribution-list entry pre-dating multi-user),
+  // fall back to no filter so they at least get the rec flips + portfolio.
+  const recipientUserId = emailToUserId?.[recipientEmail?.toLowerCase()] || null;
+  const ownedBy = (row) =>
+    !recipientUserId || !row.user_id || row.user_id === recipientUserId;
+  const newPicks = (allNewPicks || []).filter(ownedBy);
+  const freshSignalPicks = (allFreshSignalPicks || []).filter(ownedBy);
+  const activePicks = (allActivePicks || []).filter(ownedBy);
+  const openTrades = (allOpenTrades || []).filter(ownedBy);
 
   // Portfolio P/L
   let portfolioPL = 0;
@@ -200,17 +264,26 @@ function buildHtml({ data, recipientEmail }) {
     return acc;
   }, {});
 
-  // Top-of-mind blurb
+  // Top-of-mind blurb — counts now span both brand-new and fresh-signal picks.
+  // To the reader, both are "things to look at this morning."
   let topOfMind;
   const flipsToday = recChanges.length;
-  if (flipsToday === 0 && newPicks.length === 0) {
-    topOfMind = `<strong>Quiet morning.</strong> No recommendation flips overnight, no new picks added. Your portfolio is sitting at <strong>${fmtPct(portfolioPct)}</strong> overall — review the dashboard if you want to fine-tune any positions.`;
-  } else if (flipsToday > 0 && newPicks.length === 0) {
+  const totalAttentionPicks = newPicks.length + freshSignalPicks.length;
+  const picksWord = totalAttentionPicks === 1 ? 'pick' : 'picks';
+  if (flipsToday === 0 && totalAttentionPicks === 0) {
+    topOfMind = `<strong>Quiet morning.</strong> No recommendation flips overnight, no new or re-signaled picks. Your portfolio is sitting at <strong>${fmtPct(portfolioPct)}</strong> overall — review the dashboard if you want to fine-tune any positions.`;
+  } else if (flipsToday > 0 && totalAttentionPicks === 0) {
     topOfMind = `<strong>${flipsToday} recommendation ${flipsToday === 1 ? 'change' : 'changes'} since yesterday's close.</strong> Scroll down for the flip list — you may want to act on these before the bell.`;
-  } else if (newPicks.length > 0 && flipsToday === 0) {
-    topOfMind = `<strong>${newPicks.length} new ${newPicks.length === 1 ? 'pick' : 'picks'} added overnight.</strong> Entry/target/stop bands below — line up your orders before 9:30 AM ET.`;
+  } else if (totalAttentionPicks > 0 && flipsToday === 0) {
+    const breakdown =
+      newPicks.length > 0 && freshSignalPicks.length > 0
+        ? `${newPicks.length} new + ${freshSignalPicks.length} re-signaled`
+        : newPicks.length > 0
+          ? `${newPicks.length} new`
+          : `${freshSignalPicks.length} re-signaled`;
+    topOfMind = `<strong>${totalAttentionPicks} ${picksWord} need attention this morning</strong> (${breakdown}). Entry/target/stop bands below — line up your orders before 9:30 AM ET.`;
   } else {
-    topOfMind = `<strong>${flipsToday} ${flipsToday === 1 ? 'flip' : 'flips'} + ${newPicks.length} new ${newPicks.length === 1 ? 'pick' : 'picks'} overnight.</strong> Both lists below — act before the bell.`;
+    topOfMind = `<strong>${flipsToday} ${flipsToday === 1 ? 'flip' : 'flips'} + ${totalAttentionPicks} ${picksWord} overnight.</strong> Both lists below — act before the bell.`;
   }
 
   const unsubUrl = makeUnsubscribeUrl(APP_URL, recipientEmail);
@@ -269,14 +342,15 @@ function buildHtml({ data, recipientEmail }) {
       ${
         newPicks.length > 0
           ? `<tr><td style="padding:16px 24px 8px 24px;">
-        <div style="font-size:14px;font-weight:600;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;">New picks (overnight)</div>
+        <div style="font-size:14px;font-weight:600;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">Brand-new picks</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px;">First-time detections from the overnight scan.</div>
         ${newPicks
           .slice(0, 8)
           .map(
             (p) => `
-          <div style="background:#0f172a;border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid #1e293b;">
+          <div style="background:#0f172a;border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid #1e293b;border-left:3px solid #4fc3f7;">
             <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <div style="font-size:16px;font-weight:700;color:#fff;">${p.ticker}</div>
+              <div style="font-size:16px;font-weight:700;color:#fff;">${p.ticker} <span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;background:rgba(79,195,247,0.2);color:#4fc3f7;padding:2px 6px;border-radius:4px;margin-left:4px;vertical-align:middle;">NEW</span></div>
               <div style="font-size:12px;font-weight:600;color:${recColor(p.recommendation)};">${p.recommendation || ''}</div>
             </div>
             <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''} · ${p.signal_type || ''}</div>
@@ -290,6 +364,38 @@ function buildHtml({ data, recipientEmail }) {
           )
           .join('')}
         ${newPicks.length > 8 ? `<div style="font-size:12px;color:#94a3b8;text-align:center;margin-top:6px;">+${newPicks.length - 8} more on the dashboard</div>` : ''}
+      </td></tr>`
+          : ''
+      }
+
+      ${
+        freshSignalPicks.length > 0
+          ? `<tr><td style="padding:16px 24px 8px 24px;">
+        <div style="font-size:14px;font-weight:600;color:#fac775;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">🔥 Fresh signals on existing picks</div>
+        <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Active picks the scan re-detected overnight — the AI is doubling down. Already on your dashboard; signal history shows when previous flags fired.</div>
+        ${freshSignalPicks
+          .slice(0, 8)
+          .map((p) => {
+            const hist = Array.isArray(p.signal_history) ? p.signal_history : [];
+            const flagCount = hist.length;
+            const countNote = flagCount > 1 ? `${flagCount}× total flags` : 'fresh signal';
+            return `
+          <div style="background:#0f172a;border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid #1e293b;border-left:3px solid #ef9f27;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;">
+              <div style="font-size:16px;font-weight:700;color:#fff;">${p.ticker} <span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;background:rgba(239,159,39,0.18);color:#fac775;padding:2px 6px;border-radius:999px;margin-left:4px;vertical-align:middle;">FRESH · ${countNote}</span></div>
+              <div style="font-size:12px;font-weight:600;color:${recColor(p.recommendation)};">${p.recommendation || ''}</div>
+            </div>
+            <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''} · ${p.signal_type || ''}</div>
+            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5;">🧠 ${p.ai_read}</div>` : ''}
+            <div style="font-size:12px;color:#94a3b8;margin-top:8px;">
+              Entry ${fmtMoney(p.entry_low)}–${fmtMoney(p.entry_high)} ·
+              Target ${fmtMoney(p.target_low)}–${fmtMoney(p.target_high)} ·
+              Stop ${fmtMoney(p.stop_loss)}
+            </div>
+          </div>`;
+          })
+          .join('')}
+        ${freshSignalPicks.length > 8 ? `<div style="font-size:12px;color:#94a3b8;text-align:center;margin-top:6px;">+${freshSignalPicks.length - 8} more on the dashboard</div>` : ''}
       </td></tr>`
           : ''
       }
@@ -356,7 +462,18 @@ function buildHtml({ data, recipientEmail }) {
 }
 
 function buildText({ data, recipientEmail }) {
-  const { recChanges, newPicks } = data;
+  const {
+    recChanges,
+    newPicks: allNewPicks,
+    freshSignalPicks: allFreshSignalPicks,
+    emailToUserId,
+  } = data;
+  const recipientUserId = emailToUserId?.[recipientEmail?.toLowerCase()] || null;
+  const ownedBy = (row) =>
+    !recipientUserId || !row.user_id || row.user_id === recipientUserId;
+  const newPicks = (allNewPicks || []).filter(ownedBy);
+  const freshSignalPicks = (allFreshSignalPicks || []).filter(ownedBy);
+
   const unsubUrl = makeUnsubscribeUrl(APP_URL, recipientEmail);
   const lines = [];
   lines.push(`Stock Chatter — Pre-market digest · ${shortET()}`);
@@ -369,9 +486,18 @@ function buildText({ data, recipientEmail }) {
     lines.push('');
   }
   if (newPicks.length > 0) {
-    lines.push(`${newPicks.length} new picks overnight:`);
+    lines.push(`${newPicks.length} brand-new ${newPicks.length === 1 ? 'pick' : 'picks'} overnight:`);
     for (const p of newPicks.slice(0, 8)) {
       lines.push(`  - ${p.ticker} (${p.recommendation || '—'}) — ${p.ai_read || p.signal_type || ''}`);
+    }
+    lines.push('');
+  }
+  if (freshSignalPicks.length > 0) {
+    lines.push(`${freshSignalPicks.length} fresh ${freshSignalPicks.length === 1 ? 'signal' : 'signals'} on existing picks:`);
+    for (const p of freshSignalPicks.slice(0, 8)) {
+      const hist = Array.isArray(p.signal_history) ? p.signal_history : [];
+      const cnt = hist.length;
+      lines.push(`  - ${p.ticker} (${p.recommendation || '—'}) — ${p.ai_read || p.signal_type || ''}${cnt > 1 ? ` [${cnt}× total flags]` : ''}`);
     }
     lines.push('');
   }
