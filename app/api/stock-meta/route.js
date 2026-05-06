@@ -19,10 +19,39 @@ import { NextResponse } from 'next/server';
 // ─────────────────────────────────────────────────────────────────────────────
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36';
-const MAX_TICKERS = 200;     // safety cap to prevent abuse
+const MAX_TICKERS = 100;     // safety cap to prevent abuse (was 200; lowered after Yahoo
+                             // EMFILE incident on 2026-05-06 where a large batch + 3 sub-fetches
+                             // per ticker exhausted the serverless function's file descriptors)
 const ANALYST_TTL  = 3600;   //  1h — analyst consensus doesn't move often
 const EARNINGS_TTL = 21600;  //  6h — earnings dates rarely change
 const HISTORY_TTL  = 900;    // 15m — daily close updates at market close
+
+// Cap concurrent OUTBOUND fetches to Yahoo Finance per invocation.
+// Each ticker fans out into 3 parallel sub-fetches; without a limiter, a 100-ticker
+// batch fires 300 sockets at once and blows past Vercel's per-function FD limit
+// (~1024). 8 keeps us well under the limit while still being plenty parallel —
+// Yahoo's response time is the bottleneck, not our concurrency.
+const FETCH_CONCURRENCY = 8;
+
+// Tiny semaphore: returns a function `run(fn)` that queues `fn` so at most
+// `limit` are in-flight at once. No external deps — just a counter and queue.
+function createLimiter(limit) {
+  let active = 0;
+  const queue = [];
+  const next = () => {
+    if (active >= limit || queue.length === 0) return;
+    active++;
+    const { fn, resolve, reject } = queue.shift();
+    Promise.resolve()
+      .then(fn)
+      .then(resolve, reject)
+      .finally(() => { active--; next(); });
+  };
+  return (fn) => new Promise((resolve, reject) => {
+    queue.push({ fn, resolve, reject });
+    next();
+  });
+}
 
 // ── Analyst ─────────────────────────────────────────────────────────────────
 async function fetchAnalyst(ticker) {
@@ -250,13 +279,20 @@ function parseTickers(input) {
 }
 
 async function buildMetaResponse(tickers) {
-  // For each ticker, run the three sub-fetches in parallel.
+  // Single shared limiter so all sub-fetches (3 per ticker) compete for the
+  // same FETCH_CONCURRENCY slots. Without this, a big batch fans out hundreds
+  // of simultaneous Yahoo calls and exhausts file descriptors → 504s.
+  const limit = createLimiter(FETCH_CONCURRENCY);
+
+  // For each ticker, run the three sub-fetches in parallel — but each one is
+  // queued through the limiter so we never have more than FETCH_CONCURRENCY
+  // outbound sockets open at any moment.
   // Promise.allSettled so a single bad ticker can't poison the whole batch.
   const results = await Promise.all(tickers.map(async (ticker) => {
     const [analystR, earningsR, historyR] = await Promise.allSettled([
-      fetchAnalyst(ticker),
-      fetchEarnings(ticker),
-      fetchHistory(ticker),
+      limit(() => fetchAnalyst(ticker)),
+      limit(() => fetchEarnings(ticker)),
+      limit(() => fetchHistory(ticker)),
     ]);
     return [ticker, {
       analyst:  analystR.status  === 'fulfilled' ? analystR.value  : emptyAnalyst(ticker),
