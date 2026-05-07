@@ -32,12 +32,23 @@ export async function GET() {
     return NextResponse.json({ error: 'Failed to load source health' }, { status: 500 });
   }
 
-  const rows = data || [];
+  const allRows = data || [];
+  // Retired sources — flagged via last_error_code starting with `RETIRED_`.
+  // The row stays in source_health for audit/history, but it's hidden from
+  // the admin banner so we don't pretend a deliberately-disabled source
+  // is "broken." When the replacement ships, the new source's row will
+  // start populating its own status independently.
+  const isRetired = (r) =>
+    typeof r.last_error_code === 'string' && r.last_error_code.startsWith('RETIRED_');
+  const rows = allRows.filter((r) => !isRetired(r));
+  const retired = allRows.filter(isRetired);
+
   const anyDown = rows.some((r) => r.status === 'down');
   const anyDegraded = rows.some((r) => r.status === 'degraded');
 
   return NextResponse.json({
     sources: rows,
+    retired, // surfaced separately so admin pages can document them
     anyDegraded,
     anyDown,
     summary: anyDown
