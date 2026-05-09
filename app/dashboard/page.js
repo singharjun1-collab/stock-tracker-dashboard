@@ -4995,7 +4995,9 @@ export default function Dashboard() {
           <input
             type="text"
             className="search-input"
-            placeholder="Search by ticker or company name..."
+            placeholder="Filter your AI watchlist (ticker or company name)…"
+            title="Filters the stocks already surfaced by Stock Chatter — does NOT search every US-listed stock."
+            aria-label="Filter the stocks Stock Chatter has already surfaced"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -5030,6 +5032,22 @@ export default function Dashboard() {
           </button>
         )}
       </div>
+
+      {/* Search-bar helper: clarifies that the search filters the AI
+          watchlist only, not the entire US market. Stays subtle on
+          desktop, wraps cleanly on mobile. */}
+      <p
+        className="search-bar-hint"
+        style={{
+          margin: '4px 16px 8px',
+          fontSize: 12,
+          color: '#7a9bc0',
+          lineHeight: 1.4,
+          textAlign: 'left',
+        }}
+      >
+        {"ℹ️"} Search filters this watchlist only — it doesn't search every US-listed stock. To pull in a new ticker, adjust your <strong style={{ color: '#9fc3e6' }}>AI engine settings</strong> or wait for the next daily scan.
+      </p>
 
       {/* Sticky tabs wrapper — tabs stay pinned to top as user scrolls */}
       <div id="tabs-anchor" />
