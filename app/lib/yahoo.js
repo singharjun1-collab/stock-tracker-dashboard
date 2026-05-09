@@ -187,3 +187,95 @@ export async function fetchYahooQuotes(tickers, { staggerMs = 250 } = {}) {
 
   return { results, ok_count: okCount, fail_count: failCount, abort_reason: abortReason };
 }
+
+// ─────────────────────────────────────────────────────────────
+// Yahoo CLASSIFICATION (sector / industry) for a ticker.
+// ─────────────────────────────────────────────────────────────
+// Used by /api/classify-sectors to populate the new ticker_meta table that
+// backs the Sector Pulse feature. Independent of price refresh — runs once
+// nightly and only re-classifies stale rows (>30 days) or unclassified
+// tickers, so it adds <1 req/sec of load to Yahoo even with hundreds of
+// tickers.
+//
+// Endpoint choice: we use Yahoo's `v1/finance/search` rather than
+// `v10/finance/quoteSummary?modules=summaryProfile`. The search endpoint:
+//   • does NOT require a `crumb` cookie (quoteSummary increasingly does)
+//   • returns sector + industry directly on the top quote result
+//   • is what most open-source classifiers use because it's stable
+const YAHOO_SEARCH = 'https://query2.finance.yahoo.com/v1/finance/search';
+
+/**
+ * Fetch sector/industry classification for a single ticker.
+ * Returns { ok: true, ticker, sector, industry, display_name }
+ *      or { ok: false, ticker, error_code, error_message }.
+ *
+ * Retries up to 3x with exponential backoff on 429 (same backoff matrix
+ * as fetchChart so behaviour is consistent with the price fetcher).
+ */
+export async function fetchYahooClassification(ticker) {
+  const url = `${YAHOO_SEARCH}?q=${encodeURIComponent(ticker)}&quotesCount=1&newsCount=0&enableFuzzyQuery=false`;
+  const backoffs = [0, 2000, 8000];
+
+  for (const wait of backoffs) {
+    if (wait > 0) await sleep(wait);
+    try {
+      const res = await fetch(url, {
+        headers: { 'User-Agent': UA, Accept: 'application/json' },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (res.status === 429) continue;
+      if (!res.ok) {
+        return { ok: false, ticker, error_code: String(res.status), error_message: `HTTP ${res.status}` };
+      }
+      const json = await res.json();
+      const quote = json?.quotes?.find(
+        (q) => q?.symbol && q.symbol.toUpperCase() === ticker.toUpperCase()
+      ) || json?.quotes?.[0];
+
+      if (!quote || quote.quoteType !== 'EQUITY' && quote.quoteType !== 'ETF') {
+        return { ok: false, ticker, error_code: 'NOT_EQUITY', error_message: `quoteType=${quote?.quoteType ?? 'none'}` };
+      }
+
+      // ETFs don't have sector/industry; that's expected. We still record
+      // them so we don't keep retrying — we just store nulls, which the
+      // Sector Pulse UI treats as "Other" / unclassified.
+      const sector = quote.sectorDisp || quote.sector || null;
+      const industry = quote.industryDisp || quote.industry || null;
+      const display_name = quote.longname || quote.shortname || null;
+
+      return { ok: true, ticker, sector, industry, display_name };
+    } catch (e) {
+      if (wait === backoffs[backoffs.length - 1]) {
+        return { ok: false, ticker, error_code: 'FETCH', error_message: e?.message || String(e) };
+      }
+    }
+  }
+  return { ok: false, ticker, error_code: 'RATE_LIMITED', error_message: '429 after retries' };
+}
+
+/**
+ * Batch classify with the same stagger + circuit breaker as fetchYahooQuotes.
+ * 400ms between calls (slightly slower than price fetch — no urgency, runs
+ * once nightly).
+ */
+export async function fetchYahooClassifications(tickers, { staggerMs = 400 } = {}) {
+  const results = [];
+  let okCount = 0;
+  let failCount = 0;
+  let abortReason = null;
+
+  for (let i = 0; i < tickers.length; i++) {
+    const t = tickers[i];
+    if (i > 0) await sleep(staggerMs);
+    const r = await fetchYahooClassification(t);
+    results.push(r);
+    if (r.ok) okCount++; else failCount++;
+
+    if (i === 9 && failCount / 10 >= 0.2) {
+      abortReason = `Yahoo classification failure rate ${failCount}/10 — aborting batch`;
+      break;
+    }
+  }
+
+  return { results, ok_count: okCount, fail_count: failCount, abort_reason: abortReason };
+}

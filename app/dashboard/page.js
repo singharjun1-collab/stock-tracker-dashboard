@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo, createContext
 import { useRouter } from 'next/navigation';
 import '../globals.css';
 import { SIGNAL_WEIGHTS, SIGNAL_BUCKETS, bucketFor } from '../lib/signalStrength';
+import SectorPulseBar from '../components/SectorPulseBar';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock meta batch fetching.
@@ -707,7 +708,10 @@ function AlertCard({
   alert, index, sectionPrefix, watchlist, sharedPrices,
   forceCompact, forceCompactNonce,
   onToggleWatchlist, onRate, onDismiss, onSaveNote,
-  userNote, openPosition, onOpenBuyModal, onOpenSellModal
+  userNote, openPosition, onOpenBuyModal, onOpenSellModal,
+  // Optional ticker meta for the new Sector Pulse feature. Always falls back
+  // to null so legacy callers that don't pass it keep working unchanged.
+  tickerMeta
 }) {
   const [compact, setCompact] = useState(false);
   const [noteEditing, setNoteEditing] = useState(false);
@@ -947,7 +951,7 @@ function AlertCard({
         <span className="ac-since-lbl">since alert<br/>{daysLabel}</span>
       </div>
 
-      {/* BADGES — source, market cap, volume spike */}
+      {/* BADGES — source, market cap, volume spike, sector */}
       <div className="ac-badges">
         <span className={`ac-b ac-b-source ${sourceMeta.cls}${wsbArrow}`}>
           {sourceMeta.emoji} {sourceMeta.label}
@@ -956,6 +960,14 @@ function AlertCard({
         {volSpike && (
           <span className="ac-b ac-b-vol">
             🔥 {parseFloat(alert.volume_ratio).toFixed(1)}× vol
+          </span>
+        )}
+        {/* Sector chip — only shown when ticker_meta has been classified.
+            Hidden gracefully on unclassified tickers; doesn't disturb the
+            existing badge row when absent. */}
+        {tickerMeta?.industry && (
+          <span className="ac-sector-chip" title={`${tickerMeta.industry}${tickerMeta.sector ? ' · ' + tickerMeta.sector : ''}`}>
+            {tickerMeta.industry}
           </span>
         )}
       </div>
@@ -2125,6 +2137,9 @@ function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
 function StockCardModal({
   ticker, alerts, prices, watchlist, userNote, openPosition, onClose,
   onToggleWatchlist, onRate, onDismiss, onSaveNote, onOpenBuyModal, onOpenSellModal,
+  // Optional. When undefined (legacy callers), the AlertCard simply hides
+  // its sector chip — same fallback the main grid uses for unclassified rows.
+  tickerMeta,
 }) {
   // Close on Escape key.
   useEffect(() => {
@@ -2170,6 +2185,7 @@ function StockCardModal({
               openPosition={openPosition}
               onOpenBuyModal={onOpenBuyModal}
               onOpenSellModal={onOpenSellModal}
+              tickerMeta={tickerMeta}
             />
           ) : (
             <div className="card-modal-empty">
@@ -4058,6 +4074,15 @@ export default function Dashboard() {
   }, [kebabOpen]);
   // Per-user ticker notes, keyed by ticker symbol. Loaded alongside alerts.
   const [userNotes, setUserNotes] = useState({});
+  // ─── Sector Pulse (added 2026-05-08) ──────────────────────────────
+  // tickerMetaMap: { TICKER: { sector, industry, display_name } } populated
+  //   by /api/ticker-meta. Drives the sector chip on each card AND the
+  //   per-sector card-count shown in the Sector Pulse row.
+  // sectorFilter: 'ALL' (default) or the industry name to filter by. Wired
+  //   into applyAllFilters as an additional, optional filter step. Existing
+  //   filter behaviour is unchanged when sectorFilter === 'ALL'.
+  const [tickerMetaMap, setTickerMetaMap] = useState({});
+  const [sectorFilter, setSectorFilter] = useState('ALL');
   const router = useRouter();
 
   useEffect(() => {
@@ -4137,6 +4162,21 @@ export default function Dashboard() {
     fetch('/api/settings')
       .then(res => res.ok ? res.json() : null)
       .then(data => { if (data?.settings) setAISettings(data.settings); })
+      .catch(() => {});
+
+    // Fetch ticker_meta lookup ({ TICKER: { sector, industry, display_name } })
+    // for the new Sector Pulse feature. Optional — if the endpoint 404s or
+    // ticker_meta is empty, the dashboard renders identically to before.
+    fetch('/api/ticker-meta')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (!data?.items) return;
+        const map = {};
+        for (const m of data.items) {
+          if (m.ticker) map[String(m.ticker).toUpperCase()] = m;
+        }
+        setTickerMetaMap(map);
+      })
       .catch(() => {});
   }, [router]);
 
@@ -4495,8 +4535,18 @@ export default function Dashboard() {
       });
     }
 
+    // Sector filter (added 2026-05-08). Only narrows when the user has picked
+    // a specific sector in the new Sector Pulse bar. ALL is the default and
+    // is a no-op so all existing card flows behave identically.
+    if (sectorFilter !== 'ALL') {
+      filtered = filtered.filter(a => {
+        const meta = tickerMetaMap[String(a.ticker).toUpperCase()];
+        return meta && meta.industry === sectorFilter;
+      });
+    }
+
     return filtered;
-  }, [recFilter, searchQuery, mcapRange]);
+  }, [recFilter, searchQuery, mcapRange, sectorFilter, tickerMetaMap]);
 
   // Dismissed rows drop out of the normal tabs (they reappear in the Archive section).
   const notDismissed = (a) => !a.dismissed_at;
@@ -4967,6 +5017,18 @@ export default function Dashboard() {
         />
       )}
 
+      {/* SECTOR PULSE BAR (added 2026-05-08; admin-only during soft launch).
+          Self-contained: returns null if /api/sector-pulse is empty, errors,
+          or the user isn't admin. Existing layout is unchanged when hidden. */}
+      {showRecFilter && (
+        <SectorPulseBar
+          enabled={profile?.is_admin === true}
+          selected={sectorFilter}
+          onSelect={setSectorFilter}
+          tickerMeta={tickerMetaMap}
+        />
+      )}
+
       {/* SOURCE HEALTH BANNER - admin-only; silently no-ops for everyone else.
           Flags degraded/down scan sources (Reddit, Yahoo, etc.) so we know
           when the daily scan is running blind. */}
@@ -5204,6 +5266,7 @@ export default function Dashboard() {
                 openPosition={openTradeFor(alert.ticker)}
                 onOpenBuyModal={handleOpenBuyModal}
                 onOpenSellModal={handleOpenSellModal}
+                tickerMeta={tickerMetaMap[String(alert.ticker).toUpperCase()] || null}
               />
             )) : (
               <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem' }}>
@@ -5249,6 +5312,7 @@ export default function Dashboard() {
           onSaveNote={handleSaveNote}
           onOpenBuyModal={handleOpenBuyModal}
           onOpenSellModal={handleOpenSellModal}
+          tickerMeta={tickerMetaMap[String(cardModalTicker).toUpperCase()] || null}
         />
       )}
 

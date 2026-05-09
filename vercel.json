@@ -14,6 +14,14 @@
     {
       "path": "/api/send-trial-reminders",
       "schedule": "0 14 * * *"
+    },
+    {
+      "path": "/api/classify-sectors",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/sector-pulse-refresh",
+      "schedule": "0 8 * * *"
     }
   ]
 }
