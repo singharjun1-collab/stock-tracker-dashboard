@@ -5017,12 +5017,14 @@ export default function Dashboard() {
         />
       )}
 
-      {/* SECTOR PULSE BAR (added 2026-05-08; admin-only during soft launch).
-          Self-contained: returns null if /api/sector-pulse is empty, errors,
-          or the user isn't admin. Existing layout is unchanged when hidden. */}
+      {/* SECTOR PULSE BAR (rolled out to all approved users 2026-05-09).
+          Self-contained: returns null if /api/sector-pulse is empty or errors.
+          Existing layout is unchanged when hidden. The dashboard route is
+          already gated on profile.status === 'approved' upstream, so any user
+          who reaches this point is allowed to see Sector Pulse. */}
       {showRecFilter && (
         <SectorPulseBar
-          enabled={profile?.is_admin === true}
+          enabled={!!profile}
           selected={sectorFilter}
           onSelect={setSectorFilter}
           tickerMeta={tickerMetaMap}
