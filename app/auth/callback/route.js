@@ -3,6 +3,24 @@ import { createServerClient } from '@supabase/ssr';
 import { sendNewSignupAlert, sendTrialWelcomeEmail } from '@/app/lib/email';
 import { createSupabaseAdminClient } from '@/app/lib/supabase/admin';
 
+// Helper: best-effort add a freshly-signed-up user to the
+// alert_distribution_list so they automatically get the daily
+// pre-market digest. Existing rows (same email) are left untouched
+// thanks to the unique constraint on email — we just swallow 23505.
+async function autoSubscribeNewUser(admin, { email, name }) {
+  if (!email) return;
+  try {
+    const { error } = await admin
+      .from('alert_distribution_list')
+      .insert({ email: email.toLowerCase(), name: name || null });
+    if (error && error.code !== '23505') {
+      console.error('[auth/callback] auto-subscribe failed:', error);
+    }
+  } catch (e) {
+    console.error('[auth/callback] auto-subscribe threw:', e);
+  }
+}
+
 // States that grant access via Lemon Squeezy. Mirror webhook APPROVED_STATES.
 const PAID_STATES = new Set(['active', 'on_trial', 'past_due']);
 
@@ -152,22 +170,42 @@ export async function GET(request) {
     }
   }
 
-  // Legacy path: if for any reason this user is still 'pending' (e.g. existing
-  // pending user that AJ hasn't approved yet, or the trial auto-approve threw
-  // an error above), fall through to the original admin-alert flow.
-  if (profile && profile.status === 'pending' && !profile.signup_notified_at) {
+  // ── ADMIN ALERT + AUTO-SUBSCRIBE ON FRESH SIGNUP ────────────────
+  // We always want the admin to know when a new person signs up — even
+  // if they were auto-approved into the 7-day trial above. Previously
+  // this alert was only sent on the legacy "still pending" path, which
+  // meant fresh trial signups were silent to the admin.
+  //
+  // We also auto-add the new user's email to alert_distribution_list
+  // so they receive the daily 6:30 AM ET pre-market digest from day 1.
+  // Both happen inside the same `signup_notified_at IS NULL` guard so
+  // each new user only fires this once.
+  if (profile && !profile.signup_notified_at) {
     try {
       await sendNewSignupAlert({
         userEmail: profile.email || user.email,
         userName: profile.display_name || user.user_metadata?.full_name,
       });
-      await supabase
+    } catch (e) {
+      // Don't block sign-in if the alert fails.
+      console.error('[auth/callback] signup alert failed:', e);
+    }
+
+    // Auto-subscribe to the daily digest. Idempotent (23505 is ignored).
+    await autoSubscribeNewUser(admin, {
+      email: profile.email || user.email,
+      name: profile.display_name || user.user_metadata?.full_name,
+    });
+
+    // Mark notified regardless of whether the email succeeded — we've
+    // tried, and we don't want to spam the admin every login.
+    try {
+      await admin
         .from('profiles')
         .update({ signup_notified_at: new Date().toISOString() })
         .eq('id', user.id);
     } catch (e) {
-      // Don't block sign-in if the alert fails.
-      console.error('[auth/callback] signup alert failed:', e);
+      console.error('[auth/callback] mark notified failed:', e);
     }
   }
 

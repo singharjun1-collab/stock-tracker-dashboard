@@ -3398,7 +3398,13 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
               <span className="quicktable-count">{rows.length} picks</span>
             </h2>
             {!collapsed && (
-              <p className="quicktable-hint">Click any column header to sort. Click a ticker or company name to jump to its card.</p>
+              <p className="quicktable-hint">
+                Click any column header to sort. Click a ticker or company name to jump to its card.
+                <br />
+                <span style={{ color: '#7a9bc0', fontSize: 12 }}>
+                  {"\u{1F50D}"} Search filters this watchlist only — it does <strong>not</strong> search every US-listed stock. To surface a new ticker, adjust your AI engine settings or wait for the next daily scan.
+                </span>
+              </p>
             )}
           </div>
         </div>
@@ -3408,7 +3414,9 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
               <span className="qt-search-icon">{"\u{1F50D}"}</span>
               <input
                 type="text"
-                placeholder="Filter ticker, company, signal..."
+                placeholder="Filter surfaced picks (ticker, company, signal)…"
+                title="Searches only stocks already surfaced by the AI scan — not every US-listed stock."
+                aria-label="Filter your surfaced picks by ticker, company name or signal type"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
@@ -3830,6 +3838,28 @@ function UsersAdminTab({ currentUserId }) {
       <td>
         <span className={`admin-status admin-status-${u.status}`}>{u.status}</span>
       </td>
+      <td>
+        {/* Per-row "Subscribed to alerts" toggle. Maps to a row in
+            alert_distribution_list keyed by the user's email. New
+            signups are auto-subscribed in /auth/callback. */}
+        <label
+          className="admin-sub-toggle"
+          title={u.is_subscribed
+            ? 'Receiving the daily 6:30 AM ET pre-market digest. Uncheck to unsubscribe.'
+            : 'Not on the daily digest list. Check to subscribe.'}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: busyId === u.id ? 'wait' : 'pointer' }}
+        >
+          <input
+            type="checkbox"
+            checked={!!u.is_subscribed}
+            disabled={busyId === u.id}
+            onChange={(e) => updateUser(u.id, { is_subscribed: e.target.checked })}
+          />
+          <span style={{ fontSize: 12, color: u.is_subscribed ? '#4fc3f7' : '#7a9bc0' }}>
+            {u.is_subscribed ? 'Subscribed' : 'Not subscribed'}
+          </span>
+        </label>
+      </td>
       <td>{new Date(u.created_at).toLocaleDateString()}</td>
       <td>
         <div className="admin-actions">
@@ -3856,17 +3886,32 @@ function UsersAdminTab({ currentUserId }) {
     </tr>
   );
 
+  // Shared header row used by all three sub-tables. Adding "Alerts"
+  // here once means the column lines up across pending / approved /
+  // disabled even on narrow mobile screens.
+  const tableHead = (
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>Status</th>
+        <th>Alerts</th>
+        <th>Joined</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+  );
+
   return (
     <div className="admin-users-tab">
       <p className="section-hint" style={{ marginLeft: 0, marginTop: 0 }}>
-        Approve new signups, disable access, or promote others to admin. You are the initial admin.
+        Approve new signups, disable access, or promote others to admin. New users are auto-added to the daily pre-market alert list — toggle <strong>Alerts</strong> to subscribe or unsubscribe anyone.
       </p>
 
       {pending.length > 0 && (
         <>
           <h3 className="admin-section-title">{"\u{23F3}"} Pending approval ({pending.length})</h3>
           <div className="pt-table-wrap"><table className="pt-table admin-table">
-            <thead><tr><th>User</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            {tableHead}
             <tbody>{pending.map(renderRow)}</tbody>
           </table></div>
         </>
@@ -3874,7 +3919,7 @@ function UsersAdminTab({ currentUserId }) {
 
       <h3 className="admin-section-title">{"\u{2705}"} Approved ({approved.length})</h3>
       <div className="pt-table-wrap"><table className="pt-table admin-table">
-        <thead><tr><th>User</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+        {tableHead}
         <tbody>{approved.map(renderRow)}</tbody>
       </table></div>
 
@@ -3882,7 +3927,7 @@ function UsersAdminTab({ currentUserId }) {
         <>
           <h3 className="admin-section-title">{"\u{1F6AB}"} Disabled ({disabled.length})</h3>
           <div className="pt-table-wrap"><table className="pt-table admin-table">
-            <thead><tr><th>User</th><th>Status</th><th>Joined</th><th>Actions</th></tr></thead>
+            {tableHead}
             <tbody>{disabled.map(renderRow)}</tbody>
           </table></div>
         </>

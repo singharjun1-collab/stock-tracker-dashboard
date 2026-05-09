@@ -1,0 +1,67 @@
+# Stock Chatter
+
+> Stock Chatter is an AI-first stock signal service that fuses 10
+> leading-indicator sources (SEC 8-K filings, FDA catalysts, pre-market
+> movers, Reddit chatter, prediction markets and more) into a daily
+> watchlist with a clear BUY / HOLD / TRIM / EXIT / SELL recommendation
+> plus entry, target and stop on every pick.
+
+Stock Chatter helps non-professional investors catch market-moving
+events before they show up in price. It is delivered as a mobile-first
+web dashboard plus a single pre-market email digest at 6:30 AM ET on
+US trading days.
+
+## Pricing
+
+- AUD $199 / year (≈ AUD $16.58 / month)
+- 7-day free trial — no credit card required
+- Cancel anytime
+- Sold via Lemon Squeezy
+
+## Key features
+
+- Daily AI watchlist with 5-state recommendation engine (BUY, HOLD,
+  TRIM, EXIT, SELL)
+- Entry, target and stop price on every pick
+- Pre-market email digest at 6:30 AM ET, weekdays
+- 10 leading-indicator signal sources fused by an AI scoring engine
+- Mobile-first dashboard (Robinhood-style polish)
+- Paper-trading and personal watchlist
+- Per-user market-cap range and other AI engine settings
+
+## Signal sources
+
+Stock Chatter blends ten data streams:
+
+1. SEC 8-K filings (material corporate events)
+2. FDA biotech catalyst calendar (PDUFA dates, AdComm meetings)
+3. Pre-market movers (Yahoo Finance)
+4. Reddit retail chatter (ApeWisdom)
+5. Prediction markets (Kalshi, Polymarket where applicable)
+6. Insider buying (Form 4 filings)
+7. Analyst rating changes
+8. Earnings surprises
+9. Sector pulse (relative strength)
+10. News + sentiment
+
+## What Stock Chatter is NOT
+
+- Not financial advice. You can lose money.
+- Not a brokerage — Stock Chatter does not place trades.
+- Not a high-frequency trading tool. The signal frequency is daily.
+- Not a black box — every pick shows the source signal that triggered it.
+
+## URLs
+
+- Home: https://stocktracker.getfamilyfinance.com/
+- Sign in / start trial: https://stocktracker.getfamilyfinance.com/login
+- Privacy: https://stocktracker.getfamilyfinance.com/privacy
+- Terms: https://stocktracker.getfamilyfinance.com/terms
+
+## About
+
+Stock Chatter is part of the GetFamilyFinance family of products —
+small, sharp finance tools built for non-professional investors who
+want institutional-grade data without the noise.
+
+Contact: singh.arjun1@gmail.com
