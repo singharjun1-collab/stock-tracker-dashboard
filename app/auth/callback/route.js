@@ -21,6 +21,146 @@ async function autoSubscribeNewUser(admin, { email, name }) {
   }
 }
 
+// Helper: seed a default ai_settings row for a brand-new user so the
+// next per-user AI scan has a market_cap_range filter to work against.
+// Without this row the scan loop in daily-stock-tracker would still
+// process the user (it loops over all approved profiles), but every
+// candidate would fail the cap filter. 50M–50B is the broadest
+// reasonable default — they can narrow it later via the Settings UI.
+async function seedDefaultAiSettings(admin, userId) {
+  try {
+    const { error } = await admin
+      .from('ai_settings')
+      .upsert(
+        {
+          user_id: userId,
+          setting_key: 'market_cap_range',
+          setting_value: { min: 0.05, max: 50 },
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id,setting_key' }
+      );
+    if (error) {
+      console.error('[auth/callback] ai_settings seed failed:', error);
+    }
+  } catch (e) {
+    console.error('[auth/callback] ai_settings seed threw:', e);
+  }
+}
+
+// Helper: copy the most recent live picks (across all users) into the
+// new user's account so their dashboard isn't blank on first load.
+//
+// Why this exists: the daily-stock-tracker SKILL runs ~7x per weekday
+// and writes per-user rows to stock_alerts. A user who signs up between
+// runs (or over a weekend) sees an empty dashboard until the next scan
+// happens to include them. That's a brutal first impression.
+//
+// What we do: pull the freshest distinct tickers from the last 72 hours
+// (wide enough to catch Friday's picks for a Sunday signup), copy each
+// one into stock_alerts under the new user_id with status='new'. The
+// next scheduled scan will personalize from there based on their
+// ai_settings.
+//
+// Robustness:
+// - Inserts one row at a time so the trg_validate_pick_entry_price
+//   trigger rejecting a single ticker (entry-band drift > 15%) doesn't
+//   wipe the whole batch.
+// - All errors are caught and logged — signup must never block.
+async function seedNewUserAlerts(admin, userId) {
+  try {
+    const lookbackMs = 72 * 60 * 60 * 1000; // 72h covers a weekend signup
+    const { data: source, error: fetchErr } = await admin
+      .from('stock_alerts')
+      .select(
+        'ticker, company, alert_date, alert_reason, signal_type, price_at_alert, ' +
+        'recommendation, recommendation_reason, forecast_sell_date, source, market_cap, ' +
+        'entry_low, entry_high, target_low, target_high, stop_loss, ai_read, ' +
+        'volume_ratio, week52_low, week52_high, wsb_trend, ' +
+        'catalyst_date, catalyst_type, signal_history, created_at'
+      )
+      .in('status', ['new', 'active'])
+      .is('dismissed_at', null)
+      .gte('created_at', new Date(Date.now() - lookbackMs).toISOString())
+      .order('created_at', { ascending: false })
+      .limit(100);
+
+    if (fetchErr) {
+      console.error('[auth/callback] seed fetch failed:', fetchErr);
+      return;
+    }
+    if (!source || source.length === 0) {
+      console.log('[auth/callback] no recent picks available to seed new user');
+      return;
+    }
+
+    // Dedupe by ticker — keep the most recent row per symbol so a single
+    // ticker re-signaled multiple times in the window only counts once.
+    const byTicker = new Map();
+    for (const a of source) {
+      if (!byTicker.has(a.ticker)) byTicker.set(a.ticker, a);
+    }
+    const picks = Array.from(byTicker.values()).slice(0, 15);
+
+    const nowIso = new Date().toISOString();
+    let inserted = 0;
+    let skipped = 0;
+
+    for (const p of picks) {
+      const row = {
+        ticker: p.ticker,
+        company: p.company,
+        alert_date: nowIso.slice(0, 10), // today's date for the new user
+        alert_reason: p.alert_reason,
+        signal_type: p.signal_type,
+        price_at_alert: p.price_at_alert,
+        recommendation: p.recommendation || 'BUY',
+        recommendation_reason: p.recommendation_reason || '',
+        forecast_sell_date: p.forecast_sell_date,
+        source: p.source,
+        market_cap: p.market_cap,
+        entry_low: p.entry_low,
+        entry_high: p.entry_high,
+        target_low: p.target_low,
+        target_high: p.target_high,
+        stop_loss: p.stop_loss,
+        ai_read: p.ai_read,
+        volume_ratio: p.volume_ratio,
+        week52_low: p.week52_low,
+        week52_high: p.week52_high,
+        wsb_trend: p.wsb_trend,
+        catalyst_date: p.catalyst_date,
+        catalyst_type: p.catalyst_type,
+        signal_history: p.signal_history || [],
+        user_id: userId,
+        status: 'new',
+        created_at: nowIso,
+        last_resignal_at: nowIso,
+      };
+
+      const { error } = await admin.from('stock_alerts').insert(row);
+      if (error) {
+        // Most common failure: trg_validate_pick_entry_price rejected
+        // because the live price has drifted >15% from the entry band
+        // since the original alert. Skip this ticker and continue.
+        skipped++;
+        console.warn(
+          `[auth/callback] skipped seeding ${row.ticker} for user ${userId}:`,
+          error.message
+        );
+        continue;
+      }
+      inserted++;
+    }
+
+    console.log(
+      `[auth/callback] seeded ${inserted} alerts (${skipped} skipped) for new user ${userId}`
+    );
+  } catch (e) {
+    console.error('[auth/callback] seedNewUserAlerts threw:', e);
+  }
+}
+
 // States that grant access via Lemon Squeezy. Mirror webhook APPROVED_STATES.
 const PAID_STATES = new Set(['active', 'on_trial', 'past_due']);
 
@@ -149,6 +289,20 @@ export async function GET(request) {
     } catch (e) {
       console.error('[auth/callback] trial auto-approve failed:', e);
     }
+  }
+
+  // ── SEED FRESH SIGNUP'S DASHBOARD ────────────────────────────────
+  // Brand-new users need cards on day one. Without this, the first
+  // dashboard load is empty until the next scan run happens to include
+  // them — which on a weekend signup means waiting until Monday.
+  //
+  // Both calls are best-effort (errors logged, never thrown):
+  //   1. seedDefaultAiSettings — gives the next scan something to filter on.
+  //   2. seedNewUserAlerts     — copies the most recent ~12 picks across
+  //                              all users so cards populate immediately.
+  if (isFreshSignup) {
+    await seedDefaultAiSettings(admin, user.id);
+    await seedNewUserAlerts(admin, user.id);
   }
 
   // Send the trial welcome email exactly once for fresh auto-approved signups.
