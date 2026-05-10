@@ -716,6 +716,7 @@ function AlertCard({
   const [compact, setCompact] = useState(false);
   const [noteEditing, setNoteEditing] = useState(false);
   const [noteDraft, setNoteDraft] = useState(userNote || '');
+  const [sigHistOpen, setSigHistOpen] = useState(false);
 
   useEffect(() => { setNoteDraft(userNote || ''); }, [userNote]);
 
@@ -1051,22 +1052,61 @@ function AlertCard({
       <AnalystBadge ticker={alert.ticker} />
       <EarningsDate ticker={alert.ticker} />
 
-      {/* SIGNAL CHANGE */}
-      {alert.latest_signal_change && (
-        <div className="ac-sig-change">
-          <span>📢 Signal changed:</span>
-          <span className={`ac-mini-chip ${recClass(alert.latest_signal_change.old_recommendation)}`}>
-            {alert.latest_signal_change.old_recommendation}
-          </span>
-          →
-          <span className={`ac-mini-chip ${recClass(alert.latest_signal_change.new_recommendation)}`}>
-            {alert.latest_signal_change.new_recommendation}
-          </span>
-          <span className="ac-sig-date">
-            {new Date(alert.latest_signal_change.change_date || alert.latest_signal_change.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-          </span>
-        </div>
-      )}
+      {/* SIGNAL CHANGE — latest visible, expandable to last 5 */}
+      {alert.latest_signal_change && (() => {
+        const history = (alert.signal_change_history && alert.signal_change_history.length > 0)
+          ? alert.signal_change_history
+          : [alert.latest_signal_change];
+        const latest = history[0];
+        const older = history.slice(1, 5); // up to 4 older, total 5
+        const hasMore = older.length > 0;
+        const fmtDate = (sc) =>
+          new Date(sc.change_date || sc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return (
+          <div className={`ac-sig-change ${hasMore ? 'ac-sig-expandable' : ''} ${sigHistOpen ? 'is-open' : ''}`}>
+            <div
+              className="ac-sig-row ac-sig-latest"
+              onClick={hasMore ? () => setSigHistOpen(o => !o) : undefined}
+              role={hasMore ? 'button' : undefined}
+              tabIndex={hasMore ? 0 : undefined}
+              aria-expanded={hasMore ? sigHistOpen : undefined}
+            >
+              <span className="ac-sig-icon">📢</span>
+              <span className="ac-sig-label">Signal changed:</span>
+              <span className={`ac-mini-chip ${recClass(latest.old_recommendation)}`}>
+                {latest.old_recommendation}
+              </span>
+              <span className="ac-sig-arrow">→</span>
+              <span className={`ac-mini-chip ${recClass(latest.new_recommendation)}`}>
+                {latest.new_recommendation}
+              </span>
+              <span className="ac-sig-date">{fmtDate(latest)}</span>
+              {hasMore && (
+                <span className="ac-sig-chevron" aria-hidden="true">
+                  {sigHistOpen ? '▲' : '▼'}
+                </span>
+              )}
+            </div>
+            {hasMore && sigHistOpen && (
+              <div className="ac-sig-history">
+                <div className="ac-sig-history-title">Earlier signals</div>
+                {older.map((sc, i) => (
+                  <div key={sc.id || `${sc.alert_id}-${i}`} className="ac-sig-row ac-sig-prev">
+                    <span className={`ac-mini-chip ${recClass(sc.old_recommendation)}`}>
+                      {sc.old_recommendation}
+                    </span>
+                    <span className="ac-sig-arrow">→</span>
+                    <span className={`ac-mini-chip ${recClass(sc.new_recommendation)}`}>
+                      {sc.new_recommendation}
+                    </span>
+                    <span className="ac-sig-date">{fmtDate(sc)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* PAPER TRADE (watchlist only) */}
       {sectionPrefix === 'watchlist' && onOpenBuyModal && (

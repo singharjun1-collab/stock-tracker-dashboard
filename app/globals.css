@@ -3967,12 +3967,36 @@ footer span { color: #4fc3f7; }
   margin: 8px 0;
 }
 .ac-sig-change {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; flex-direction: column;
   font-size: 0.72rem; color: #7a9bc0;
   background: rgba(30,58,95,0.35);
   padding: 5px 9px; border-radius: 8px;
   margin: 8px 0;
+}
+.ac-sig-row {
+  display: flex; align-items: center; gap: 6px;
   flex-wrap: wrap;
+  min-height: 26px;
+}
+.ac-sig-expandable .ac-sig-latest {
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.ac-sig-expandable .ac-sig-latest:hover { color: #a9bdd3; }
+.ac-sig-expandable .ac-sig-latest:focus-visible {
+  outline: 2px solid rgba(34,197,94,0.55);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.ac-sig-icon { line-height: 1; }
+.ac-sig-label { white-space: nowrap; }
+.ac-sig-arrow { opacity: 0.7; }
+.ac-sig-chevron {
+  margin-left: 4px;
+  font-size: 0.62rem;
+  color: #7a9bc0;
+  transition: transform 0.15s ease;
 }
 .ac-mini-chip {
   padding: 1px 8px; border-radius: 999px;
@@ -3982,6 +4006,41 @@ footer span { color: #4fc3f7; }
 .ac-mini-chip.rec-hold { background: rgba(251,191,36,0.2); color: #fbbf24; }
 .ac-mini-chip.rec-sell { background: rgba(239,68,68,0.2); color: #ef4444; }
 .ac-sig-date { margin-left: auto; font-size: 0.68rem; }
+
+/* Expanded "earlier signals" history list */
+.ac-sig-history {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed rgba(122,155,192,0.25);
+  display: flex; flex-direction: column; gap: 4px;
+  animation: acSigFade 0.18s ease-out;
+}
+.ac-sig-history-title {
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #5b7a99;
+  margin-bottom: 2px;
+}
+.ac-sig-prev {
+  opacity: 0.85;
+  padding: 2px 0;
+}
+.ac-sig-prev .ac-mini-chip {
+  font-size: 0.62rem;
+  padding: 1px 7px;
+}
+@keyframes acSigFade {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Mobile tweak: bigger tap target and tighter chip layout */
+@media (max-width: 540px) {
+  .ac-sig-change { padding: 7px 10px; }
+  .ac-sig-row { min-height: 32px; }
+  .ac-sig-chevron { font-size: 0.7rem; }
+}
 
 /* ─── PERSONAL NOTE ─── */
 .ac-note {

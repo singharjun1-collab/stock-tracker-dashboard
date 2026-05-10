@@ -62,9 +62,16 @@ export async function GET() {
     const ratingsMap = {};
     (ratings || []).forEach(r => { ratingsMap[r.alert_id] = r.rating; });
 
+    // changesMap: latest single change per alert (legacy field)
+    // historyMap: up to 5 most recent changes per alert (newest first)
     const changesMap = {};
+    const historyMap = {};
     signalChanges.forEach(sc => {
       if (!changesMap[sc.alert_id]) changesMap[sc.alert_id] = sc;
+      if (!historyMap[sc.alert_id]) historyMap[sc.alert_id] = [];
+      if (historyMap[sc.alert_id].length < 5) {
+        historyMap[sc.alert_id].push(sc);
+      }
     });
 
     const activityIndex = buildActivityIndex(alerts || [], signalChanges);
@@ -80,6 +87,7 @@ export async function GET() {
         forecast_sell_date: alert.forecast_sell_date || null,
         user_rating: ratingsMap[alert.id] || null,
         latest_signal_change: changesMap[alert.id] || null,
+        signal_change_history: historyMap[alert.id] || [],
         prices: prices
           .filter(p => p.alert_id === alert.id)
           .map(p => ({
