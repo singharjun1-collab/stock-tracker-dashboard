@@ -4823,34 +4823,15 @@ export default function Dashboard() {
         </div>
         <div className="header-tools">
           {/* ─── ASK GEMINI AI ───
-              Quick external link to Google Gemini. Opens in a new tab so it
-              never disrupts an in-progress dashboard session. */}
-          <a
-            href="https://gemini.google.com/gem-labs/1Ucp1CKUKNvlKbW49PgoY0rWAyj8_uuJp"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-tool-btn gemini-btn"
-            title="Ask Gemini AI (opens in a new tab)"
-            aria-label="Ask Gemini AI"
-          >
-            <span className="gemini-btn-ic" aria-hidden="true">{"\u2728"}</span>
-            <span className="gemini-btn-label">Ask Gemini</span>
-          </a>
+              REMOVED 2026-05-11 \u2014 Ask Gemini button was retired from the
+              header to declutter. Surge Scout was moved into the kebab
+              menu under a "Deeper Research" section (see below). */}
 
           {/* ─── THE SURGE SCOUT ───
               Quick external link to a specialized Gemini gem tuned for
               spotting pre-surge momentum. Opens in a new tab. */}
-          <a
-            href="https://gemini.google.com/gem/1W9hF1pMpn8nE2mWzgix83jK6OC6PAkn9?usp=sharing"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="header-tool-btn scout-btn"
-            title="The Surge Scout (opens in a new tab)"
-            aria-label="The Surge Scout"
-          >
-            <span className="scout-btn-ic" aria-hidden="true">{"\u{1F680}"}</span>
-            <span className="scout-btn-label">The Surge Scout</span>
-          </a>
+          {/* Surge Scout has been moved into the kebab dropdown
+              (Deeper Research section). Nothing renders here anymore. */}
 
           {/* ─── MORE MENU (kebab) ───
               Single entry point for less-frequent destinations. Keeps the
@@ -4923,6 +4904,22 @@ export default function Dashboard() {
                   <span className="kebab-ic">{"\u{1F4CA}"}</span>
                   <span className="kebab-label">Analytics</span>
                 </button>
+                {/* ─── DEEPER RESEARCH ───
+                    External Gemini-powered research tools live here so the
+                    header stays clean. Each link opens in a new tab so an
+                    in-progress dashboard session is never disrupted. */}
+                <div className="kebab-divider" />
+                <div className="kebab-section-label">Deeper Research</div>
+                <a
+                  href="https://gemini.google.com/gem/1W9hF1pMpn8nE2mWzgix83jK6OC6PAkn9?usp=sharing"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="kebab-item"
+                  onClick={() => setKebabOpen(false)}
+                >
+                  <span className="kebab-ic">{"\u{1F680}"}</span>
+                  <span className="kebab-label">The Surge Scout</span>
+                </a>
                 <div className="kebab-divider" />
                 <button
                   className={`kebab-item${showAISettings ? ' active' : ''}`}
