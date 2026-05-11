@@ -623,19 +623,18 @@ function SparklineChart({ prices, canvasId }) {
 
 // ── Rating Buttons Component ──
 function RatingButtons({ alertId, currentRating, onRate }) {
+  // Single "Not for me" action. Tapping 👎 marks the pick as a bad one
+  // (writes to user_ratings) AND dismisses it from the user's feed in
+  // one gesture. The dismiss is handled inside the parent's handleRate.
+  // We dropped the thumbs-up because users already express positive
+  // intent by tapping "+ Track" on a card — adding a stock IS the upvote.
   return (
     <div className="rating-buttons">
       <button
-        className={`rating-btn rating-up ${currentRating === 'up' ? 'active' : ''}`}
-        onClick={() => onRate(alertId, currentRating === 'up' ? null : 'up')}
-        title="Good pick"
-      >
-        {"\u{1F44D}"}
-      </button>
-      <button
         className={`rating-btn rating-down ${currentRating === 'down' ? 'active' : ''}`}
         onClick={() => onRate(alertId, currentRating === 'down' ? null : 'down')}
-        title="Bad pick"
+        title="Not for me — hide this card and tell the AI"
+        aria-label="Not for me"
       >
         {"\u{1F44E}"}
       </button>
@@ -713,7 +712,14 @@ function AlertCard({
   userNote, openPosition, onOpenBuyModal, onOpenSellModal,
   // Optional ticker meta for the new Sector Pulse feature. Always falls back
   // to null so legacy callers that don't pass it keep working unchanged.
-  tickerMeta
+  tickerMeta,
+  // NEW (Phase 5): handler for the "+ Track this stock" button. Opens the
+  // unified AddStockSheet pre-filled with this card's ticker + AI data.
+  // Optional — if not provided, the button falls back to legacy watchlist toggle.
+  onOpenAddSheet,
+  // NEW: server-side watchlist (Supabase) — used to determine if THIS card's
+  // ticker is already in the user's watchlist (drives the + Track button state).
+  serverWatchlist
 }) {
   const [compact, setCompact] = useState(false);
   const [noteEditing, setNoteEditing] = useState(false);
@@ -924,17 +930,13 @@ function AlertCard({
               sourceCount={alert.signal_source_count}
               mentionCount={alert.signal_mention_count}
             />
-            <button className="ac-dismiss" title="Dismiss / archive (only hides this card for you)" onClick={handleDismiss} aria-label="Dismiss">×</button>
+            {/* The × dismiss button was removed in Phase 5 — its action now
+                folds into the 👎 below: tapping 👎 both rates and dismisses. */}
           </div>
           <div className="ac-actions">
             <RatingButtons alertId={alert.id} currentRating={alert.user_rating} onRate={onRate} />
-            <button
-              className={`ac-watch-btn ${isWatched ? 'watched' : ''}`}
-              onClick={() => onToggleWatchlist(alert.ticker)}
-              title={isWatched ? 'Remove from watchlist' : 'Add to watchlist'}
-            >
-              {isWatched ? '\u{2605}' : '\u{2606}'}
-            </button>
+            {/* The ⭐ watchlist star was removed in Phase 5. The new prominent
+                "+ Track this stock" button at the bottom of the card replaces it. */}
           </div>
         </div>
       </div>
@@ -1176,6 +1178,50 @@ function AlertCard({
           </div>
         )}
       </div>
+
+      {/* TRACK BUTTON (Phase 5) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+          Prominent CTA replacing the small \u2B50 star icon. Opens the unified
+          AddStockSheet pre-filled with this card's ticker + AI data so the
+          user can either add to watchlist (1 tap) or log a paper position
+          (2 taps with AI-suggested entry/target/stop already filled in).
+
+          Three visual states:
+            - Holding a position \u2192 green "\u25CF Holding X shares" pill
+            - Already on watchlist \u2192 subtle gray "\u2713 Watching \u00B7 tap to log position"
+            - Not tracked \u2192 bright blue "+ Track this stock" gradient
+      */}
+      {onOpenAddSheet && (() => {
+        const isServerWatched = !!(serverWatchlist || []).find(
+          (w) => (w.ticker || '').toUpperCase() === alert.ticker.toUpperCase()
+        );
+        const hasPosition = !!openPosition;
+        let label, classMod;
+        if (hasPosition) {
+          const shares = parseFloat(openPosition.shares || 0);
+          label = `\u{2713} Holding ${shares.toFixed(2)} sh \u00B7 tap to manage`;
+          classMod = 'ac-track-cta-holding';
+        } else if (isServerWatched) {
+          label = '\u{2713} Watching \u00B7 tap to log a position';
+          classMod = 'ac-track-cta-watching';
+        } else {
+          label = '+ Track this stock';
+          classMod = '';
+        }
+        return (
+          <button
+            type="button"
+            className={`ac-track-cta ${classMod}`}
+            onClick={() => onOpenAddSheet({
+              ticker: alert.ticker,
+              company: alert.company,
+              alert: alert,
+            })}
+            aria-label={`Track ${alert.ticker}`}
+          >
+            {label}
+          </button>
+        );
+      })()}
 
       {/* COLLAPSE TOGGLE */}
       <button className="ac-expand-btn" onClick={() => setCompact(!compact)}>
@@ -2182,6 +2228,8 @@ function StockCardModal({
   // Optional. When undefined (legacy callers), the AlertCard simply hides
   // its sector chip — same fallback the main grid uses for unclassified rows.
   tickerMeta,
+  // NEW (Phase 5): forward to AlertCard for the "+ Track" button
+  onOpenAddSheet, serverWatchlist,
 }) {
   // Close on Escape key.
   useEffect(() => {
@@ -2228,6 +2276,8 @@ function StockCardModal({
               onOpenBuyModal={onOpenBuyModal}
               onOpenSellModal={onOpenSellModal}
               tickerMeta={tickerMeta}
+              onOpenAddSheet={onOpenAddSheet}
+              serverWatchlist={serverWatchlist}
             />
           ) : (
             <div className="card-modal-empty">
@@ -4262,6 +4312,16 @@ export default function Dashboard() {
   const [tickerMetaMap, setTickerMetaMap] = useState({});
   const [sectorFilter, setSectorFilter] = useState('ALL');
 
+  // ─── My Stocks filter (Phase 7) ───────────────────────────────────
+  // Filter chip selection inside the (renamed) My Stocks tab — replaces
+  // the older split between Watchlist + Portfolio tabs by letting the user
+  // see all their tracked stocks in one place and filter by lifecycle state.
+  //   all       → every ticker on the user's watchlist
+  //   watching  → in watchlist + no open paper position
+  //   holding   → has an open paper position
+  //   sold      → has a closed paper position (no open one)
+  const [myStocksFilter, setMyStocksFilter] = useState('all');
+
   // ─── AddStockSheet (new unified add flow) ──────────────────────────
   // sheetOpen        — boolean, controls the bottom-sheet's visibility
   // sheetPrefill     — { ticker, company, alert } when opened from a card's "+ Track"
@@ -4276,9 +4336,61 @@ export default function Dashboard() {
       if (r.ok) {
         const data = await r.json();
         setServerWatchlist(data.watchlist || []);
+        // Keep the legacy cookie-based `watchlist` state in sync with the
+        // server, so the existing Watchlist tab + filter logic keeps working
+        // unchanged. The cookie becomes a write-cache of the server list.
+        const tickers = (data.watchlist || []).map((w) => (w.ticker || '').toUpperCase()).filter(Boolean);
+        setWatchlistState(tickers);
+        setWatchlist(tickers);    // also persist to cookie (legacy compatibility)
       }
     } catch { /* non-fatal */ }
   }, []);
+
+  // ── One-time cookie → Supabase migration ──
+  // On the first dashboard load after Phase 6 deploys, any tickers in the
+  // legacy `stock_watchlist` cookie are POSTed to /api/watchlist (so they
+  // persist server-side, per-user, cross-device). Migration runs at most
+  // once per browser, gated by the `wl_migrated_v1` cookie flag.
+  const migrateCookieWatchlist = useCallback(async () => {
+    if (typeof document === 'undefined') return;
+    if (document.cookie.match(/(?:^|; )wl_migrated_v1=1/)) return; // already done
+    const cookieList = getWatchlist();
+    if (!cookieList || cookieList.length === 0) {
+      document.cookie = `wl_migrated_v1=1; path=/; max-age=${60 * 60 * 24 * 3650}; SameSite=Lax`;
+      return;
+    }
+    // Fetch current server watchlist so we don't re-add tickers already there
+    let existing = new Set();
+    try {
+      const r = await fetch('/api/watchlist', { credentials: 'include' });
+      if (r.ok) {
+        const data = await r.json();
+        (data.watchlist || []).forEach((w) => existing.add((w.ticker || '').toUpperCase()));
+      }
+    } catch { /* ignore */ }
+
+    // POST every cookie ticker that isn't already on the server
+    let added = 0;
+    for (const t of cookieList) {
+      const ticker = (t || '').toUpperCase();
+      if (!ticker || existing.has(ticker)) continue;
+      try {
+        const r = await fetch('/api/watchlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ticker, source: 'cookie_migration' }),
+        });
+        if (r.ok) added += 1;
+      } catch { /* skip this one, keep going */ }
+    }
+
+    // Mark done so we don't run again. Keep the cookie itself for now in
+    // case the server lookup fails on slow first paint — refreshServerWatchlist
+    // will overwrite it with the canonical list right after.
+    document.cookie = `wl_migrated_v1=1; path=/; max-age=${60 * 60 * 24 * 3650}; SameSite=Lax`;
+    if (added > 0) await refreshServerWatchlist();
+  }, [refreshServerWatchlist]);
   const openAddSheet = useCallback((prefill = null) => {
     setSheetPrefill(prefill);
     setSheetOpen(true);
@@ -4294,7 +4406,10 @@ export default function Dashboard() {
   useEffect(() => {
     setWatchlistState(getWatchlist());
     setMcapRange(getMarketCapFilter());
-    refreshServerWatchlist();
+    // First load: migrate legacy cookie watchlist to Supabase (one-shot),
+    // then pull the canonical server list. After this, the cookie is just
+    // a write-through cache kept in sync by refreshServerWatchlist.
+    migrateCookieWatchlist().finally(() => refreshServerWatchlist());
 
     // Load the logged-in user's profile (Google-auth). If none, send to /
     fetch('/api/profile')
@@ -4472,10 +4587,29 @@ export default function Dashboard() {
     } catch {}
   }, []);
 
-  const handleToggleWatchlist = useCallback((ticker) => {
-    const newList = toggleWatchlist(ticker);
+  const handleToggleWatchlist = useCallback(async (ticker) => {
+    // Legacy entry point still wired into a few places (archive restore,
+    // archive table row, etc). Now also syncs to the Supabase watchlist
+    // table so the new server-of-truth stays current.
+    const t = (ticker || '').toUpperCase();
+    if (!t) return;
+    const wasOnList = getWatchlist().includes(t);
+    const newList = toggleWatchlist(t);
     setWatchlistState([...newList]);
-  }, []);
+    try {
+      if (wasOnList) {
+        await fetch(`/api/watchlist?ticker=${encodeURIComponent(t)}`, { method: 'DELETE', credentials: 'include' });
+      } else {
+        await fetch('/api/watchlist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ ticker: t, source: 'manual' }),
+        });
+      }
+      refreshServerWatchlist();
+    } catch { /* non-fatal — cookie already updated, server will re-sync next refresh */ }
+  }, [refreshServerWatchlist]);
 
   const handleSignOut = useCallback(async () => {
     try {
@@ -4508,8 +4642,16 @@ export default function Dashboard() {
   }, [nameInput]);
 
   const handleRate = useCallback(async (alertId, rating) => {
-    // Optimistic update
-    setAlerts(prev => prev.map(a => a.id === alertId ? { ...a, user_rating: rating } : a));
+    // Optimistic update — and if the user is marking 'down' ("Not for me"),
+    // also dismiss the card from their feed in the same gesture. One tap
+    // does both: rates negatively AND hides from view. The card is still
+    // reachable from the Archive view via "Bring back".
+    setAlerts(prev => prev.map(a => {
+      if (a.id !== alertId) return a;
+      const next = { ...a, user_rating: rating };
+      if (rating === 'down') next.dismissed_at = new Date().toISOString();
+      return next;
+    }));
 
     try {
       if (rating === null) {
@@ -4520,6 +4662,14 @@ export default function Dashboard() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ alert_id: alertId, rating }),
         });
+        // Auto-dismiss on negative rating (folds the old × button into 👎)
+        if (rating === 'down') {
+          await fetch('/api/dismiss', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ alert_id: alertId }),
+          }).catch(() => {});
+        }
       }
     } catch {
       // Revert on error
@@ -4781,7 +4931,32 @@ export default function Dashboard() {
     a.status === 'active' && notDismissed(a) && !isRecentResignal(a)
   )), [alerts]);
   const droppedPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'dropped' && notDismissed(a))), [alerts]);
-  const watchlistPicks = useMemo(() => sortByPerf(alerts.filter(a => watchlist.includes(a.ticker) && notDismissed(a))), [alerts, watchlist]);
+  // My Stocks tab data (was: watchlist tab). Includes any ticker that is
+  //   - in the user's watchlist (cookie + server), OR
+  //   - has any paper_trade (open or closed)
+  // ...so the new unified "My Stocks" view shows everything the user is
+  // tracking, regardless of whether the AI is currently flagging it.
+  const watchlistPicks = useMemo(() => {
+    const wlTickers = new Set((watchlist || []).map((t) => String(t).toUpperCase()));
+    const tradeTickers = new Set((paperTrades || []).map((t) => String(t.ticker).toUpperCase()));
+    const universe = alerts.filter((a) => {
+      const tk = String(a.ticker).toUpperCase();
+      return (wlTickers.has(tk) || tradeTickers.has(tk)) && notDismissed(a);
+    });
+    const filtered = universe.filter((a) => {
+      const tk = String(a.ticker).toUpperCase();
+      const openTrade = (paperTrades || []).find((t) => String(t.ticker).toUpperCase() === tk && t.status === 'open');
+      const closedTrade = (paperTrades || []).find((t) => String(t.ticker).toUpperCase() === tk && t.status === 'closed');
+      switch (myStocksFilter) {
+        case 'watching': return wlTickers.has(tk) && !openTrade;
+        case 'holding':  return !!openTrade;
+        case 'sold':     return !openTrade && !!closedTrade;
+        case 'all':
+        default:         return true;
+      }
+    });
+    return sortByPerf(filtered);
+  }, [alerts, watchlist, paperTrades, myStocksFilter]);
 
   const filteredNew = useMemo(() => applyAllFilters(newPicks), [newPicks, applyAllFilters]);
   const filteredActive = useMemo(() => applyAllFilters(activePicks), [activePicks, applyAllFilters]);
@@ -4829,10 +5004,13 @@ export default function Dashboard() {
   // Primary tab definitions — shown in the main tab bar.
   // Secondary destinations (Dropped, Analytics, Users) live in the ⋯ kebab menu
   // in the header but still set `activeTab` so the tab-content blocks render.
+  // The "watchlist" tab is now the unified "My Stocks" view (Phase 7).
+  // Tab id stays as 'watchlist' for backward compatibility with existing
+  // links and analytics. Portfolio tab is kept as a power-user view.
   const tabs = [
     { id: 'new', label: '\u{1F195} New', count: newPicks.length },
     { id: 'active', label: '\u{1F525} Active', count: activePicks.length },
-    { id: 'watchlist', label: '\u{2B50} Watchlist', count: watchlistPicks.length },
+    { id: 'watchlist', label: '\u{2B50} My Stocks', count: watchlistPicks.length },
     { id: 'portfolio', label: '\u{1F4BC} My Portfolio', count: paperTrades.filter(t => t.status === 'open').length || null },
     { id: 'leaderboard', label: '\u{1F3C6} Leaderboard', count: null },
   ];
@@ -5467,8 +5645,53 @@ export default function Dashboard() {
             {activeTab === 'new' && 'Fresh signals detected today. Worth investigating before they move.'}
             {activeTab === 'active' && 'Current picks being tracked. Sorted by performance.'}
             {activeTab === 'dropped' && 'Previously tracked stocks where the signal has faded.'}
-            {activeTab === 'watchlist' && 'Stocks you\'re personally tracking. Click the star on any card to add/remove. Use Paper Buy to simulate trades.'}
+            {activeTab === 'watchlist' && 'All the stocks you\'re tracking. Tap "+ Track" on any card, or the big + button in the bottom nav, to add a stock.'}
           </p>
+
+          {/* MY STOCKS FILTER CHIPS (Phase 7) ─────────────────────────────
+              Lifecycle filter for the unified My Stocks view. Replaces the
+              old split between Watchlist and Portfolio tabs by collapsing
+              both into one tab with chips: All · Watching · Holding · Sold. */}
+          {activeTab === 'watchlist' && (() => {
+            const upper = (t) => String(t || '').toUpperCase();
+            const tradeMap = {};
+            (paperTrades || []).forEach((t) => { (tradeMap[upper(t.ticker)] ||= []).push(t); });
+            const wlSet = new Set((watchlist || []).map(upper));
+            const wlActive = alerts.filter((a) => (wlSet.has(upper(a.ticker)) || tradeMap[upper(a.ticker)]) && notDismissed(a));
+            const counts = { all: 0, watching: 0, holding: 0, sold: 0 };
+            for (const a of wlActive) {
+              const tr = tradeMap[upper(a.ticker)] || [];
+              const hasOpen = tr.some((t) => t.status === 'open');
+              const hasClosed = tr.some((t) => t.status === 'closed');
+              counts.all++;
+              if (hasOpen) counts.holding++;
+              else if (hasClosed) counts.sold++;
+              else counts.watching++;
+            }
+            const chips = [
+              { id: 'all', label: 'All', count: counts.all },
+              { id: 'watching', label: 'Watching', count: counts.watching },
+              { id: 'holding', label: 'Holding', count: counts.holding },
+              { id: 'sold', label: 'Sold', count: counts.sold },
+            ];
+            return (
+              <div className="mystocks-chips" role="tablist" aria-label="My stocks filter">
+                {chips.map((c) => (
+                  <button
+                    key={c.id}
+                    role="tab"
+                    type="button"
+                    aria-selected={myStocksFilter === c.id}
+                    className={`mystocks-chip${myStocksFilter === c.id ? ' selected' : ''}`}
+                    onClick={() => setMyStocksFilter(c.id)}
+                  >
+                    {c.label}
+                    <span className="mystocks-chip-count">{c.count}</span>
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
 
           {/* Cards grid */}
           <div className={`cards-grid${allCompact && compactNonce > 0 ? ' grid-all-compact' : ''}`}>
@@ -5491,12 +5714,117 @@ export default function Dashboard() {
                 onOpenBuyModal={handleOpenBuyModal}
                 onOpenSellModal={handleOpenSellModal}
                 tickerMeta={tickerMetaMap[String(alert.ticker).toUpperCase()] || null}
+                onOpenAddSheet={openAddSheet}
+                serverWatchlist={serverWatchlist}
               />
             )) : (
               <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem' }}>
                 {searchQuery ? `No results for "${searchQuery}" in this tab.` : 'No picks match current filters.'}
               </p>
             )}
+
+            {/* MONITOR-MODE CARDS (Phase 8) ─────────────────────────────
+                Render simpler cards for tickers in the user's server watchlist
+                that AREN'T currently in today's AI feed. Lets users keep
+                track of stocks the AI isn't actively flagging — the scan
+                will pick them up if/when chatter emerges. Only shown in the
+                My Stocks tab, and respect the same filter chip selection. */}
+            {activeTab === 'watchlist' && (() => {
+              const alertTickers = new Set(getTabData().map((a) => String(a.ticker).toUpperCase()));
+              const upper = (t) => String(t || '').toUpperCase();
+              const monitorRows = (serverWatchlist || []).filter((w) => {
+                const tk = upper(w.ticker);
+                if (alertTickers.has(tk)) return false; // already in main grid
+                const openTrade = (paperTrades || []).find((t) => upper(t.ticker) === tk && t.status === 'open');
+                const closedTrade = (paperTrades || []).find((t) => upper(t.ticker) === tk && t.status === 'closed');
+                // respect the filter chip
+                if (myStocksFilter === 'holding') return !!openTrade;
+                if (myStocksFilter === 'sold') return !openTrade && !!closedTrade;
+                if (myStocksFilter === 'watching') return !openTrade;
+                return true;
+              });
+              if (monitorRows.length === 0) return null;
+              return (
+                <>
+                  {monitorRows.map((w) => {
+                    const tk = upper(w.ticker);
+                    const openTrade = (paperTrades || []).find((t) => upper(t.ticker) === tk && t.status === 'open');
+                    const price = w.current_price;
+                    const pct = w.today_pct;
+                    const hasPosition = !!openTrade;
+                    return (
+                      <div key={`monitor-${tk}`} className="monitor-card">
+                        <div className="monitor-head">
+                          <div className="monitor-logo">{tk.slice(0, 2)}</div>
+                          <div className="monitor-meta">
+                            <div className="monitor-ticker-row">
+                              <span className="monitor-ticker">{tk}</span>
+                              <span className={`monitor-status ${hasPosition ? 'holding' : 'watching'}`}>
+                                {hasPosition ? 'HOLDING' : 'WATCHING'}
+                              </span>
+                            </div>
+                            <div className="monitor-company">{w.company || w.current_alert?.company || 'Stock'}</div>
+                          </div>
+                          <div className="monitor-price-block">
+                            {price != null && <div className="monitor-price">${Number(price).toFixed(2)}</div>}
+                            {pct != null && (
+                              <div className={`monitor-pct ${pct >= 0 ? 'up' : 'down'}`}>
+                                {pct >= 0 ? '+' : ''}{Number(pct).toFixed(2)}%
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="monitor-banner">
+                          <span className="monitor-banner-icon">🤖</span>
+                          <span>
+                            <strong>No active AI signal</strong> — we're monitoring {tk} and will flag it here if chatter emerges across our sources.
+                          </span>
+                        </div>
+
+                        {hasPosition && (() => {
+                          const invested = parseFloat(openTrade.entry_amount);
+                          const shares = parseFloat(openTrade.shares);
+                          const cur = price ?? parseFloat(openTrade.entry_price);
+                          const cv = cur * shares;
+                          const pnl = cv - invested;
+                          const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
+                          return (
+                            <div className={`monitor-position ${pnl >= 0 ? 'up' : 'down'}`}>
+                              <span>💼 {shares.toFixed(2)} sh @ ${parseFloat(openTrade.entry_price).toFixed(2)} · now ${cv.toFixed(2)}</span>
+                              <span className="monitor-position-pnl">
+                                {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
+                              </span>
+                            </div>
+                          );
+                        })()}
+
+                        <div className="monitor-actions">
+                          <button
+                            type="button"
+                            className="monitor-btn-primary"
+                            onClick={() => openAddSheet({ ticker: tk, company: w.company, alert: null })}
+                          >
+                            {hasPosition ? 'Manage' : 'Log a Position'}
+                          </button>
+                          <button
+                            type="button"
+                            className="monitor-btn-secondary"
+                            onClick={async () => {
+                              if (!confirm(`Remove ${tk} from your watchlist?`)) return;
+                              await fetch(`/api/watchlist?ticker=${encodeURIComponent(tk)}`, { method: 'DELETE', credentials: 'include' });
+                              refreshServerWatchlist();
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              );
+            })()}
           </div>
         </>
       )}
@@ -5537,6 +5865,8 @@ export default function Dashboard() {
           onOpenBuyModal={handleOpenBuyModal}
           onOpenSellModal={handleOpenSellModal}
           tickerMeta={tickerMetaMap[String(cardModalTicker).toUpperCase()] || null}
+          onOpenAddSheet={openAddSheet}
+          serverWatchlist={serverWatchlist}
         />
       )}
 
@@ -5716,11 +6046,11 @@ export default function Dashboard() {
         <button
           className={`mb-nav-btn${activeTab === 'watchlist' ? ' active' : ''}`}
           onClick={() => { setActiveTab('watchlist'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          aria-label="Watchlist"
+          aria-label="My Stocks"
         >
-          <span className="mb-nav-icon">{"\u{2B50}"}</span>
-          <span className="mb-nav-label">Watch</span>
-          {watchlist.length > 0 && <span className="mb-nav-badge">{watchlist.length}</span>}
+          <span className="mb-nav-icon">{"\u{1F4CA}"}</span>
+          <span className="mb-nav-label">My Stocks</span>
+          {watchlistPicks.length > 0 && <span className="mb-nav-badge">{watchlistPicks.length}</span>}
         </button>
         <button
           className={`mb-nav-btn${activeTab === 'portfolio' ? ' active' : ''}`}

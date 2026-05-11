@@ -4108,6 +4108,207 @@ footer span { color: #4fc3f7; }
 }
 .ac-expand-btn:hover { color: #4fc3f7; }
 
+/* ─── MONITOR-MODE CARD (Phase 8) ───
+   Simpler card shown in the My Stocks view for tickers the user is tracking
+   but the AI hasn't flagged today. Sits in the same grid as the rich AlertCards,
+   so spacing/sizing follow card-grid rules. */
+.monitor-card {
+  background: rgba(13, 27, 42, 0.6);
+  border: 1px solid rgba(74, 106, 133, 0.3);
+  border-radius: 14px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.monitor-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.monitor-logo {
+  width: 40px; height: 40px;
+  border-radius: 11px;
+  background: rgba(79, 195, 247, 0.12);
+  color: #4fc3f7;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 0.85rem;
+  flex-shrink: 0;
+}
+.monitor-meta { flex: 1; min-width: 0; }
+.monitor-ticker-row { display: flex; align-items: center; gap: 8px; }
+.monitor-ticker { font-size: 1rem; font-weight: 700; color: #cfe1f4; }
+.monitor-status {
+  font-size: 0.62rem; font-weight: 800;
+  padding: 2px 6px; border-radius: 4px; letter-spacing: 0.4px;
+}
+.monitor-status.watching { background: rgba(74, 106, 133, 0.25); color: #7a9bc0; }
+.monitor-status.holding { background: rgba(0, 200, 83, 0.15); color: #00c853; }
+.monitor-company { font-size: 0.78rem; color: #7a9bc0; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.monitor-price-block { text-align: right; flex-shrink: 0; }
+.monitor-price { font-size: 1rem; font-weight: 700; color: #cfe1f4; }
+.monitor-pct { font-size: 0.78rem; font-weight: 600; margin-top: 2px; }
+.monitor-pct.up { color: #00c853; }
+.monitor-pct.down { color: #ff5252; }
+
+.monitor-banner {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  background: rgba(79, 195, 247, 0.08);
+  border: 1px solid rgba(79, 195, 247, 0.2);
+  border-radius: 10px;
+  font-size: 0.78rem;
+  color: #a8c5dd;
+  line-height: 1.45;
+}
+.monitor-banner-icon { flex-shrink: 0; font-size: 1rem; }
+.monitor-banner strong { color: #4fc3f7; font-weight: 700; }
+
+.monitor-position {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 12px;
+  background: rgba(0,200,83,0.08);
+  border-radius: 10px;
+  font-size: 0.78rem;
+  color: #cfe1f4;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.monitor-position.down { background: rgba(255,82,82,0.08); }
+.monitor-position-pnl { font-weight: 700; color: #00c853; }
+.monitor-position.down .monitor-position-pnl { color: #ff5252; }
+
+.monitor-actions { display: flex; gap: 8px; }
+.monitor-btn-primary {
+  flex: 1;
+  padding: 11px;
+  background: linear-gradient(135deg, #0a84ff 0%, #0066ff 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 0.85rem; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+}
+.monitor-btn-primary:hover { box-shadow: 0 4px 14px rgba(10,132,255,0.3); }
+.monitor-btn-secondary {
+  padding: 11px 14px;
+  background: transparent;
+  color: #7a9bc0;
+  border: 1px solid rgba(74, 106, 133, 0.4);
+  border-radius: 10px;
+  font-size: 0.85rem; font-weight: 600;
+  cursor: pointer; font-family: inherit;
+}
+.monitor-btn-secondary:hover { background: rgba(74, 106, 133, 0.1); color: #cfe1f4; }
+
+/* ─── MY STOCKS FILTER CHIPS (Phase 7) ───
+   Horizontal pills above the My Stocks card grid. Each chip filters by
+   lifecycle state: All / Watching / Holding / Sold. Scrolls horizontally
+   on narrow phones; wraps as needed. */
+.mystocks-chips {
+  display: flex;
+  gap: 8px;
+  padding: 8px 40px 16px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mystocks-chips::-webkit-scrollbar { display: none; }
+.mystocks-chip {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  background: rgba(17, 24, 35, 0.6);
+  border: 1px solid rgba(74, 106, 133, 0.3);
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #7a9bc0;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.mystocks-chip:hover {
+  background: rgba(17, 24, 35, 0.9);
+  color: #cfe1f4;
+}
+.mystocks-chip.selected {
+  background: #4fc3f7;
+  color: #0a0e14;
+  border-color: #4fc3f7;
+}
+.mystocks-chip.selected:hover {
+  background: #5fcef9;
+}
+.mystocks-chip-count {
+  background: rgba(255,255,255,0.15);
+  padding: 1px 7px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.mystocks-chip.selected .mystocks-chip-count {
+  background: rgba(0,0,0,0.18);
+  color: #0a0e14;
+}
+@media (max-width: 640px) {
+  .mystocks-chips { padding: 8px 16px 14px; }
+}
+
+/* ─── + TRACK CTA (Phase 5) ───
+   Prominent gradient button at the bottom of every AlertCard. Replaces
+   the small ⭐ star and the watchlist-only "Paper Buy" button. Three
+   visual states (default / watching / holding) — modifiers stacked. */
+.ac-track-cta {
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 13px 14px;
+  background: linear-gradient(135deg, #0a84ff 0%, #0066ff 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: inherit;
+  box-shadow: 0 4px 14px rgba(10,132,255,0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s;
+  letter-spacing: 0.3px;
+}
+.ac-track-cta:hover {
+  box-shadow: 0 6px 18px rgba(10,132,255,0.4);
+}
+.ac-track-cta:active {
+  transform: scale(0.98);
+  box-shadow: 0 2px 8px rgba(10,132,255,0.3);
+}
+.ac-track-cta-watching {
+  background: #1a2230;
+  color: #8b95a8;
+  border: 1px solid #2a3447;
+  box-shadow: none;
+  font-weight: 600;
+}
+.ac-track-cta-watching:hover {
+  background: #232d3e;
+  box-shadow: none;
+}
+.ac-track-cta-holding {
+  background: linear-gradient(135deg, #00c853 0%, #00a042 100%);
+  color: white;
+  box-shadow: 0 4px 14px rgba(0,200,83,0.3);
+}
+.ac-track-cta-holding:hover {
+  box-shadow: 0 6px 18px rgba(0,200,83,0.4);
+}
+
 .ac.ac-compact .ac-badges,
 .ac.ac-compact .ac-plan,
 .ac.ac-compact .ac-ai-read,
