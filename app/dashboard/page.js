@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation';
 import '../globals.css';
 import { SIGNAL_WEIGHTS, SIGNAL_BUCKETS, bucketFor } from '../lib/signalStrength';
 import SectorPulseBar from '../components/SectorPulseBar';
+import AddStockSheet from '../components/AddStockSheet';
+import AddStockFab from '../components/AddStockFab';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock meta batch fetching.
@@ -4259,11 +4261,40 @@ export default function Dashboard() {
   //   filter behaviour is unchanged when sectorFilter === 'ALL'.
   const [tickerMetaMap, setTickerMetaMap] = useState({});
   const [sectorFilter, setSectorFilter] = useState('ALL');
+
+  // ─── AddStockSheet (new unified add flow) ──────────────────────────
+  // sheetOpen        — boolean, controls the bottom-sheet's visibility
+  // sheetPrefill     — { ticker, company, alert } when opened from a card's "+ Track"
+  // serverWatchlist  — Supabase-backed watchlist (replaces cookie-based eventually).
+  //                    Loaded on mount; refetched after every add/remove.
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetPrefill, setSheetPrefill] = useState(null);
+  const [serverWatchlist, setServerWatchlist] = useState([]);
+  const refreshServerWatchlist = useCallback(async () => {
+    try {
+      const r = await fetch('/api/watchlist', { credentials: 'include' });
+      if (r.ok) {
+        const data = await r.json();
+        setServerWatchlist(data.watchlist || []);
+      }
+    } catch { /* non-fatal */ }
+  }, []);
+  const openAddSheet = useCallback((prefill = null) => {
+    setSheetPrefill(prefill);
+    setSheetOpen(true);
+  }, []);
+  const closeAddSheet = useCallback(() => {
+    setSheetOpen(false);
+    // Clear prefill after close animation finishes
+    setTimeout(() => setSheetPrefill(null), 400);
+  }, []);
+
   const router = useRouter();
 
   useEffect(() => {
     setWatchlistState(getWatchlist());
     setMcapRange(getMarketCapFilter());
+    refreshServerWatchlist();
 
     // Load the logged-in user's profile (Google-auth). If none, send to /
     fetch('/api/profile')
@@ -5708,6 +5739,34 @@ export default function Dashboard() {
           <span className="mb-nav-label">Leaders</span>
         </button>
       </nav>
+
+      {/* ─── ADD STOCK FAB ───
+          Big blue + button — primary entry point for adding/finding a stock.
+          Robinhood-style elevated FAB. Opens the unified AddStockSheet. */}
+      <AddStockFab onClick={() => openAddSheet()} />
+
+      {/* ─── ADD STOCK SHEET ───
+          Single bottom-sheet that handles: searching for a stock, adding to
+          watchlist, and logging a paper position. Pre-fills with AI data
+          when opened from a card's "+ Track" button. */}
+      <AddStockSheet
+        isOpen={sheetOpen}
+        onClose={closeAddSheet}
+        prefillTicker={sheetPrefill?.ticker || null}
+        prefillCompany={sheetPrefill?.company || null}
+        prefillAlert={sheetPrefill?.alert || null}
+        watchlist={serverWatchlist}
+        activeAlerts={alerts}
+        onAdded={() => { refreshServerWatchlist(); }}
+        onPositionLogged={() => {
+          refreshServerWatchlist();
+          // Refresh paper trades too so the new position shows up
+          fetch('/api/paper-trades', { credentials: 'include' })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => { if (d?.trades) setPaperTrades(d.trades); })
+            .catch(() => {});
+        }}
+      />
     </StockMetaProvider>
   );
 }
