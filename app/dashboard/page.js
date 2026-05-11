@@ -3827,6 +3827,56 @@ function LeaderboardTab({ alerts, prices, currentUserId }) {
 }
 
 // ---------- ADMIN USERS TAB ----------
+// Helpers shared by the admin user rows.
+//
+// `planPill` returns the coloured pill describing the user's monetisation
+// state — paid / on trial / trial ended / free. The states come from
+// /api/admin/users which folds together the `subscriptions` table (paid
+// users from the Lemon Squeezy webhook) and the in-app trial flow on
+// `profiles.trial_ends_at`.
+function planPill(u) {
+  if (u.plan === 'paid') {
+    const cancelled = u.subscription?.status === 'cancelled';
+    return <span className="admin-plan admin-plan-paid" title={cancelled ? 'Subscription cancelled — access until period ends' : 'Active paid subscriber'}>{cancelled ? '★ Cancelling' : '★ Paid'}</span>;
+  }
+  if (u.plan === 'trial') {
+    const d = u.trial_days_left;
+    const label = d === 0 ? 'Trial · last day' : d === 1 ? 'Trial · 1d left' : `Trial · ${d}d left`;
+    return <span className="admin-plan admin-plan-trial" title="Free 7-day trial in progress">{label}</span>;
+  }
+  if (u.plan === 'expired') {
+    return <span className="admin-plan admin-plan-expired" title="Trial ended — has not upgraded">Trial ended</span>;
+  }
+  return <span className="admin-plan admin-plan-free" title="No trial or paid subscription">Free</span>;
+}
+
+// Relative "last active" label with a colour-coded dot.
+//   < 24h    → green   (active)
+//   1–7d     → amber   (slipping)
+//   8d+ or null → red  (cold / never logged in)
+function lastActiveCell(u) {
+  const ts = u.last_sign_in_at;
+  if (!ts) {
+    return <span className="admin-active admin-active-cold" title="Never signed in">● Never</span>;
+  }
+  const diffMs = Date.now() - new Date(ts).getTime();
+  const diffHours = diffMs / 3_600_000;
+  const diffDays = diffMs / 86_400_000;
+  let cls = 'admin-active-warm';
+  let label;
+  if (diffHours < 1) label = 'Just now';
+  else if (diffHours < 24) label = `${Math.floor(diffHours)}h ago`;
+  else if (diffDays < 7) label = `${Math.floor(diffDays)}d ago`;
+  else label = `${Math.floor(diffDays)}d ago`;
+
+  if (diffHours < 24) cls = 'admin-active-warm';
+  else if (diffDays < 7) cls = 'admin-active-mid';
+  else cls = 'admin-active-cold';
+
+  const tip = new Date(ts).toLocaleString();
+  return <span className={`admin-active ${cls}`} title={`Last sign-in: ${tip}`}>● {label}</span>;
+}
+
 function UsersAdminTab({ currentUserId }) {
   const [users, setUsers] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -3858,88 +3908,106 @@ function UsersAdminTab({ currentUserId }) {
   const approved = users.filter(u => u.status === 'approved');
   const disabled = users.filter(u => u.status === 'disabled');
 
-  const renderRow = (u) => (
-    <tr key={u.id}>
-      <td>
-        <div className="admin-user-cell">
-          {u.avatar_url ? (
-            <img src={u.avatar_url} alt="" className="admin-avatar" referrerPolicy="no-referrer" />
-          ) : (
-            <span className="admin-avatar admin-avatar-fallback">{(u.display_name || u.email).charAt(0).toUpperCase()}</span>
-          )}
-          <div>
-            <div className="admin-name">
-              {u.display_name || '—'} {u.is_admin && <span className="lb-admin-badge">Admin</span>}
+  const renderRow = (u) => {
+    const joinedTip = `Joined ${new Date(u.created_at).toLocaleDateString()}`;
+    return (
+      <tr key={u.id}>
+        <td>
+          <div className="admin-user-cell" title={joinedTip}>
+            {u.avatar_url ? (
+              <img src={u.avatar_url} alt="" className="admin-avatar" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="admin-avatar admin-avatar-fallback">{(u.display_name || u.email).charAt(0).toUpperCase()}</span>
+            )}
+            <div>
+              <div className="admin-name">
+                {u.display_name || '—'} {u.is_admin && <span className="lb-admin-badge">Admin</span>}
+              </div>
+              <div className="admin-email">{u.email}</div>
             </div>
-            <div className="admin-email">{u.email}</div>
           </div>
-        </div>
-      </td>
-      <td>
-        <span className={`admin-status admin-status-${u.status}`}>{u.status}</span>
-      </td>
-      <td>
-        {/* Per-row "Subscribed to alerts" toggle. Maps to a row in
-            alert_distribution_list keyed by the user's email. New
-            signups are auto-subscribed in /auth/callback. */}
-        <label
-          className="admin-sub-toggle"
-          title={u.is_subscribed
-            ? 'Receiving the daily 6:30 AM ET pre-market digest. Uncheck to unsubscribe.'
-            : 'Not on the daily digest list. Check to subscribe.'}
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: busyId === u.id ? 'wait' : 'pointer' }}
-        >
-          <input
-            type="checkbox"
-            checked={!!u.is_subscribed}
-            disabled={busyId === u.id}
-            onChange={(e) => updateUser(u.id, { is_subscribed: e.target.checked })}
-          />
-          <span style={{ fontSize: 12, color: u.is_subscribed ? '#4fc3f7' : '#7a9bc0' }}>
-            {u.is_subscribed ? 'Subscribed' : 'Not subscribed'}
-          </span>
-        </label>
-      </td>
-      <td>{new Date(u.created_at).toLocaleDateString()}</td>
-      <td>
-        <div className="admin-actions">
-          {u.status !== 'approved' && (
-            <button className="admin-btn admin-btn-approve" disabled={busyId === u.id}
-              onClick={() => updateUser(u.id, { status: 'approved' })}>Approve</button>
-          )}
-          {u.status !== 'disabled' && u.id !== currentUserId && (
-            <button className="admin-btn admin-btn-disable" disabled={busyId === u.id}
-              onClick={() => updateUser(u.id, { status: 'disabled' })}>Disable</button>
-          )}
-          {u.status === 'disabled' && (
-            <button className="admin-btn admin-btn-approve" disabled={busyId === u.id}
-              onClick={() => updateUser(u.id, { status: 'approved' })}>Re-enable</button>
-          )}
-          {u.id !== currentUserId && (
-            <button className="admin-btn admin-btn-secondary" disabled={busyId === u.id}
-              onClick={() => updateUser(u.id, { is_admin: !u.is_admin })}>
-              {u.is_admin ? 'Remove Admin' : 'Make Admin'}
-            </button>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
+        </td>
+        <td data-label="Plan">{planPill(u)}</td>
+        <td data-label="Last active">{lastActiveCell(u)}</td>
+        <td data-label="Alerts">
+          {/* Per-row "Subscribed to alerts" toggle. Maps to a row in
+              alert_distribution_list keyed by the user's email. New
+              signups are auto-subscribed in /auth/callback. */}
+          <label
+            className="admin-sub-toggle"
+            title={u.is_subscribed
+              ? 'Receiving the daily 6:30 AM ET pre-market digest. Uncheck to unsubscribe.'
+              : 'Not on the daily digest list. Check to subscribe.'}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: busyId === u.id ? 'wait' : 'pointer' }}
+          >
+            <input
+              type="checkbox"
+              checked={!!u.is_subscribed}
+              disabled={busyId === u.id}
+              onChange={(e) => updateUser(u.id, { is_subscribed: e.target.checked })}
+            />
+            <span style={{ fontSize: 12, color: u.is_subscribed ? '#4fc3f7' : '#7a9bc0' }}>
+              {u.is_subscribed ? 'Subscribed' : 'Not subscribed'}
+            </span>
+          </label>
+        </td>
+        <td>
+          <div className="admin-actions">
+            {u.status !== 'approved' && (
+              <button className="admin-btn admin-btn-approve" disabled={busyId === u.id}
+                onClick={() => updateUser(u.id, { status: 'approved' })}>Approve</button>
+            )}
+            {u.status !== 'disabled' && u.id !== currentUserId && (
+              <button className="admin-btn admin-btn-disable" disabled={busyId === u.id}
+                onClick={() => updateUser(u.id, { status: 'disabled' })}>Disable</button>
+            )}
+            {u.status === 'disabled' && (
+              <button className="admin-btn admin-btn-approve" disabled={busyId === u.id}
+                onClick={() => updateUser(u.id, { status: 'approved' })}>Re-enable</button>
+            )}
+            {u.id !== currentUserId && (
+              <button className="admin-btn admin-btn-secondary" disabled={busyId === u.id}
+                onClick={() => updateUser(u.id, { is_admin: !u.is_admin })}>
+                {u.is_admin ? 'Remove Admin' : 'Make Admin'}
+              </button>
+            )}
+          </div>
+        </td>
+      </tr>
+    );
+  };
 
-  // Shared header row used by all three sub-tables. Adding "Alerts"
-  // here once means the column lines up across pending / approved /
-  // disabled even on narrow mobile screens.
+  // Shared header row used by all three sub-tables. Status + Joined got
+  // folded into the Plan and Last active columns — Status was redundant
+  // (everyone in the Approved section was "approved") and Joined is now
+  // a tooltip on the user cell, freeing room for the two business-critical
+  // metrics: monetisation state and recent activity.
   const tableHead = (
     <thead>
       <tr>
         <th>User</th>
-        <th>Status</th>
+        <th>Plan</th>
+        <th>Last active</th>
         <th>Alerts</th>
-        <th>Joined</th>
         <th>Actions</th>
       </tr>
     </thead>
   );
+
+  // Funnel summary — counted across the Approved cohort only. Pending
+  // signups haven't started a trial yet, and disabled users aren't
+  // monetisable, so we exclude both.
+  const now = Date.now();
+  const summary = approved.reduce((acc, u) => {
+    if (u.plan === 'paid') acc.paid += 1;
+    else if (u.plan === 'trial') acc.trial += 1;
+    else if (u.plan === 'expired') acc.expired += 1;
+    if (u.last_sign_in_at) {
+      const days = (now - new Date(u.last_sign_in_at).getTime()) / 86_400_000;
+      if (days <= 7) acc.active7d += 1;
+    }
+    return acc;
+  }, { paid: 0, trial: 0, expired: 0, active7d: 0 });
 
   return (
     <div className="admin-users-tab">
@@ -3958,6 +4026,29 @@ function UsersAdminTab({ currentUserId }) {
       )}
 
       <h3 className="admin-section-title">{"\u{2705}"} Approved ({approved.length})</h3>
+
+      {/* Funnel snapshot — quick at-a-glance view of monetisation state
+          across the approved cohort. Lets us answer "how's the trial
+          funnel doing today?" without scrolling rows. */}
+      <div className="admin-stats">
+        <div className="admin-stat admin-stat-paid">
+          <div className="admin-stat-label">Paid</div>
+          <div className="admin-stat-value">{summary.paid}</div>
+        </div>
+        <div className="admin-stat admin-stat-trial">
+          <div className="admin-stat-label">On trial</div>
+          <div className="admin-stat-value">{summary.trial}</div>
+        </div>
+        <div className="admin-stat admin-stat-expired">
+          <div className="admin-stat-label">Trial expired</div>
+          <div className="admin-stat-value">{summary.expired}</div>
+        </div>
+        <div className="admin-stat">
+          <div className="admin-stat-label">Active in 7d</div>
+          <div className="admin-stat-value">{summary.active7d}</div>
+        </div>
+      </div>
+
       <div className="pt-table-wrap"><table className="pt-table admin-table">
         {tableHead}
         <tbody>{approved.map(renderRow)}</tbody>

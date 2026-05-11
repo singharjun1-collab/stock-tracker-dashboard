@@ -13,15 +13,27 @@ async function requireAdmin() {
   return { profile };
 }
 
-// GET — list every user (admin only) with computed `is_subscribed`
-// flag pulled from alert_distribution_list (matched by email).
+// GET — list every user (admin only) enriched with:
+//   • is_subscribed   — alert_distribution_list membership (by email)
+//   • plan            — 'paid' | 'trial' | 'expired' | 'free'
+//   • trial_days_left — int, when plan === 'trial'
+//   • last_sign_in_at — ISO timestamp from auth.users
+//   • subscription    — { status, ends_at } when present
 //
-// `is_subscribed` is true when the user has a row in
-// alert_distribution_list AND it has not been unsubscribed.
+// Plan derivation:
+//   - 'paid'    → subscription.status ∈ {active, on_trial, paused}
+//   - 'trial'   → no paid sub, trial_ends_at in the future
+//   - 'expired' → no paid sub, trial_ends_at in the past
+//   - 'free'    → no paid sub, no trial timestamps (legacy users)
+const MS_PER_DAY = 86_400_000;
+const PAID_STATUSES = new Set(['active', 'on_trial', 'paused']);
+
 export async function GET() {
   const { error } = await requireAdmin();
   if (error) return error;
   const supabase = createSupabaseServerClient();
+  const admin = createSupabaseAdminClient();
+
   const { data: users, error: dbErr } = await supabase
     .from('profiles')
     .select('*')
@@ -31,7 +43,6 @@ export async function GET() {
   // Pull the distribution list once and build an email→subscribed map.
   // We use the admin client because alert_distribution_list has its own
   // legacy auth that doesn't grant the regular server client read access.
-  const admin = createSupabaseAdminClient();
   const { data: list } = await admin
     .from('alert_distribution_list')
     .select('email, unsubscribed_at');
@@ -42,10 +53,73 @@ export async function GET() {
       .map((r) => (r.email || '').toLowerCase())
   );
 
-  const enriched = (users || []).map((u) => ({
-    ...u,
-    is_subscribed: subscribedEmails.has((u.email || '').toLowerCase()),
-  }));
+  // Lemon Squeezy → subscriptions table, keyed by lowercased email.
+  // We surface status + ends_at so the UI can colour-code "Paid" / "Cancelled".
+  const { data: subs } = await admin
+    .from('subscriptions')
+    .select('email, status, ends_at, renews_at');
+  const subsByEmail = new Map(
+    (subs || []).map((s) => [(s.email || '').toLowerCase(), s])
+  );
+
+  // auth.users.last_sign_in_at — fetched via the admin auth API. We paginate
+  // in case the user count grows past one page (default 50).
+  const lastSignInByUserId = new Map();
+  try {
+    let page = 1;
+    // Hard stop after 20 pages (1,000 users) — well beyond expected scale.
+    while (page <= 20) {
+      const { data: authPage, error: authErr } = await admin.auth.admin.listUsers({
+        page,
+        perPage: 200,
+      });
+      if (authErr) break;
+      const pageUsers = authPage?.users || [];
+      for (const au of pageUsers) {
+        if (au?.id) lastSignInByUserId.set(au.id, au.last_sign_in_at || null);
+      }
+      if (pageUsers.length < 200) break;
+      page += 1;
+    }
+  } catch (e) {
+    // Non-fatal — last_sign_in_at just won't be set on rows.
+    console.error('[admin/users] listUsers failed:', e);
+  }
+
+  const now = Date.now();
+  const enriched = (users || []).map((u) => {
+    const emailKey = (u.email || '').toLowerCase();
+    const sub = subsByEmail.get(emailKey) || null;
+    const subStatus = sub?.status || null;
+
+    let plan = 'free';
+    let trial_days_left = null;
+
+    if (subStatus && PAID_STATUSES.has(subStatus)) {
+      plan = 'paid';
+    } else if (u.trial_ends_at) {
+      const endsMs = new Date(u.trial_ends_at).getTime();
+      if (Number.isFinite(endsMs)) {
+        if (endsMs > now) {
+          plan = 'trial';
+          trial_days_left = Math.max(0, Math.ceil((endsMs - now) / MS_PER_DAY));
+        } else {
+          plan = 'expired';
+        }
+      }
+    }
+
+    return {
+      ...u,
+      is_subscribed: subscribedEmails.has(emailKey),
+      plan,
+      trial_days_left,
+      last_sign_in_at: lastSignInByUserId.get(u.id) || null,
+      subscription: sub
+        ? { status: sub.status, ends_at: sub.ends_at, renews_at: sub.renews_at }
+        : null,
+    };
+  });
 
   return NextResponse.json({ users: enriched });
 }
