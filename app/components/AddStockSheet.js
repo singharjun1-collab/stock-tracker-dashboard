@@ -315,45 +315,59 @@ export default function AddStockSheet({
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Track a stock"
+        aria-label="Add to My Stocks"
       >
         <div className="as-handle-wrap"><div className="as-handle" /></div>
 
         <div className="as-header">
           <div className="as-title">
-            Track a stock
-            <span className="as-subtitle">Add to watchlist or log a position you own</span>
+            {selectedTicker
+              ? <>Add <span className="as-title-ticker">{selectedTicker}</span> to My Stocks</>
+              : 'Add to My Stocks'}
+            <span className="as-subtitle">
+              {selectedTicker
+                ? 'Watch the AI signals or log a position you own'
+                : 'Pick a stock to watch or log a position you own'}
+            </span>
           </div>
           <button className="as-close" onClick={onClose}>Cancel</button>
         </div>
 
-        <div className="as-search">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-            <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-          </svg>
-          <input
-            ref={inputRef}
-            type="text"
-            inputMode="search"
-            autoCapitalize="characters"
-            autoComplete="off"
-            spellCheck="false"
-            placeholder="Pick a ticker to track…"
-            value={query}
-            onChange={(e) => {
-              const v = e.target.value;
-              setQuery(v);
-              // If user clears the field, deselect
-              if (!v.trim()) {
-                setSelectedTicker(null);
-                setSelectedAlert(null);
-              }
-            }}
-          />
-          {query && (
-            <button className="as-clear" onClick={() => { setQuery(''); setSelectedTicker(null); }} aria-label="Clear">×</button>
-          )}
-        </div>
+        {/* Search input — only shown when no stock is selected yet. Once a
+            ticker is picked (via prefill from a card's "+ Add to My Stocks"
+            button, or via tapping a result here), the search collapses
+            away and the modal focuses purely on the two action buttons.
+            The user can still swap tickers via the "Change" link in the
+            selected-view panel. Updated 2026-05-12. */}
+        {!selectedTicker && (
+          <div className="as-search">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
+            </svg>
+            <input
+              ref={inputRef}
+              type="text"
+              inputMode="search"
+              autoCapitalize="characters"
+              autoComplete="off"
+              spellCheck="false"
+              placeholder="Pick a ticker to track…"
+              value={query}
+              onChange={(e) => {
+                const v = e.target.value;
+                setQuery(v);
+                // If user clears the field, deselect
+                if (!v.trim()) {
+                  setSelectedTicker(null);
+                  setSelectedAlert(null);
+                }
+              }}
+            />
+            {query && (
+              <button className="as-clear" onClick={() => { setQuery(''); setSelectedTicker(null); }} aria-label="Clear">×</button>
+            )}
+          </div>
+        )}
 
         <div className="as-body">
           {feedback && (
@@ -373,6 +387,19 @@ export default function AddStockSheet({
               busy={busy}
               onAddToWatchlist={handleAddToWatchlist}
               onLogPosition={handleLogPosition}
+              onChangeTicker={() => {
+                // Restore the search bar + clear the selected stock. Lets
+                // the user swap to a different ticker without closing the
+                // sheet entirely. Added 2026-05-12 alongside the
+                // hide-search-when-selected change.
+                setSelectedTicker(null);
+                setSelectedAlert(null);
+                setShowPositionForm(false);
+                setQuery('');
+                setEntryPrice('');
+                setNotes('');
+                setTimeout(() => inputRef.current?.focus(), 50);
+              }}
             />
           ) : results ? (
             <SearchResults
@@ -438,6 +465,37 @@ export default function AddStockSheet({
         .as-subtitle {
           font-size: 12px; font-weight: 500; color: #7a9bc0;
           letter-spacing: 0;
+        }
+        .as-title-ticker {
+          display: inline-block;
+          padding: 2px 8px;
+          margin: 0 2px;
+          background: rgba(10, 132, 255, 0.15);
+          color: #4fa3ff;
+          border-radius: 6px;
+          font-weight: 700;
+          letter-spacing: 0.02em;
+          font-size: 15px;
+          vertical-align: 1px;
+        }
+        .as-change-ticker {
+          margin: 4px 20px 12px;
+          padding: 6px 10px;
+          background: transparent;
+          border: none;
+          color: #7a9bc0;
+          font-size: 13px;
+          font-weight: 500;
+          cursor: pointer;
+          align-self: flex-start;
+          font-family: inherit;
+          border-radius: 8px;
+          transition: background 0.15s, color 0.15s;
+        }
+        .as-change-ticker:hover,
+        .as-change-ticker:active {
+          background: rgba(122, 155, 192, 0.08);
+          color: #cfe2ff;
         }
         .as-close {
           background: none; border: none;
@@ -857,6 +915,9 @@ function SelectedStockPanel({
   view, showPositionForm, onTogglePosition,
   amount, setAmount, entryPrice, setEntryPrice, notes, setNotes,
   busy, onAddToWatchlist, onLogPosition,
+  // Optional. Tapping the "← Change" link inside the selected card calls
+  // this to clear the parent's selection and re-show the search input.
+  onChangeTicker,
 }) {
   const a = view.alert;
   const isMonitor = !a;
@@ -869,6 +930,16 @@ function SelectedStockPanel({
 
   return (
     <>
+      {onChangeTicker && (
+        <button
+          type="button"
+          className="as-change-ticker"
+          onClick={onChangeTicker}
+          aria-label="Change ticker"
+        >
+          {"\u{2190}"} Change ticker
+        </button>
+      )}
       <div className="as-selected-card">
         <div className="as-sel-row">
           <div className="as-logo">{view.ticker.slice(0, 2)}</div>

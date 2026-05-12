@@ -1280,7 +1280,10 @@ function AlertCard({
           Three visual states:
             - Holding a position \u2192 green "\u25CF Holding X shares" pill
             - Already on watchlist \u2192 subtle gray "\u2713 Watching \u00B7 tap to log position"
-            - Not tracked \u2192 bright blue "+ Track this stock" gradient
+            - Not tracked \u2192 bright blue "+ Add to My Stocks" gradient
+              (covers BOTH watchlist add AND log-position; copy updated
+              2026-05-12 because the old "Track" wording implied passive
+              watching only, hiding the buy/log-position path).
       */}
       {onOpenAddSheet && (() => {
         const isServerWatched = !!(serverWatchlist || []).find(
@@ -1296,7 +1299,7 @@ function AlertCard({
           label = '\u{2713} Watching \u00B7 tap to log a position';
           classMod = 'ac-track-cta-watching';
         } else {
-          label = '+ Track this stock';
+          label = '+ Add to My Stocks';
           classMod = '';
         }
         return (
@@ -1308,7 +1311,7 @@ function AlertCard({
               company: alert.company,
               alert: alert,
             })}
-            aria-label={`Track ${alert.ticker}`}
+            aria-label={`Add ${alert.ticker} to My Stocks`}
           >
             {label}
           </button>
@@ -5651,7 +5654,7 @@ export default function Dashboard() {
               >
                 <span className="search-results-addnew-plus" aria-hidden="true">+</span>
                 <span className="search-results-addnew-text">
-                  Track <strong>{searchResults.addNew}</strong> &mdash; tap to add to your watchlist or log a position
+                  Add <strong>{searchResults.addNew}</strong> to My Stocks &mdash; watch or log a position
                 </span>
               </button>
             )}
