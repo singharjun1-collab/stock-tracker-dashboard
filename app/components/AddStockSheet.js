@@ -315,15 +315,15 @@ export default function AddStockSheet({
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Add to My Stocks"
+        aria-label="Add to Portfolio"
       >
         <div className="as-handle-wrap"><div className="as-handle" /></div>
 
         <div className="as-header">
           <div className="as-title">
             {selectedTicker
-              ? <>Add <span className="as-title-ticker">{selectedTicker}</span> to My Stocks</>
-              : 'Add to My Stocks'}
+              ? <>Add <span className="as-title-ticker">{selectedTicker}</span> to Portfolio</>
+              : 'Add to Portfolio'}
             <span className="as-subtitle">
               {selectedTicker
                 ? 'Watch the AI signals or log a position you own'

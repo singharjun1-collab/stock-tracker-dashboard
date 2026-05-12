@@ -4762,11 +4762,43 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   /* Make the tab row a bit more compact so more fit in view */
   .tab-btn { padding: 10px 10px; font-size: 0.75rem; }
   .tab-count { font-size: 0.62rem; padding: 1px 6px; }
-  /* 5-tab mobile bottom nav needs smaller labels so everything fits */
-  .mobile-bottom-nav-5 .mb-nav-label { font-size: 0.6rem; }
-  .mobile-bottom-nav-5 .mb-nav-icon  { font-size: 1.05rem; }
-  .mobile-bottom-nav-5 .mb-nav-btn   { padding: 5px 2px; }
+  /* 4-tab mobile bottom nav — each button has ~25% width, so we can use
+     a slightly more generous label/icon than the old 5-tab layout. */
+  .mobile-bottom-nav-4 .mb-nav-label { font-size: 0.66rem; }
+  .mobile-bottom-nav-4 .mb-nav-icon  { font-size: 1.15rem; }
+  .mobile-bottom-nav-4 .mb-nav-btn   { padding: 6px 4px; }
 }
+
+/* ── QUICK-WATCH PILL on New/Active cards (Phase 8, 2026-05-12) ──
+   Small secondary action that lives ABOVE the main "+ Add to Portfolio"
+   gradient CTA. One tap adds the ticker to the watchlist (Portfolio >
+   Watching) without opening the heavier AddStockSheet. Hides itself
+   automatically once the ticker is watched (the parent component
+   stops rendering it). Robinhood-style minimalist pill: subtle by
+   default, blue-tinted on hover so the affordance is discoverable. */
+.ac-quick-watch-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 8px;
+  padding: 7px 14px;
+  background: rgba(10,132,255,0.10);
+  color: #4fa3ff;
+  border: 1px solid rgba(10,132,255,0.30);
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  align-self: center;
+}
+.ac-quick-watch-btn:hover {
+  background: rgba(10,132,255,0.18);
+  border-color: rgba(10,132,255,0.55);
+}
+.ac-quick-watch-btn:active { transform: scale(0.97); }
+
 
 /* ── INLINE COLLAPSE-ALL BUTTON (now lives in the search row) ──
    Keeps the same look as the old filter-bar version but without the

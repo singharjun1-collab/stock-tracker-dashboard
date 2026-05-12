@@ -1271,7 +1271,7 @@ function AlertCard({
         )}
       </div>
 
-      {/* TRACK BUTTON (Phase 5) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+      {/* TRACK BUTTON (Phase 5, updated Phase 8) \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
           Prominent CTA replacing the small \u2B50 star icon. Opens the unified
           AddStockSheet pre-filled with this card's ticker + AI data so the
           user can either add to watchlist (1 tap) or log a paper position
@@ -1280,16 +1280,25 @@ function AlertCard({
           Three visual states:
             - Holding a position \u2192 green "\u25CF Holding X shares" pill
             - Already on watchlist \u2192 subtle gray "\u2713 Watching \u00B7 tap to log position"
-            - Not tracked \u2192 bright blue "+ Add to My Stocks" gradient
-              (covers BOTH watchlist add AND log-position; copy updated
-              2026-05-12 because the old "Track" wording implied passive
-              watching only, hiding the buy/log-position path).
+            - Not tracked \u2192 bright blue "+ Add to Portfolio" gradient
+
+          Phase 8 (2026-05-12) addition: on the New + Active tabs, also show
+          a small one-tap "+ Watch" pill ABOVE the gradient CTA when the
+          ticker isn't already tracked. This routes straight to the
+          watchlist (no sheet) so users can park a pick in their Portfolio
+          > Watching list with a single tap, Robinhood-style. The gradient
+          CTA is preserved for the heavier "log a position" path.
       */}
       {onOpenAddSheet && (() => {
         const isServerWatched = !!(serverWatchlist || []).find(
           (w) => (w.ticker || '').toUpperCase() === alert.ticker.toUpperCase()
         );
         const hasPosition = !!openPosition;
+        const showQuickWatch =
+          (sectionPrefix === 'new' || sectionPrefix === 'active') &&
+          !hasPosition &&
+          !isServerWatched &&
+          typeof onToggleWatchlist === 'function';
         let label, classMod;
         if (hasPosition) {
           const shares = parseFloat(openPosition.shares || 0);
@@ -1299,22 +1308,34 @@ function AlertCard({
           label = '\u{2713} Watching \u00B7 tap to log a position';
           classMod = 'ac-track-cta-watching';
         } else {
-          label = '+ Add to My Stocks';
+          label = '+ Add to Portfolio';
           classMod = '';
         }
         return (
-          <button
-            type="button"
-            className={`ac-track-cta ${classMod}`}
-            onClick={() => onOpenAddSheet({
-              ticker: alert.ticker,
-              company: alert.company,
-              alert: alert,
-            })}
-            aria-label={`Add ${alert.ticker} to My Stocks`}
-          >
-            {label}
-          </button>
+          <>
+            {showQuickWatch && (
+              <button
+                type="button"
+                className="ac-quick-watch-btn"
+                onClick={(e) => { e.stopPropagation(); onToggleWatchlist(alert.ticker); }}
+                aria-label={`Watch ${alert.ticker} \u2014 add to Portfolio`}
+              >
+                + Watch
+              </button>
+            )}
+            <button
+              type="button"
+              className={`ac-track-cta ${classMod}`}
+              onClick={() => onOpenAddSheet({
+                ticker: alert.ticker,
+                company: alert.company,
+                alert: alert,
+              })}
+              aria-label={`Add ${alert.ticker} to Portfolio`}
+            >
+              {label}
+            </button>
+          </>
         );
       })()}
 
@@ -4425,15 +4446,17 @@ export default function Dashboard() {
   const [tickerMetaMap, setTickerMetaMap] = useState({});
   const [sectorFilter, setSectorFilter] = useState('ALL');
 
-  // ─── My Stocks filter (Phase 7) ───────────────────────────────────
-  // Filter chip selection inside the (renamed) My Stocks tab — replaces
+  // ─── Portfolio sub-filter (Phase 8 — 2026-05-12) ────────────────────
+  // Filter chip selection inside the unified Portfolio tab — replaces
   // the older split between Watchlist + Portfolio tabs by letting the user
-  // see all their tracked stocks in one place and filter by lifecycle state.
+  // see everything personal in one place and filter by lifecycle state.
   //   all       → every ticker on the user's watchlist
   //   watching  → in watchlist + no open paper position
   //   holding   → has an open paper position
   //   sold      → has a closed paper position (no open one)
-  const [myStocksFilter, setMyStocksFilter] = useState('all');
+  // Default = 'watching' so the tab opens to the user's biggest, most-
+  // checked bucket (pre-buy research list), matching Robinhood UX.
+  const [myStocksFilter, setMyStocksFilter] = useState('watching');
 
   // ─── AddStockSheet (new unified add flow) ──────────────────────────
   // sheetOpen        — boolean, controls the bottom-sheet's visibility
@@ -5251,14 +5274,15 @@ export default function Dashboard() {
   // Primary tab definitions — shown in the main tab bar.
   // Secondary destinations (Dropped, Analytics, Users) live in the ⋯ kebab menu
   // in the header but still set `activeTab` so the tab-content blocks render.
-  // The "watchlist" tab is now the unified "My Stocks" view (Phase 7).
+  // The "watchlist" tab is the unified "Portfolio" view (Phase 8 — 2026-05-12).
   // Tab id stays as 'watchlist' for backward compatibility with existing
-  // links and analytics. Portfolio tab is kept as a power-user view.
+  // analytics and internal predicates; the LABEL is "Portfolio" and the tab
+  // contains sub-pills All · Watching · Holding · Sold so users get one
+  // home for everything personal (formerly two tabs: My Stocks + Portfolio).
   const tabs = [
     { id: 'new', label: '\u{1F195} New', count: newPicks.length },
     { id: 'active', label: '\u{1F525} Active', count: activePicks.length },
-    { id: 'watchlist', label: '\u{2B50} My Stocks', count: watchlistPicks.length },
-    { id: 'portfolio', label: '\u{1F4BC} My Portfolio', count: paperTrades.filter(t => t.status === 'open').length || null },
+    { id: 'watchlist', label: '\u{1F4BC} Portfolio', count: watchlistPicks.length },
     { id: 'leaderboard', label: '\u{1F3C6} Leaderboard', count: null },
   ];
 
@@ -5654,7 +5678,7 @@ export default function Dashboard() {
               >
                 <span className="search-results-addnew-plus" aria-hidden="true">+</span>
                 <span className="search-results-addnew-text">
-                  Add <strong>{searchResults.addNew}</strong> to My Stocks &mdash; watch or log a position
+                  Add <strong>{searchResults.addNew}</strong> to Portfolio &mdash; watch or log a position
                 </span>
               </button>
             )}
@@ -5816,9 +5840,9 @@ export default function Dashboard() {
                 <div className="stat-label">Avg Return</div>
               </div>
               <div className={`stat-card stat-card-click${activeTab === 'watchlist' ? ' stat-card-active' : ''}`}
-                onClick={() => { setActiveTab('watchlist'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
+                onClick={() => { setActiveTab('watchlist'); setMyStocksFilter('watching'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
                 <div className="stat-value" style={{ color: '#fbbf24' }}>{watchlist.length}</div>
-                <div className="stat-label">{"\u{2B50}"} Watchlist</div>
+                <div className="stat-label">{"\u{1F4BC}"} Portfolio</div>
               </div>
               <div className={`stat-card stat-card-click${activeTab === 'dropped' ? ' stat-card-active' : ''}`}
                 onClick={() => { setActiveTab('dropped'); setRecFilter('ALL'); document.getElementById('tabs-anchor')?.scrollIntoView({ behavior: 'smooth' }); }}>
@@ -5963,7 +5987,7 @@ export default function Dashboard() {
             {activeTab === 'new' && 'Fresh signals detected today. Worth investigating before they move.'}
             {activeTab === 'active' && 'Current picks being tracked. Sorted by performance.'}
             {activeTab === 'dropped' && 'Previously tracked stocks where the signal has faded.'}
-            {activeTab === 'watchlist' && 'All the stocks you\'re tracking. Tap "+ Track" on any card, or the big + button in the bottom nav, to add a stock.'}
+            {activeTab === 'watchlist' && 'Everything personal — your watchlist, open positions, and closed trades. Filter with the chips below.'}
           </p>
 
           {/* MY STOCKS FILTER CHIPS (Phase 7) ─────────────────────────────
@@ -6343,7 +6367,7 @@ export default function Dashboard() {
       {/* ─── MOBILE BOTTOM NAV BAR ───
           Fixed thumb-reachable nav for phones. Hidden on desktop via CSS.
           Mirrors the most commonly used tabs so users don't have to scroll back up. */}
-      <nav className="mobile-bottom-nav mobile-bottom-nav-5" aria-label="Primary">
+      <nav className="mobile-bottom-nav mobile-bottom-nav-4" aria-label="Primary">
         <button
           className={`mb-nav-btn${activeTab === 'new' ? ' active' : ''}`}
           onClick={() => { setActiveTab('new'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
@@ -6363,20 +6387,12 @@ export default function Dashboard() {
         </button>
         <button
           className={`mb-nav-btn${activeTab === 'watchlist' ? ' active' : ''}`}
-          onClick={() => { setActiveTab('watchlist'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          aria-label="My Stocks"
-        >
-          <span className="mb-nav-icon">{"\u{1F4CA}"}</span>
-          <span className="mb-nav-label">My Stocks</span>
-          {watchlistPicks.length > 0 && <span className="mb-nav-badge">{watchlistPicks.length}</span>}
-        </button>
-        <button
-          className={`mb-nav-btn${activeTab === 'portfolio' ? ' active' : ''}`}
-          onClick={() => { setActiveTab('portfolio'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          aria-label="My Portfolio"
+          onClick={() => { setActiveTab('watchlist'); setMyStocksFilter('watching'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Portfolio"
         >
           <span className="mb-nav-icon">{"\u{1F4BC}"}</span>
           <span className="mb-nav-label">Portfolio</span>
+          {watchlistPicks.length > 0 && <span className="mb-nav-badge">{watchlistPicks.length}</span>}
         </button>
         <button
           className={`mb-nav-btn${activeTab === 'leaderboard' ? ' active' : ''}`}
