@@ -1217,45 +1217,6 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
   text-align: center; line-height: 1.55;
 }
 
-.spg-chart {
-  background: #0f1d30; border: 1px solid #1e3a5f; border-radius: 12px;
-  padding: 14px 16px; margin-bottom: 14px;
-  display: flex; flex-direction: column; gap: 10px;
-}
-.spg-bar-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 200px) 1fr;
-  gap: 12px;
-  align-items: center;
-}
-.spg-bar-label {
-  display: flex; align-items: center; gap: 8px;
-  min-width: 0;
-}
-.spg-bar-count {
-  font-size: 0.7rem; color: #4a6a85; font-weight: 600;
-  background: #0a0e1a; padding: 2px 7px; border-radius: 999px;
-}
-.spg-bar-track {
-  /* Reserve a fixed right gutter so the % value is always visible
-     even when the bar fills the full width of the track. */
-  position: relative; height: 26px;
-  background: #0a0e1a; border-radius: 6px;
-  display: flex; align-items: center;
-  padding-right: 56px;
-}
-.spg-bar-fill {
-  height: 100%; border-radius: 6px;
-  transition: width 0.4s ease;
-  background: #22c55e;
-  max-width: 100%;
-}
-.spg-bar-value {
-  position: absolute; right: 10px;
-  font-size: 0.78rem; font-weight: 800;
-  pointer-events: none;
-}
-
 /* ── "How to read this" help button + panel ── */
 .spg-help-btn {
   margin-left: auto;
@@ -1329,6 +1290,10 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
   font-style: italic; padding: 0 4px; line-height: 1.5;
 }
 
+/* ── MOBILE LEADERBOARD: table → stacked cards ──
+   On screens ≤600px the table reshapes into one card per source.
+   Each <td> grows a "label · value" mini-row using its data-label
+   attribute, so no horizontal scrolling. */
 @media (max-width: 600px) {
   .spg-controls { gap: 6px; }
   .spg-seg button { padding: 7px 10px; font-size: 0.74rem; }
@@ -1337,18 +1302,49 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
     padding: 7px 10px; font-size: 0.74rem;
     order: 99; /* push to its own row below the segs */
   }
-  .spg-bar-row {
-    grid-template-columns: 110px 1fr;
-    gap: 8px;
+
+  .spg-table-wrap {
+    background: transparent; border: 0; overflow: visible; padding: 0;
   }
-  .spg-bar-label .source-badge-sm {
-    font-size: 0.68rem; padding: 2px 6px;
+  .spg-table { display: block; min-width: 0; }
+  .spg-table thead { display: none; }            /* labels live on each cell now */
+  .spg-table tbody { display: block; }
+  .spg-table tbody tr {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 12px;
+    background: #0f1d30;
+    border: 1px solid #1e3a5f;
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
   }
-  .spg-bar-count { font-size: 0.62rem; padding: 1px 5px; }
-  .spg-bar-track { height: 24px; padding-right: 52px; }
-  .spg-bar-value { font-size: 0.72rem; right: 8px; }
-  .spg-table { font-size: 0.78rem; min-width: 600px; }
-  .spg-table thead th, .spg-table tbody td { padding: 9px 10px; }
+  .spg-table tbody tr:last-child { margin-bottom: 0; border-bottom: 1px solid #1e3a5f; }
+  .spg-table tbody td {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 4px 0; border: 0; text-align: right;
+    color: #e0e6f0;
+    font-size: 0.85rem;
+  }
+  /* Source row spans both columns and acts as the card header */
+  .spg-table tbody td.spg-td-source {
+    grid-column: 1 / -1;
+    border-bottom: 1px solid rgba(30,58,95,0.5);
+    padding-bottom: 8px; margin-bottom: 4px;
+    justify-content: flex-start;
+  }
+  .spg-table tbody td.spg-td-source::before { content: none; }
+  /* Inject the label using the data-label attribute */
+  .spg-table tbody td::before {
+    content: attr(data-label);
+    color: #7a9bc0;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    margin-right: 10px;
+  }
+
   .spg-help-panel { padding: 14px 14px; }
   .spg-help-dl {
     grid-template-columns: 1fr;

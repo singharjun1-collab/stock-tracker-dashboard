@@ -1957,7 +1957,6 @@ function AISettingsPanel({ settings, onSave }) {
 function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
   const isPeak = mode === 'peak';
   const [windowMode, setWindowMode] = useState('mature'); // 'mature' | 'all'
-  const [rankBy, setRankBy] = useState('median'); // 'median' | 'avg' | 'hit20'
   const [showHelp, setShowHelp] = useState(false);
 
   const stats = useMemo(() => {
@@ -2056,21 +2055,12 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
     return out;
   }, [alerts, windowMode, isPeak]);
 
-  const rankKey = rankBy === 'median' ? 'median' : rankBy === 'avg' ? 'avg' : 'hit20';
-  // Ranking direction:
-  //   peak + median/avg     → higher first  (best gains on top)
-  //   peak + hit20          → higher first  (most winners on top)
-  //   drawdown + median/avg → lower first   (worst drops on top)
-  //   drawdown + hit20      → higher first  (most -20% drops on top — also "worst" first)
-  const sortDescending = isPeak || rankBy === 'hit20';
+  // Always sort by median. Peak mode → highest median on top (best gains).
+  // Drawdown mode → lowest median on top (deepest typical drop).
   const sorted = useMemo(() =>
-    [...stats].sort((a, b) => sortDescending ? b[rankKey] - a[rankKey] : a[rankKey] - b[rankKey]),
-    [stats, rankKey, sortDescending]
+    [...stats].sort((a, b) => isPeak ? b.median - a.median : a.median - b.median),
+    [stats, isPeak]
   );
-  const maxAbsForBar = useMemo(() => {
-    if (sorted.length === 0) return 1;
-    return Math.max(...sorted.map(s => Math.abs(s[rankKey])), 1);
-  }, [sorted, rankKey]);
 
   const fmtPctSigned = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
   const fmtPctRate = (v) => `${Math.round(v)}%`;
@@ -2099,8 +2089,7 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
   const ui = isPeak ? {
     icon: '\u{1F3C6}',                                              // trophy
     title: 'Source Performance — Peak Gain (14d)',
-    subtitle: 'For each pick, the highest price the stock hit within 14 days of the alert. Picks credited to multiple sources count for each.',
-    hit20Label: 'Hit +20%',
+    subtitle: 'Sources ranked by median peak gain — the typical highest price each source\'s picks reached within 14 days of the alert. Picks credited to multiple sources count for each.',
     medianCol: 'Median peak',
     avgCol: 'Avg peak',
     hit10Col: 'Hit +10%',
@@ -2108,20 +2097,17 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
     bestCol: 'Best',
     worstCol: 'Worst',
     footnote: 'Median is the "typical pick" — half did better, half did worse. Average gets pulled by big winners; median is more honest.',
-    barAria: 'peak gain by source',
   } : {
     icon: '\u{26A0}\u{FE0F}',                                       // ⚠️ warning
     title: 'Source Performance — Worst Drawdown (14d)',
-    subtitle: 'For each pick, the LOWEST price the stock dropped to within 14 days of the alert. Same window as Peak Gain — this is the downside twin.',
-    hit20Label: 'Hit \u{2212}20%',
+    subtitle: 'Sources ranked worst-first by median drop — the typical lowest price each source\'s picks fell to within 14 days. Downside twin of Peak Gain.',
     medianCol: 'Median drop',
     avgCol: 'Avg drop',
     hit10Col: 'Hit \u{2212}10%',
     hit20Col: 'Hit \u{2212}20%',
     bestCol: 'Shallowest',
     worstCol: 'Deepest',
-    footnote: 'Sources ranked worst-first. Median drop is the "typical bottom" — half the source\'s picks fell further, half didn\'t.',
-    barAria: 'worst drawdown by source',
+    footnote: 'Median drop is the "typical bottom" — half the source\'s picks fell further, half didn\'t.',
   };
 
   return (
@@ -2141,11 +2127,6 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
             className={windowMode === 'all' ? 'on' : ''}
             onClick={() => setWindowMode('all')}
           >All picks</button>
-        </div>
-        <div className="spg-seg" role="tablist" aria-label="Rank by">
-          <button type="button" className={rankBy === 'median' ? 'on' : ''} onClick={() => setRankBy('median')}>Median</button>
-          <button type="button" className={rankBy === 'avg' ? 'on' : ''} onClick={() => setRankBy('avg')}>Average</button>
-          <button type="button" className={rankBy === 'hit20' ? 'on' : ''} onClick={() => setRankBy('hit20')}>{ui.hit20Label}</button>
         </div>
         <button
           type="button"
@@ -2175,7 +2156,7 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
             <dt>{isPeak ? 'Hit +10% / Hit +20%' : 'Hit \u{2212}10% / Hit \u{2212}20%'}</dt>
             <dd>{isPeak
               ? 'The % of a source’s picks that reached at least +10% (or +20%) at some point in the 14-day window. A "winners" rate.'
-              : 'The % of a source’s picks that fell to −1% (or −20%) or worse at some point in the 14-day window. A "pain rate."'}</dd>
+              : 'The % of a source’s picks that fell to −10% (or −20%) or worse at some point in the 14-day window. A "pain rate."'}</dd>
 
             <dt>{isPeak ? 'Best / Worst' : 'Shallowest / Deepest'}</dt>
             <dd>{isPeak
@@ -2205,33 +2186,8 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
         </div>
       ) : (
         <>
-          {/* Bar chart: horizontal bars, color-coded */}
-          <div className="spg-chart" role="img" aria-label={`${rankBy} ${ui.barAria}`}>
-            {sorted.map(s => {
-              const val = s[rankKey];
-              const widthPct = Math.max(2, (Math.abs(val) / maxAbsForBar) * 100);
-              const barColor = rankBy === 'hit20' ? hitRateColorFor(val) : colorFor(val);
-              return (
-                <div key={s.source} className="spg-bar-row">
-                  <div className="spg-bar-label">
-                    <span className={`source-badge-sm ${s.meta.cls}`}>{s.meta.emoji} {s.source}</span>
-                    <span className="spg-bar-count">{s.count}</span>
-                  </div>
-                  <div className="spg-bar-track">
-                    <div
-                      className="spg-bar-fill"
-                      style={{ width: `${widthPct}%`, background: barColor }}
-                    />
-                    <span className="spg-bar-value" style={{ color: barColor }}>
-                      {rankBy === 'hit20' ? fmtPctRate(val) : fmtPctSigned(val)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Detail table (scrolls horizontally on mobile) */}
+          {/* Leaderboard table — desktop layout. On <600px CSS reshapes
+              each row into a 2-col mini-grid card using data-label attrs. */}
           <div className="spg-table-wrap">
             <table className="spg-table">
               <thead>
@@ -2249,16 +2205,16 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
               <tbody>
                 {sorted.map(s => (
                   <tr key={s.source}>
-                    <td className="spg-td-source">
+                    <td className="spg-td-source" data-label="Source">
                       <span className={`source-badge-sm ${s.meta.cls}`}>{s.meta.emoji} {s.source}</span>
                     </td>
-                    <td>{s.count}</td>
-                    <td style={{ color: colorFor(s.median), fontWeight: 700 }}>{fmtPctSigned(s.median)}</td>
-                    <td style={{ color: colorFor(s.avg), fontWeight: 700 }}>{fmtPctSigned(s.avg)}</td>
-                    <td>{fmtPctRate(s.hit10)}</td>
-                    <td style={{ color: hitRateColorFor(s.hit20), fontWeight: 700 }}>{fmtPctRate(s.hit20)}</td>
-                    <td className={isPeak ? 'spg-pos' : ''}>{fmtPctSigned(s.best)}</td>
-                    <td className={s.worst < 0 ? 'spg-neg' : ''}>{fmtPctSigned(s.worst)}</td>
+                    <td data-label="Picks">{s.count}</td>
+                    <td data-label={ui.medianCol} style={{ color: colorFor(s.median), fontWeight: 700 }}>{fmtPctSigned(s.median)}</td>
+                    <td data-label={ui.avgCol} style={{ color: colorFor(s.avg), fontWeight: 700 }}>{fmtPctSigned(s.avg)}</td>
+                    <td data-label={ui.hit10Col}>{fmtPctRate(s.hit10)}</td>
+                    <td data-label={ui.hit20Col} style={{ color: hitRateColorFor(s.hit20), fontWeight: 700 }}>{fmtPctRate(s.hit20)}</td>
+                    <td data-label={ui.bestCol} className={isPeak ? 'spg-pos' : ''}>{fmtPctSigned(s.best)}</td>
+                    <td data-label={ui.worstCol} className={s.worst < 0 ? 'spg-neg' : ''}>{fmtPctSigned(s.worst)}</td>
                   </tr>
                 ))}
               </tbody>
