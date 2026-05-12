@@ -164,6 +164,65 @@ body {
    kebab dropdown's "Deeper Research" group, which uses .kebab-item
    styling — no bespoke header rules needed anymore. */
 
+/* ── VIEW TOGGLE (Cards / Table) ──
+   Segmented control in the header. Global view-mode switcher applied to
+   the New, Active and Portfolio tabs. Robinhood-style pill design — soft
+   border, subtle glow on the active segment, compact on phones. */
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(15, 29, 48, 0.85);
+  border: 1px solid rgba(79, 195, 247, 0.3);
+  border-radius: 10px;
+  padding: 3px;
+  gap: 2px;
+  height: 38px;
+  box-sizing: border-box;
+}
+.view-toggle-btn {
+  background: transparent;
+  border: none;
+  color: #7a9bc0;
+  padding: 6px 14px;
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  font-family: inherit;
+  line-height: 1;
+}
+.view-toggle-btn:hover {
+  color: #e6f3ff;
+  background: rgba(79, 195, 247, 0.06);
+}
+.view-toggle-btn.active {
+  background: rgba(79, 195, 247, 0.18);
+  color: #e6f3ff;
+  box-shadow: 0 0 10px rgba(79, 195, 247, 0.25);
+}
+.view-toggle-btn.active:hover { transform: none; }
+.view-toggle-ic { font-size: 1rem; line-height: 1; }
+@media (max-width: 640px) {
+  .view-toggle { height: 36px; padding: 2px; border-radius: 9px; }
+  .view-toggle-btn { padding: 6px 10px; }
+  .view-toggle-label { display: none; }
+}
+
+/* Wrapper around QuickTable when it's rendered as the dashboard's main
+   feed (Table view). Adds breathing room and lets the table scroll
+   horizontally on phones without breaking the rest of the layout. */
+.dashboard-table-wrap {
+  width: 100%;
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .dashboard-table-wrap { margin-top: 8px; }
+}
+
 .section-close-btn {
   background: rgba(239, 68, 68, 0.1);
   border: 1px solid rgba(239, 68, 68, 0.35);
@@ -1659,6 +1718,29 @@ footer span { color: #4fc3f7; }
   border: 1px solid #1e3a5f;
   border-radius: 10px;
   padding: 20px;
+}
+
+/* ── AI Settings — subsection block ──
+   Used for the Alert Recipients block (moved out of the kebab menu on
+   2026-05-12). Visually separated from the Market Cap block above by a
+   top border + extra margin, so the panel reads as two related-but-
+   distinct settings groups. */
+.ai-settings-subsection {
+  margin-top: 24px;
+  padding-top: 24px;
+  border-top: 1px solid #1e3a5f;
+}
+.ai-settings-subsection-head { margin-bottom: 16px; }
+.ai-settings-subsection-title {
+  font-size: 1rem; font-weight: 800; color: #e0f0ff;
+  margin: 0 0 6px 0; display: flex; align-items: center; gap: 8px;
+}
+.ai-settings-subsection-sub {
+  font-size: 0.78rem; color: #5a8ab0; margin: 0;
+  line-height: 1.45;
+}
+@media (max-width: 640px) {
+  .ai-settings-subsection { margin-top: 18px; padding-top: 18px; }
 }
 
 .ai-setting-row { margin-bottom: 16px; }

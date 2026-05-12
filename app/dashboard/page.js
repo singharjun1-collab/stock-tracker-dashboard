@@ -4425,6 +4425,26 @@ export default function Dashboard() {
   // Quick Scan table is hidden by default (takes a lot of vertical space);
   // revealed on demand via the ⋯ kebab menu, same UX as Archive.
   const [showQuickScan, setShowQuickScan] = useState(false);
+  // ─── Card / Table view toggle (2026-05-12 v3) ──────────────────────
+  // Global view switcher in the header — applies to the New, Active and
+  // Portfolio tabs. 'cards' renders the existing .ac-* AlertCard grid
+  // (mobile-first, Robinhood-style). 'table' renders the QuickTable
+  // component (dense, sortable, power-user friendly). Default = 'cards'
+  // for the beautiful first impression. User's choice persists in the
+  // `sc_view_mode` cookie so it sticks across sessions and devices that
+  // share a browser profile.
+  const [viewMode, setViewMode] = useState('cards'); // 'cards' | 'table'
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+    const m = document.cookie.match(/(?:^|; )sc_view_mode=([^;]*)/);
+    if (m && (m[1] === 'table' || m[1] === 'cards')) setViewMode(m[1]);
+  }, []);
+  const handleSetViewMode = useCallback((m) => {
+    setViewMode(m);
+    if (typeof document !== 'undefined') {
+      document.cookie = `sc_view_mode=${m}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+    }
+  }, []);
   // Close the ⋯ kebab dropdown when the user clicks anywhere outside it.
   useEffect(() => {
     if (!kebabOpen) return;
@@ -5426,11 +5446,44 @@ export default function Dashboard() {
           {/* Surge Scout has been moved into the kebab dropdown
               (Deeper Research section). Nothing renders here anymore. */}
 
+          {/* ─── VIEW TOGGLE (Cards / Table) ───
+              Global view switcher. Only shown on tabs that render the
+              cards-grid (new, active, watchlist) — analytics, portfolio,
+              leaderboard and users tabs each have their own bespoke UI
+              that the toggle wouldn't apply to. Selection persists in
+              the `sc_view_mode` cookie. */}
+          {['new', 'active', 'watchlist'].includes(activeTab) && (
+            <div className="view-toggle" role="group" aria-label="View mode">
+              <button
+                type="button"
+                className={`view-toggle-btn${viewMode === 'cards' ? ' active' : ''}`}
+                onClick={() => handleSetViewMode('cards')}
+                aria-pressed={viewMode === 'cards'}
+                title="Card view — beautiful, mobile-friendly"
+              >
+                <span className="view-toggle-ic" aria-hidden="true">{"\u{25A6}"}</span>
+                <span className="view-toggle-label">Cards</span>
+              </button>
+              <button
+                type="button"
+                className={`view-toggle-btn${viewMode === 'table' ? ' active' : ''}`}
+                onClick={() => handleSetViewMode('table')}
+                aria-pressed={viewMode === 'table'}
+                title="Table view — dense, sortable"
+              >
+                <span className="view-toggle-ic" aria-hidden="true">{"\u{2630}"}</span>
+                <span className="view-toggle-label">Table</span>
+              </button>
+            </div>
+          )}
+
           {/* ─── MORE MENU (kebab) ───
-              Single entry point for less-frequent destinations. Keeps the
-              header uncluttered while still exposing Archive, AI Settings,
-              Alert List, Dropped picks, Analytics, Users, and a jump to
-              Quick Scan. Closing handled by click-outside below. */}
+              Single entry point for less-frequent destinations. As of
+              2026-05-12 (v3) the Quick Scan, Dropped, Archive and Alert
+              List entries have been removed: Quick Scan is now a global
+              Card↔Table view toggle (header), and the Alert List moved
+              into AI Settings. The menu keeps Analytics, Deeper Research,
+              Filters & Sectors, AI Settings, and Manage Users. */}
           <div className="kebab-menu-wrap">
             <button
               className={`header-tool-btn kebab-trigger ${kebabOpen ? 'active' : ''}`}
@@ -5444,52 +5497,6 @@ export default function Dashboard() {
             </button>
             {kebabOpen && (
               <div className="kebab-dropdown" role="menu" onClick={e => e.stopPropagation()}>
-                <button
-                  className={`kebab-item${showQuickScan ? ' active' : ''}`}
-                  onClick={() => {
-                    const next = !showQuickScan;
-                    setShowQuickScan(next);
-                    setKebabOpen(false);
-                    if (next) setTimeout(() => document.getElementById('quick-scan-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-                  }}
-                >
-                  <span className="kebab-ic">{"\u{26A1}"}</span>
-                  <span className="kebab-label">Quick Scan</span>
-                  <span className="kebab-badge">{alerts.length}</span>
-                </button>
-                <button
-                  className={`kebab-item${activeTab === 'dropped' ? ' active' : ''}`}
-                  onClick={() => { setActiveTab('dropped'); setRecFilter('ALL'); setKebabOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                >
-                  <span className="kebab-ic">{"\u{1F4E6}"}</span>
-                  <span className="kebab-label">Dropped</span>
-                  <span className="kebab-badge">{droppedPicks.length}</span>
-                </button>
-                <button
-                  className={`kebab-item${showArchive ? ' active' : ''}`}
-                  onClick={() => {
-                    const next = !showArchive;
-                    setShowArchive(next);
-                    setKebabOpen(false);
-                    if (next) setTimeout(() => document.getElementById('archive-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-                  }}
-                >
-                  <span className="kebab-ic">{"\u{1F4C2}"}</span>
-                  <span className="kebab-label">Archive</span>
-                  <span className="kebab-badge">{alerts.length}</span>
-                </button>
-                <button
-                  className={`kebab-item${showDistList ? ' active' : ''}`}
-                  onClick={() => {
-                    const next = !showDistList;
-                    setShowDistList(next);
-                    setKebabOpen(false);
-                    if (next) setTimeout(() => document.getElementById('dist-list-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
-                  }}
-                >
-                  <span className="kebab-ic">{"\u{1F4E7}"}</span>
-                  <span className="kebab-label">Alert List</span>
-                </button>
                 <button
                   className={`kebab-item${activeTab === 'analytics' ? ' active' : ''}`}
                   onClick={() => { setActiveTab('analytics'); setRecFilter('ALL'); setKebabOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
@@ -6028,19 +6035,9 @@ export default function Dashboard() {
       </>}
       {/* ─── END ANALYTICS-ONLY SECTIONS ─── */}
 
-      {/* QUICK SCAN TABLE — hidden by default to save vertical space.
-          Opened from the ⋯ More menu. Anchor div is always present so the
-          scroll-into-view call works even when the table itself is collapsed. */}
-      <div id="quick-scan-section">
-        {showQuickScan && (
-          <QuickTable
-            alerts={alerts}
-            watchlist={watchlist}
-            onToggleWatchlist={handleToggleWatchlist}
-            onJumpToCard={handleJumpToCard}
-          />
-        )}
-      </div>
+      {/* Quick Scan section retired 2026-05-12 v3 — the QuickTable is now
+          rendered inline via the Cards/Table view toggle in the header,
+          replacing the cards-grid when viewMode === 'table'. */}
 
       {/* TAB CONTENT */}
       {activeTab === 'analytics' ? (
@@ -6254,7 +6251,26 @@ export default function Dashboard() {
             );
           })()}
 
-          {/* Cards grid */}
+          {/* Cards grid OR Table view (2026-05-12 v3) — global view toggle
+              lives in the header and persists in the `sc_view_mode` cookie.
+              Table mode reuses the QuickTable component (previously hidden
+              in the kebab menu). Clicking a ticker in the table switches
+              back to card view and scrolls to that card. */}
+          {viewMode === 'table' ? (
+            <div className="dashboard-table-wrap">
+              <QuickTable
+                alerts={getTabData()}
+                watchlist={watchlist}
+                onToggleWatchlist={handleToggleWatchlist}
+                onJumpToCard={(alert) => { handleSetViewMode('cards'); handleJumpToCard(alert); }}
+              />
+              {getTabData().length === 0 && (
+                <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem', textAlign: 'center' }}>
+                  {searchQuery ? `No results for "${searchQuery}" in this tab.` : 'No picks match current filters.'}
+                </p>
+              )}
+            </div>
+          ) : (
           <div className={`cards-grid${allCompact && compactNonce > 0 ? ' grid-all-compact' : ''}`}>
             {getTabData().length > 0 ? getTabData().map((alert, idx) => {
               const card = (
@@ -6429,6 +6445,7 @@ export default function Dashboard() {
               );
             })()}
           </div>
+          )}
         </>
       )}
 
@@ -6640,22 +6657,29 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* AI ENGINE SETTINGS */}
+      {/* AI ENGINE SETTINGS — also hosts the Alert Recipients section
+          (formerly its own "Alert List" kebab entry, merged here 2026-05-12 v3
+          so admin-y configuration lives in one place). */}
       <div className="archive-section" id="ai-settings-section">
         {showAISettings && (
           <>
             <p className="section-title" style={{ marginLeft: 0 }}>{"\u{2699}\u{FE0F}"} AI Engine Settings <button className="section-close-btn" onClick={() => setShowAISettings(false)}>{"\u{2715}"} Close</button></p>
             <AISettingsPanel settings={aiSettings} onSave={handleSaveAISetting} />
-          </>
-        )}
-      </div>
 
-      {/* DISTRIBUTION LIST */}
-      <div className="archive-section" id="dist-list-section">
-        {showDistList && (
-          <>
-            <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4E7}"} Signal Change Alert List <button className="section-close-btn" onClick={() => setShowDistList(false)}>{"\u{2715}"} Close</button></p>
-            <DistributionListManager />
+            {/* Alert Recipients — moved out of the kebab menu and into
+                the Settings panel on 2026-05-12. Same component, same data,
+                just a cleaner home that matches how Robinhood / Public.com
+                bury notification-list management inside Settings. */}
+            <div className="ai-settings-subsection">
+              <div className="ai-settings-subsection-head">
+                <h3 className="ai-settings-subsection-title">{"\u{1F4E7}"} Alert Recipients</h3>
+                <p className="ai-settings-subsection-sub">
+                  When a stock changes from BUY to SELL (or vice versa),
+                  everyone on this list gets notified by email.
+                </p>
+              </div>
+              <DistributionListManager />
+            </div>
           </>
         )}
       </div>
