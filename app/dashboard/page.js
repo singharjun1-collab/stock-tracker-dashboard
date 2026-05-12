@@ -705,6 +705,48 @@ function SignalHistoryAccordion({ entries, totalCount }) {
   );
 }
 
+// ── Search result row (2026-05-12) ──
+// Compact, mobile-first row used in the unified-search dropdown. Mirrors
+// the visual language of AlertCard (Buy/Hold/Trim/Exit colour dot, live
+// price, rec mini-chip) but at a single-line cadence so the dropdown
+// surfaces 10+ matches without scrolling.
+function SearchResultRow({ alert, sharedPrices, tracked, onTap }) {
+  const ticker = String(alert.ticker || '').toUpperCase();
+  const rec = (alert.recommendation || 'HOLD').toUpperCase();
+  const live = sharedPrices?.[ticker]?.price;
+  const prevClose = sharedPrices?.[ticker]?.previous_close;
+  const todayPct = (live != null && prevClose != null && prevClose > 0)
+    ? ((live - prevClose) / prevClose) * 100
+    : null;
+  return (
+    <button
+      type="button"
+      className={`search-result-row ${tracked ? 'is-tracked' : ''}`}
+      onClick={onTap}
+      onMouseDown={(e) => e.preventDefault()}  // keep input focus until click fires
+      role="option"
+    >
+      <span
+        className={`search-result-dot ${tracked ? `dot-${recClass(rec)}` : 'dot-untracked'}`}
+        aria-hidden="true"
+      />
+      <span className="search-result-ticker">{ticker}</span>
+      <span className="search-result-company">{alert.company || ''}</span>
+      <span className="search-result-right">
+        {live != null && (
+          <span className="search-result-price">${Number(live).toFixed(2)}</span>
+        )}
+        {todayPct != null && (
+          <span className={`search-result-pct ${todayPct >= 0 ? 'pos' : 'neg'}`}>
+            {todayPct >= 0 ? '+' : ''}{todayPct.toFixed(1)}%
+          </span>
+        )}
+        <span className="search-result-chev" aria-hidden="true">›</span>
+      </span>
+    </button>
+  );
+}
+
 function AlertCard({
   alert, index, sectionPrefix, watchlist, sharedPrices,
   forceCompact, forceCompactNonce,
@@ -822,6 +864,47 @@ function AlertCard({
   const daysLabel = daysSinceAlert <= 0 ? 'today'
     : daysSinceAlert === 1 ? '1 day ago' : `${daysSinceAlert} days ago`;
 
+  // ────────────────────────────────────────────────────────────────────
+  // Quiet / stale-chatter detection (2026-05-12). Cards whose newest
+  // AI chatter is 30+ days old get a "Quiet · 47d" pill and a muted
+  // visual treatment so users can scan freshness at a glance.
+  //
+  // We compute "last chatter" as the MAX of:
+  //   - last_resignal_at  (a recent re-detection by the daily scan)
+  //   - the newest signal_change_history entry
+  //   - alert_date        (the original AI flag date — fallback)
+  // ────────────────────────────────────────────────────────────────────
+  const lastChatterMs = (() => {
+    const cands = [];
+    if (alert.last_resignal_at) {
+      const t = new Date(alert.last_resignal_at).getTime();
+      if (!Number.isNaN(t)) cands.push(t);
+    }
+    if (Array.isArray(alert.signal_change_history) && alert.signal_change_history.length > 0) {
+      for (const sc of alert.signal_change_history) {
+        const ts = new Date(sc.change_date || sc.created_at || 0).getTime();
+        if (!Number.isNaN(ts) && ts > 0) cands.push(ts);
+      }
+    }
+    if (alert.latest_signal_change) {
+      const ts = new Date(alert.latest_signal_change.change_date || alert.latest_signal_change.created_at || 0).getTime();
+      if (!Number.isNaN(ts) && ts > 0) cands.push(ts);
+    }
+    if (alert.alert_date) {
+      const ts = new Date(alert.alert_date + 'T00:00:00').getTime();
+      if (!Number.isNaN(ts) && ts > 0) cands.push(ts);
+    }
+    return cands.length ? Math.max(...cands) : null;
+  })();
+  const quietDays = lastChatterMs != null
+    ? Math.floor((Date.now() - lastChatterMs) / 86400000)
+    : null;
+  const QUIET_THRESHOLD_DAYS = 30;
+  const isQuiet = quietDays != null && quietDays >= QUIET_THRESHOLD_DAYS;
+  const quietLabel = isQuiet
+    ? `Quiet · ${quietDays}d`
+    : null;
+
   // Market-hours indicator was moved to the page-level MarketClock.
   // Each card no longer displays its own ET time.
 
@@ -872,7 +955,7 @@ function AlertCard({
   return (
     <div
       id={`card-${alert.ticker}`}
-      className={`ac ac-${recVariant}${compact ? ' ac-compact' : ''}${isNew ? ' ac-new' : ''}${isDropped ? ' ac-dropped' : ''}${isWatched ? ' ac-watched' : ''}`}
+      className={`ac ac-${recVariant}${compact ? ' ac-compact' : ''}${isNew ? ' ac-new' : ''}${isDropped ? ' ac-dropped' : ''}${isWatched ? ' ac-watched' : ''}${isQuiet ? ' ac-quiet' : ''}`}
     >
       {/* HEADER — ticker, live price, signal bars, dismiss */}
       <div className="ac-header">
@@ -899,6 +982,15 @@ function AlertCard({
               >
                 <span className="ac-fresh-dot" aria-hidden="true"></span>
                 {freshSignalLabel}
+              </span>
+            )}
+            {!isNew && !isFreshSignal && isQuiet && (
+              <span
+                className="ac-quiet-pill"
+                title={`No fresh AI chatter on this ticker in ${quietDays} days. The signal may be stale — check the chart and signal history before acting.`}
+              >
+                <span className="ac-quiet-dot" aria-hidden="true"></span>
+                {quietLabel}
               </span>
             )}
             {isDropped && <span className="ac-dropped-pill">DROPPED</span>}
@@ -2282,12 +2374,25 @@ function StockCardModal({
           ) : (
             <div className="card-modal-empty">
               <p>
-                {"\u{1F4ED}"} The AI doesn't have an active card for <strong>{ticker}</strong> right now.
+                {"\u{1F4ED}"} The AI doesn&rsquo;t have an active card for <strong>{ticker}</strong> right now.
               </p>
               <p style={{ marginTop: 8, color: '#7a9bc0', fontSize: '0.88rem' }}>
-                This usually means the stock has been dropped from the daily scan.
-                Closed trades in dropped tickers won't show a live card.
+                This usually means the stock isn&rsquo;t in your watchlist yet, or it&rsquo;s been dropped from the daily scan.
+                You can still track it — choose an option below.
               </p>
+              {onOpenAddSheet && (
+                <div className="card-modal-empty-actions">
+                  <button
+                    className="card-modal-empty-primary"
+                    onClick={() => {
+                      onOpenAddSheet({ ticker, company: null, alert: null });
+                      onClose();
+                    }}
+                  >
+                    {"\u{2795}"} Track {ticker}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -4235,6 +4340,11 @@ export default function Dashboard() {
   const [recFilter, setRecFilter] = useState('ALL');   // 'ALL' | 'BUY' | 'HOLD' | 'TRIM' | 'EXIT' | 'SELL'
   const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
+  // Drives the unified-search results dropdown (2026-05-12). Mirrors the
+  // input's focused state but also stays open while the user is hovering
+  // / tapping results — onBlur uses a 200ms timeout so the click registers
+  // before we close. Cleared on tap-outside via the document-level handler.
+  const [searchFocused, setSearchFocused] = useState(false);
   const [mcapRange, setMcapRange] = useState([0, 5000]);
   const [showArchive, setShowArchive] = useState(false);
   const [showDistList, setShowDistList] = useState(false);
@@ -4921,16 +5031,79 @@ export default function Dashboard() {
     return new Date(a.last_resignal_at).getTime() >= cutoffMs;
   };
 
-  const newPicks = useMemo(() => sortByPerf(alerts.filter(a =>
+  // ────────────────────────────────────────────────────────────────────
+  // Dedupe alerts by ticker (2026-05-12). Older signal cycles for the
+  // same stock used to render as separate cards. Now one card per
+  // ticker — older cycles' signal_change_history is merged into the
+  // most-recent (kept) row so the accordion history captures it all.
+  //
+  // /api/alerts returns rows ordered by alert_date DESC, so the FIRST
+  // occurrence of each ticker we encounter is the most recent —
+  // that's our "headline" alert for the card. We then walk the older
+  // duplicates and fold their history into the kept alert's history.
+  // ────────────────────────────────────────────────────────────────────
+  const dedupedAlerts = useMemo(() => {
+    const byTicker = new Map();   // ticker -> kept alert object (the headline)
+    const extraHistory = new Map(); // ticker -> array of signal_changes from dropped duplicates
+
+    for (const a of alerts) {
+      const t = String(a.ticker || '').toUpperCase();
+      if (!t) continue;
+
+      if (!byTicker.has(t)) {
+        // First time seeing this ticker → it's the most recent (headline)
+        byTicker.set(t, a);
+        continue;
+      }
+
+      // Duplicate row — fold its history into the kept ticker's bucket.
+      // We also fold its latest_signal_change in case signal_change_history
+      // wasn't populated for the duplicate row.
+      const bucket = extraHistory.get(t) || [];
+      if (Array.isArray(a.signal_change_history)) {
+        bucket.push(...a.signal_change_history);
+      }
+      if (a.latest_signal_change) bucket.push(a.latest_signal_change);
+      extraHistory.set(t, bucket);
+    }
+
+    // Now produce the result array. For each kept alert, merge its own
+    // history with any extras, dedupe by id (or change_date+old+new key
+    // for legacy rows), and sort newest first.
+    const out = [];
+    for (const [t, kept] of byTicker.entries()) {
+      const extras = extraHistory.get(t) || [];
+      if (extras.length === 0) {
+        out.push(kept);
+        continue;
+      }
+      const combined = [...(kept.signal_change_history || []), ...extras];
+      const seen = new Map();
+      for (const sc of combined) {
+        if (!sc) continue;
+        const key = sc.id || `${sc.change_date || sc.created_at}-${sc.old_recommendation}-${sc.new_recommendation}`;
+        if (!seen.has(key)) seen.set(key, sc);
+      }
+      const merged = Array.from(seen.values()).sort((x, y) => {
+        const xt = new Date(x.change_date || x.created_at || 0).getTime();
+        const yt = new Date(y.change_date || y.created_at || 0).getTime();
+        return yt - xt; // newest first
+      });
+      out.push({ ...kept, signal_change_history: merged });
+    }
+    return out;
+  }, [alerts]);
+
+  const newPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
     notDismissed(a) && (
       a.status === 'new' ||
       (a.status === 'active' && isRecentResignal(a))
     )
-  )), [alerts]);
-  const activePicks = useMemo(() => sortByPerf(alerts.filter(a =>
+  )), [dedupedAlerts]);
+  const activePicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
     a.status === 'active' && notDismissed(a) && !isRecentResignal(a)
-  )), [alerts]);
-  const droppedPicks = useMemo(() => sortByPerf(alerts.filter(a => a.status === 'dropped' && notDismissed(a))), [alerts]);
+  )), [dedupedAlerts]);
+  const droppedPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a => a.status === 'dropped' && notDismissed(a))), [dedupedAlerts]);
   // My Stocks tab data (was: watchlist tab). Includes any ticker that is
   //   - in the user's watchlist (cookie + server), OR
   //   - has any paper_trade (open or closed)
@@ -4939,7 +5112,7 @@ export default function Dashboard() {
   const watchlistPicks = useMemo(() => {
     const wlTickers = new Set((watchlist || []).map((t) => String(t).toUpperCase()));
     const tradeTickers = new Set((paperTrades || []).map((t) => String(t.ticker).toUpperCase()));
-    const universe = alerts.filter((a) => {
+    const universe = dedupedAlerts.filter((a) => {
       const tk = String(a.ticker).toUpperCase();
       return (wlTickers.has(tk) || tradeTickers.has(tk)) && notDismissed(a);
     });
@@ -4956,12 +5129,83 @@ export default function Dashboard() {
       }
     });
     return sortByPerf(filtered);
-  }, [alerts, watchlist, paperTrades, myStocksFilter]);
+  }, [dedupedAlerts, watchlist, paperTrades, myStocksFilter]);
 
   const filteredNew = useMemo(() => applyAllFilters(newPicks), [newPicks, applyAllFilters]);
   const filteredActive = useMemo(() => applyAllFilters(activePicks), [activePicks, applyAllFilters]);
   const filteredDropped = useMemo(() => applyAllFilters(droppedPicks), [droppedPicks, applyAllFilters]);
   const filteredWatchlist = useMemo(() => applyAllFilters(watchlistPicks), [watchlistPicks, applyAllFilters]);
+
+  // ────────────────────────────────────────────────────────────────────
+  // Unified-search results (2026-05-12). The top search bar is now a
+  // discovery hub — it surfaces matches across the WHOLE deduped alert
+  // universe (not just the current tab), grouped into:
+  //   1. On your watchlist (tickers you're tracking OR have a paper-trade
+  //      position in)
+  //   2. All stocks (everything else the AI has flagged at some point)
+  //   3. Add new TICKER (when the typed string looks like a fresh ticker
+  //      that isn't in either group — bridges to the AddStockSheet flow)
+  //
+  // Tapping any group-1 / group-2 result opens the StockCardModal for that
+  // ticker (the existing detail-modal hook), so search is no longer a
+  // dead-end. Tapping "Add new" opens the position-logging sheet pre-filled
+  // with that ticker.
+  // ────────────────────────────────────────────────────────────────────
+  const TICKER_REGEX = /^[A-Z0-9.\-]{1,10}$/;
+  const searchResults = useMemo(() => {
+    const q = (searchQuery || '').trim().toUpperCase();
+    if (!q) return null;
+    const wlSet = new Set((watchlist || []).map(t => String(t).toUpperCase()));
+    const tradeSet = new Set((paperTrades || []).map(t => String(t.ticker).toUpperCase()));
+    const tracked = (t) => wlSet.has(t) || tradeSet.has(t);
+    const matchesQuery = (a) => {
+      const t = String(a.ticker || '').toUpperCase();
+      const c = String(a.company || '').toUpperCase();
+      return t.includes(q) || c.includes(q);
+    };
+    const onWatchlist = [];
+    const allStocks = [];
+    for (const a of dedupedAlerts) {
+      if (a.dismissed_at) continue;
+      if (!matchesQuery(a)) continue;
+      const t = String(a.ticker).toUpperCase();
+      if (tracked(t)) onWatchlist.push(a);
+      else allStocks.push(a);
+    }
+    const present = new Set([
+      ...onWatchlist.map(a => String(a.ticker).toUpperCase()),
+      ...allStocks.map(a => String(a.ticker).toUpperCase()),
+    ]);
+    const showAddNew = TICKER_REGEX.test(q) && !present.has(q);
+    return {
+      onWatchlist: onWatchlist.slice(0, 6),
+      allStocks: allStocks.slice(0, 12),
+      addNew: showAddNew ? q : null,
+      onWatchlistTotal: onWatchlist.length,
+      allStocksTotal: allStocks.length,
+    };
+  }, [searchQuery, dedupedAlerts, watchlist, paperTrades]);
+
+  // Tap-handler for a search result row. Closes the dropdown + clears the
+  // input so the cards return to their unfiltered view, then pops the
+  // StockCardModal for the chosen ticker — the same detail view the
+  // Portfolio tab uses, so the experience is consistent across the app.
+  const handleSearchResultTap = useCallback((ticker) => {
+    setCardModalTicker(String(ticker).toUpperCase());
+    setSearchFocused(false);
+    setSearchQuery('');
+  }, []);
+
+  // Tap-handler for the "Add new TICKER" footer row. Opens the existing
+  // AddStockSheet pre-filled with the typed ticker so the user can finish
+  // adding it to their watchlist or logging a position.
+  const handleSearchAddNew = useCallback((ticker) => {
+    const t = String(ticker || '').toUpperCase();
+    if (!t) return;
+    openAddSheet({ ticker: t, company: null, alert: null });
+    setSearchFocused(false);
+    setSearchQuery('');
+  }, [openAddSheet]);
 
   // Which pick-list feeds the rec-filter chip counts — depends on active tab.
   // Counts reflect what's available to filter in the current view so users
@@ -5332,16 +5576,87 @@ export default function Dashboard() {
           <input
             type="text"
             className="search-input"
-            placeholder="Filter your AI watchlist (ticker or company name)…"
-            title="Filters the stocks already surfaced by Stock Chatter — does NOT search every US-listed stock."
-            aria-label="Filter the stocks Stock Chatter has already surfaced"
+            placeholder="Search any stock — ticker or company name"
+            title="Searches across your watchlist AND every stock Stock Chatter knows about. Tap a result to view it."
+            aria-label="Search your watchlist and the wider Stock Chatter universe"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setSearchFocused(true)}
+            onBlur={() => {
+              // Delay close so a tap on a result row registers before the
+              // dropdown unmounts. 200ms is enough for fast taps without
+              // feeling laggy on slower devices.
+              setTimeout(() => setSearchFocused(false), 200);
+            }}
           />
           {searchQuery && (
-            <button className="search-clear" onClick={() => setSearchQuery('')}>{"\u{2715}"}</button>
+            <button className="search-clear" onClick={() => { setSearchQuery(''); setSearchFocused(false); }}>{"\u{2715}"}</button>
           )}
         </div>
+
+        {/* UNIFIED-SEARCH DROPDOWN (2026-05-12) — grouped results that
+            replace the old "dead-end" + button search. Renders only when
+            the input is focused AND the user has typed something. Tap a
+            row to open the stock-detail modal; tap "Add new" to jump into
+            the AddStockSheet for that ticker. */}
+        {searchFocused && searchResults && (
+          <div className="search-results-dropdown" role="listbox" aria-label="Search results">
+            {searchResults.onWatchlist.length === 0 &&
+             searchResults.allStocks.length === 0 &&
+             !searchResults.addNew && (
+              <div className="search-results-empty">
+                No matches for &ldquo;{searchQuery}&rdquo;. Try a ticker like NVDA or AAPL.
+              </div>
+            )}
+
+            {searchResults.onWatchlist.length > 0 && (
+              <>
+                <div className="search-results-group-label">
+                  ON YOUR WATCHLIST · {searchResults.onWatchlistTotal}
+                </div>
+                {searchResults.onWatchlist.map((a) => (
+                  <SearchResultRow
+                    key={`wl-${a.id}`}
+                    alert={a}
+                    sharedPrices={prices}
+                    tracked={true}
+                    onTap={() => handleSearchResultTap(a.ticker)}
+                  />
+                ))}
+              </>
+            )}
+
+            {searchResults.allStocks.length > 0 && (
+              <>
+                <div className="search-results-group-label">
+                  ALL STOCKS · {searchResults.allStocksTotal}
+                </div>
+                {searchResults.allStocks.map((a) => (
+                  <SearchResultRow
+                    key={`all-${a.id}`}
+                    alert={a}
+                    sharedPrices={prices}
+                    tracked={false}
+                    onTap={() => handleSearchResultTap(a.ticker)}
+                  />
+                ))}
+              </>
+            )}
+
+            {searchResults.addNew && (
+              <button
+                type="button"
+                className="search-results-addnew"
+                onClick={() => handleSearchAddNew(searchResults.addNew)}
+              >
+                <span className="search-results-addnew-plus" aria-hidden="true">+</span>
+                <span className="search-results-addnew-text">
+                  Track <strong>{searchResults.addNew}</strong> &mdash; tap to add to your watchlist or log a position
+                </span>
+              </button>
+            )}
+          </div>
+        )}
         <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
         {activeTab !== 'analytics' && (
           <button
@@ -5370,9 +5685,9 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Search-bar helper: clarifies that the search filters the AI
-          watchlist only, not the entire US market. Stays subtle on
-          desktop, wraps cleanly on mobile. */}
+      {/* Search-bar helper: tells the user where the unified search reaches
+          and how to bring in a fresh ticker. Updated 2026-05-12 when search
+          stopped being a "watchlist filter" and became a discovery hub. */}
       <p
         className="search-bar-hint"
         style={{
@@ -5383,7 +5698,7 @@ export default function Dashboard() {
           textAlign: 'left',
         }}
       >
-        {"ℹ️"} Search filters this watchlist only — it doesn't search every US-listed stock. To pull in a new ticker, adjust your <strong style={{ color: '#9fc3e6' }}>AI engine settings</strong> or wait for the next daily scan.
+        {"ℹ️"} Tap any result to view the stock. To pull in a brand-new ticker the AI hasn&rsquo;t flagged yet, type its symbol and choose <strong style={{ color: '#9fc3e6' }}>Track</strong> — or adjust your <strong style={{ color: '#9fc3e6' }}>AI engine settings</strong>.
       </p>
 
       {/* Sticky tabs wrapper — tabs stay pinned to top as user scrolls */}

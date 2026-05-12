@@ -315,12 +315,15 @@ export default function AddStockSheet({
         ref={sheetRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Add a stock"
+        aria-label="Track a stock"
       >
         <div className="as-handle-wrap"><div className="as-handle" /></div>
 
         <div className="as-header">
-          <div className="as-title">Add Stock</div>
+          <div className="as-title">
+            Track a stock
+            <span className="as-subtitle">Add to watchlist or log a position you own</span>
+          </div>
           <button className="as-close" onClick={onClose}>Cancel</button>
         </div>
 
@@ -335,7 +338,7 @@ export default function AddStockSheet({
             autoCapitalize="characters"
             autoComplete="off"
             spellCheck="false"
-            placeholder="Search ticker or company name…"
+            placeholder="Pick a ticker to track…"
             value={query}
             onChange={(e) => {
               const v = e.target.value;
@@ -424,10 +427,18 @@ export default function AddStockSheet({
 
         .as-header {
           padding: 4px 20px 12px;
-          display: flex; align-items: center; justify-content: space-between;
+          display: flex; align-items: flex-start; justify-content: space-between;
           flex-shrink: 0;
+          gap: 12px;
         }
-        .as-title { font-size: 17px; font-weight: 700; color: #e8ecf3; }
+        .as-title {
+          font-size: 17px; font-weight: 700; color: #e8ecf3;
+          display: flex; flex-direction: column; gap: 2px;
+        }
+        .as-subtitle {
+          font-size: 12px; font-weight: 500; color: #7a9bc0;
+          letter-spacing: 0;
+        }
         .as-close {
           background: none; border: none;
           color: #8b95a8; font-size: 14px; font-weight: 600;
