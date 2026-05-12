@@ -43,14 +43,24 @@ export default function AddStockSheet({
   const [query, setQuery] = useState('');
   const [selectedTicker, setSelectedTicker] = useState(null);
   const [selectedAlert, setSelectedAlert] = useState(null);  // the AI alert object for the selected ticker (or null)
-  const [showPositionForm, setShowPositionForm] = useState(false);
+  // Which sub-screen is showing after a ticker is selected:
+  //   'choice'        — Watch vs I-own-shares choice cards (default)
+  //   'log-position'  — Robinhood-style shares + avg cost form with live preview
+  // Replaces the old `showPositionForm` boolean. Updated 2026-05-12 in the
+  // Add-to-Portfolio redesign — see PR feat/add-to-portfolio-redesign.
+  const [screen, setScreen] = useState('choice');
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState(null);            // {type:'success'|'error', message}
   const inputRef = useRef(null);
   const sheetRef = useRef(null);
 
-  // Position form fields
-  const [amount, setAmount] = useState(1000);
+  // Position form fields — new Robinhood-style model:
+  //   shares     — integer count via +/- stepper (default 1)
+  //   entryPrice — avg cost per share (default = AI entry_low or current price)
+  //   notes      — optional free text
+  // On submit we compute entry_amount = shares × entryPrice and POST that to
+  // /api/paper-trades to preserve the existing API contract.
+  const [shares, setShares] = useState(1);
   const [entryPrice, setEntryPrice] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -76,10 +86,10 @@ export default function AddStockSheet({
       setQuery('');
       setSelectedTicker(null);
       setSelectedAlert(null);
-      setShowPositionForm(false);
+      setScreen('choice');
       setBusy(false);
       setFeedback(null);
-      setAmount(1000);
+      setShares(1);
       setEntryPrice('');
       setNotes('');
     }
@@ -164,11 +174,16 @@ export default function AddStockSheet({
     setSelectedTicker(t);
     setSelectedAlert(alert);
     setQuery(t);
-    setShowPositionForm(false);
+    setScreen('choice');
+    setShares(1);
+    setNotes('');
     setFeedback(null);
-    // Prefill entry price from AI or current price
+    // Prefill avg cost from AI entry_low or the latest price we know about.
+    // The user can tap "Use $X" in the log-position screen to swap to the
+    // current price if their actual fill was different.
     if (alert?.entry_low != null) setEntryPrice(String(alert.entry_low));
     else if (alert?.price_at_alert != null) setEntryPrice(String(alert.price_at_alert));
+    else setEntryPrice('');
   }, []);
 
   const handleAddToWatchlist = async () => {
@@ -240,15 +255,18 @@ export default function AddStockSheet({
   const handleLogPosition = async () => {
     if (!selectedView || busy) return;
     const price = parseFloat(entryPrice);
-    const amt = parseFloat(amount);
+    const shareCount = parseInt(shares, 10);
     if (!Number.isFinite(price) || price <= 0) {
-      setFeedback({ type: 'error', message: 'Enter a valid entry price' });
+      setFeedback({ type: 'error', message: 'Enter a valid average cost' });
       return;
     }
-    if (!Number.isFinite(amt) || amt <= 0) {
-      setFeedback({ type: 'error', message: 'Enter a valid amount' });
+    if (!Number.isFinite(shareCount) || shareCount <= 0) {
+      setFeedback({ type: 'error', message: 'Add at least 1 share' });
       return;
     }
+    // Convert shares × cost → entry_amount to keep the existing
+    // /api/paper-trades contract intact. Server still derives shares = amount/price.
+    const amt = shareCount * price;
     setBusy(true);
     setFeedback(null);
 
@@ -293,7 +311,7 @@ export default function AddStockSheet({
           }),
         });
       } catch { /* non-fatal */ }
-      setFeedback({ type: 'success', message: `Position opened: ${(amt / price).toFixed(2)} shares of ${selectedView.ticker}` });
+      setFeedback({ type: 'success', message: `Logged ${shareCount} ${shareCount === 1 ? 'share' : 'shares'} of ${selectedView.ticker}` });
       onPositionLogged?.(data.trade);
       onAdded?.();
       setTimeout(() => onClose?.(), 1100);
@@ -403,9 +421,10 @@ export default function AddStockSheet({
           {selectedView ? (
             <SelectedStockPanel
               view={selectedView}
-              showPositionForm={showPositionForm}
-              onTogglePosition={() => setShowPositionForm((v) => !v)}
-              amount={amount} setAmount={setAmount}
+              screen={screen}
+              onGoToLogPosition={() => { setScreen('log-position'); setFeedback(null); }}
+              onBackToChoice={() => { setScreen('choice'); setFeedback(null); }}
+              shares={shares} setShares={setShares}
               entryPrice={entryPrice} setEntryPrice={setEntryPrice}
               notes={notes} setNotes={setNotes}
               busy={busy}
@@ -415,13 +434,13 @@ export default function AddStockSheet({
               onChangeTicker={() => {
                 // Restore the search bar + clear the selected stock. Lets
                 // the user swap to a different ticker without closing the
-                // sheet entirely. Added 2026-05-12 alongside the
-                // hide-search-when-selected change.
+                // sheet entirely.
                 setSelectedTicker(null);
                 setSelectedAlert(null);
-                setShowPositionForm(false);
+                setScreen('choice');
                 setQuery('');
                 setEntryPrice('');
+                setShares(1);
                 setNotes('');
                 setTimeout(() => inputRef.current?.focus(), 50);
               }}
@@ -857,6 +876,313 @@ export default function AddStockSheet({
           margin: 12px 0;
         }
         .as-calc strong { color: #e8ecf3; font-weight: 700; font-size: 13px; }
+
+        /* ── Add-to-Portfolio redesign (2026-05-12) ─────────────────────
+           New compact stock strip + two-card choice + log-position form
+           with live P&L preview. Replaces the old as-selected-card +
+           inline form pattern.
+           ─────────────────────────────────────────────────────────────── */
+
+        .as-stock-strip {
+          padding: 12px 14px;
+          background: #1a2230;
+          border: 1px solid #2a3447;
+          border-radius: 14px;
+          margin-bottom: 14px;
+        }
+        .as-stock-strip-top {
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 10px;
+        }
+        .as-stock-strip-meta { flex: 1; min-width: 0; }
+        .as-stock-strip-company {
+          font-size: 13px; font-weight: 700; color: #e8ecf3;
+          overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .as-stock-strip-ticker {
+          font-size: 10px; color: #8b95a8;
+          letter-spacing: 0.4px; margin-top: 1px; font-weight: 600;
+        }
+        .as-stock-strip-right { text-align: right; flex-shrink: 0; }
+        .as-stock-strip-price { font-size: 17px; font-weight: 700; color: #e8ecf3; }
+        .as-stock-strip-pct { font-size: 11px; font-weight: 600; margin-top: 1px; }
+        .as-stock-strip-pct.up { color: #00c853; }
+        .as-stock-strip-pct.down { color: #ff3b30; }
+
+        .as-stock-strip-ai {
+          margin-top: 8px; padding-top: 8px;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          display: flex; align-items: center; gap: 8px;
+          flex-wrap: wrap;
+        }
+        .as-ai-tag {
+          font-size: 9px; font-weight: 800;
+          padding: 3px 7px; border-radius: 5px;
+          letter-spacing: 0.5px; flex-shrink: 0;
+        }
+        .as-ai-tag.buy { background: rgba(0,200,83,0.18); color: #00c853; }
+        .as-ai-tag.hold { background: rgba(255,184,0,0.18); color: #ffb800; }
+        .as-ai-tag.trim { background: rgba(255,149,0,0.18); color: #ff9500; }
+        .as-ai-tag.sell, .as-ai-tag.exit { background: rgba(255,59,48,0.18); color: #ff3b30; }
+        .as-ai-tag.watching { background: #2a3447; color: #8b95a8; }
+
+        .as-stock-strip-ai-text {
+          font-size: 11px; color: #b8c4d6; line-height: 1.35;
+          min-width: 0; flex: 1;
+        }
+        .as-stock-strip-monitor {
+          margin-top: 8px; padding-top: 8px;
+          border-top: 1px solid rgba(255,255,255,0.06);
+          font-size: 11px; color: #8b95a8;
+        }
+
+        .as-choose-label {
+          font-size: 11px; color: #5a6478;
+          letter-spacing: 0.5px; text-transform: uppercase;
+          margin: 6px 0 10px;
+          font-weight: 700;
+        }
+
+        .as-choice-card {
+          width: 100%;
+          padding: 14px;
+          background: #1a2230;
+          border: 1px solid #2a3447;
+          border-radius: 14px;
+          display: flex; align-items: center; gap: 12px;
+          cursor: pointer;
+          font-family: inherit;
+          text-align: left;
+          margin-bottom: 10px;
+          transition: background 0.15s, border-color 0.15s, transform 0.1s;
+        }
+        .as-choice-card:active:not(:disabled) {
+          background: #232d3e;
+          transform: scale(0.99);
+        }
+        .as-choice-card:disabled { opacity: 0.5; cursor: not-allowed; }
+        .as-choice-card.is-active { border-color: rgba(0,200,83,0.4); }
+        .as-choice-watch.is-active:active:not(:disabled) {
+          background: rgba(255,59,48,0.08);
+          border-color: rgba(255,59,48,0.4);
+        }
+
+        .as-choice-icon {
+          width: 36px; height: 36px; border-radius: 10px;
+          display: grid; place-items: center;
+          flex-shrink: 0;
+        }
+        .as-choice-icon-watch {
+          background: rgba(10,132,255,0.15);
+          color: #4fa3ff;
+        }
+        .as-choice-card.is-active .as-choice-icon-watch {
+          background: rgba(0,200,83,0.15);
+          color: #00c853;
+        }
+        .as-choice-icon-own {
+          background: rgba(0,200,83,0.15);
+          color: #00c853;
+        }
+
+        .as-choice-body { flex: 1; min-width: 0; }
+        .as-choice-title {
+          font-size: 14px; font-weight: 700; color: #e8ecf3;
+        }
+        .as-choice-sub {
+          font-size: 11px; color: #8b95a8;
+          margin-top: 3px; line-height: 1.35;
+        }
+        .as-choice-action {
+          background: #0a84ff;
+          color: white;
+          font-size: 12px; font-weight: 700;
+          padding: 7px 14px;
+          border-radius: 8px;
+          flex-shrink: 0;
+        }
+        .as-choice-action.is-remove {
+          background: rgba(255,59,48,0.12);
+          color: #ff3b30;
+          border: 1px solid rgba(255,59,48,0.3);
+        }
+        .as-choice-action-secondary {
+          background: transparent;
+          color: #e8ecf3;
+          border: 1px solid #2a3447;
+        }
+
+        .as-choice-footer {
+          margin-top: 12px;
+          padding: 8px;
+          display: flex; align-items: center; justify-content: center; gap: 6px;
+          font-size: 11px; color: #5a6478;
+        }
+
+        /* ── Log Position screen ────────────────────────────────────── */
+
+        .as-field-block { margin-bottom: 14px; }
+        .as-field-label-row {
+          display: flex; align-items: center; justify-content: space-between;
+          margin-bottom: 8px;
+        }
+        .as-field-eyebrow {
+          font-size: 11px; color: #5a6478;
+          letter-spacing: 0.5px; text-transform: uppercase;
+          font-weight: 700;
+        }
+        .as-use-current {
+          background: transparent;
+          border: 1px solid rgba(10,132,255,0.4);
+          color: #4fa3ff;
+          font-size: 11px; font-weight: 600;
+          padding: 4px 10px; border-radius: 7px;
+          cursor: pointer; font-family: inherit;
+        }
+        .as-use-current:active:not(:disabled) {
+          background: rgba(10,132,255,0.12);
+        }
+        .as-use-current:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .as-stepper {
+          display: flex; align-items: center; justify-content: space-between;
+          background: #1a2230;
+          border: 1px solid #2a3447;
+          border-radius: 14px;
+          padding: 10px 14px;
+        }
+        .as-stepper-btn {
+          width: 38px; height: 38px;
+          border-radius: 10px;
+          background: #2a3447;
+          color: #e8ecf3;
+          border: none;
+          font-size: 20px; font-weight: 700;
+          cursor: pointer; font-family: inherit;
+          display: grid; place-items: center;
+          line-height: 1;
+        }
+        .as-stepper-btn:active:not(:disabled) { background: #3a4459; }
+        .as-stepper-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+        .as-stepper-value {
+          display: flex; flex-direction: column; align-items: center;
+        }
+        .as-stepper-input {
+          background: transparent; border: none; outline: none;
+          color: #e8ecf3;
+          font-size: 26px; font-weight: 700;
+          text-align: center;
+          width: 80px;
+          font-family: inherit;
+          padding: 0; line-height: 1;
+          -moz-appearance: textfield;
+        }
+        .as-stepper-input::-webkit-outer-spin-button,
+        .as-stepper-input::-webkit-inner-spin-button {
+          -webkit-appearance: none; margin: 0;
+        }
+        .as-stepper-label {
+          font-size: 10px; color: #8b95a8;
+          margin-top: 2px;
+        }
+
+        .as-cost-input-wrap {
+          background: #1a2230;
+          border: 1px solid #2a3447;
+          border-radius: 14px;
+          padding: 12px 14px;
+          display: flex; align-items: center; gap: 6px;
+          transition: border-color 0.15s;
+        }
+        .as-cost-input-wrap:focus-within { border-color: #0a84ff; }
+        .as-cost-input-currency {
+          font-size: 22px; font-weight: 700; color: #8b95a8;
+        }
+        .as-cost-input {
+          flex: 1; min-width: 0;
+          background: transparent; border: none; outline: none;
+          color: #e8ecf3;
+          font-size: 22px; font-weight: 700;
+          font-family: inherit;
+          padding: 0;
+        }
+
+        .as-notes-input {
+          width: 100%;
+          padding: 11px 14px;
+          background: #1a2230;
+          border: 1px solid #2a3447;
+          border-radius: 12px;
+          color: #e8ecf3;
+          font-size: 13px;
+          font-family: inherit;
+          outline: none;
+          transition: border-color 0.15s;
+        }
+        .as-notes-input:focus { border-color: #0a84ff; }
+        .as-notes-input::placeholder { color: #5a6478; }
+
+        .as-preview {
+          margin: 16px 0;
+          padding: 14px;
+          background: rgba(0,200,83,0.06);
+          border: 1px solid rgba(0,200,83,0.22);
+          border-radius: 14px;
+        }
+        .as-preview.is-down {
+          background: rgba(255,59,48,0.06);
+          border-color: rgba(255,59,48,0.22);
+        }
+        .as-preview-eyebrow {
+          font-size: 10px; font-weight: 700;
+          letter-spacing: 0.5px; text-transform: uppercase;
+          color: #00c853;
+          margin-bottom: 8px;
+        }
+        .as-preview.is-down .as-preview-eyebrow { color: #ff3b30; }
+        .as-preview-hero {
+          display: flex; align-items: baseline; gap: 10px;
+          margin-bottom: 12px;
+        }
+        .as-preview-hero-pending {
+          font-size: 13px; color: #8b95a8;
+        }
+        .as-preview-pct {
+          font-size: 24px; font-weight: 700; color: #00c853;
+          line-height: 1;
+        }
+        .as-preview.is-down .as-preview-pct { color: #ff3b30; }
+        .as-preview-dollar {
+          font-size: 13px; font-weight: 600; color: #00c853;
+        }
+        .as-preview.is-down .as-preview-dollar { color: #ff3b30; }
+        .as-preview-row {
+          display: flex; justify-content: space-between;
+          font-size: 11px;
+        }
+        .as-preview-label { color: #8b95a8; }
+        .as-preview-val {
+          color: #e8ecf3; margin-top: 2px;
+          font-size: 13px; font-weight: 600;
+        }
+        .as-preview-scenarios {
+          margin-top: 12px; padding-top: 10px;
+          border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        .as-preview-scenarios-label {
+          font-size: 10px; font-weight: 700;
+          letter-spacing: 0.5px; text-transform: uppercase;
+          color: #8b95a8;
+          margin-bottom: 6px;
+        }
+        .as-preview-scenario-row {
+          display: flex; justify-content: space-between;
+          font-size: 12px;
+          margin-bottom: 4px;
+        }
+        .as-preview-scenario-row span:first-child { color: #b8c4d6; }
+        .as-preview-scenario-row .up { color: #00c853; font-weight: 600; }
+        .as-preview-scenario-row .down { color: #ff3b30; font-weight: 600; }
       `}</style>
     </>
   );
@@ -988,183 +1314,334 @@ function SearchResults({ results, alertByTicker, onPickWatched, onPickAlert, onP
   );
 }
 
+// ----------------------------------------------------------------------------
+// SelectedStockPanel — two-screen flow shown once a ticker is selected.
+//   screen='choice'        → compact stock header + two choice cards
+//                              (Watch  /  I own shares)
+//   screen='log-position'  → Robinhood-style shares stepper + avg cost +
+//                              live P&L preview against AI target/stop
+// Replaces the old "single panel with two stacked buttons + inline form"
+// pattern. See PR feat/add-to-portfolio-redesign (2026-05-12).
+// ----------------------------------------------------------------------------
 function SelectedStockPanel({
-  view, showPositionForm, onTogglePosition,
-  amount, setAmount, entryPrice, setEntryPrice, notes, setNotes,
+  view, screen,
+  onGoToLogPosition, onBackToChoice,
+  shares, setShares, entryPrice, setEntryPrice, notes, setNotes,
   busy, onAddToWatchlist, onRemoveFromWatchlist, onLogPosition,
-  // Optional. Tapping the "← Change" link inside the selected card calls
-  // this to clear the parent's selection and re-show the search input.
   onChangeTicker,
 }) {
   const a = view.alert;
-  const isMonitor = !a;
-  const shares = (() => {
-    const p = parseFloat(entryPrice);
-    const amt = parseFloat(amount);
-    if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(amt) || amt <= 0) return null;
-    return amt / p;
-  })();
+
+  // Compact stock header used by both screens. Single row: company name +
+  // current price on top, AI badge + target/stop strip below. Replaces the
+  // old larger `.as-selected-card` block.
+  const StockHeader = (
+    <div className="as-stock-strip">
+      <div className="as-stock-strip-top">
+        <div className="as-stock-strip-meta">
+          <div className="as-stock-strip-company">{view.company || view.ticker}</div>
+          <div className="as-stock-strip-ticker">{view.ticker}</div>
+        </div>
+        <div className="as-stock-strip-right">
+          {view.currentPrice != null && (
+            <div className="as-stock-strip-price">${view.currentPrice.toFixed(2)}</div>
+          )}
+          {view.todayPct != null && (
+            <div className={`as-stock-strip-pct ${view.todayPct >= 0 ? 'up' : 'down'}`}>
+              {view.todayPct >= 0 ? '+' : ''}{view.todayPct.toFixed(2)}%
+            </div>
+          )}
+        </div>
+      </div>
+      {a ? (
+        <div className="as-stock-strip-ai">
+          {a.recommendation && (
+            <span className={`as-ai-tag ${a.recommendation.toLowerCase()}`}>AI {a.recommendation}</span>
+          )}
+          <span className="as-stock-strip-ai-text">
+            {a.entry_low != null && <>Entry ${a.entry_low}{a.entry_high && a.entry_high !== a.entry_low ? `–${a.entry_high}` : ''}</>}
+            {a.target_low != null && <> · Target ${a.target_low}{a.target_high && a.target_high !== a.target_low ? `–${a.target_high}` : ''}</>}
+            {a.stop_loss != null && <> · Stop ${a.stop_loss}</>}
+          </span>
+        </div>
+      ) : (
+        <div className="as-stock-strip-monitor">
+          🤖 No active AI signal — we'll monitor and flag if chatter emerges
+        </div>
+      )}
+    </div>
+  );
+
+  // ─── Screen 1: choice ─────────────────────────────────────────────────
+  if (screen === 'choice') {
+    return (
+      <>
+        {onChangeTicker && (
+          <button
+            type="button"
+            className="as-change-ticker"
+            onClick={onChangeTicker}
+            aria-label="Change ticker"
+          >
+            {"\u{2190}"} Change ticker
+          </button>
+        )}
+        {StockHeader}
+
+        <div className="as-choose-label">Choose how to track it</div>
+
+        {/* Watch card — toggles between Add and Remove based on current state */}
+        <button
+          type="button"
+          className={`as-choice-card as-choice-watch ${view.alreadyWatching ? 'is-active' : ''}`}
+          onClick={view.alreadyWatching ? onRemoveFromWatchlist : onAddToWatchlist}
+          disabled={busy}
+        >
+          <div className="as-choice-icon as-choice-icon-watch">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+          </div>
+          <div className="as-choice-body">
+            <div className="as-choice-title">
+              {view.alreadyWatching ? '✓ Watching this stock' : 'Watch this stock'}
+            </div>
+            <div className="as-choice-sub">
+              {view.alreadyWatching
+                ? 'Tap to stop watching'
+                : a?.entry_low != null
+                  ? `Alert me when it enters the buy zone`
+                  : `Alert me on AI signal updates`}
+            </div>
+          </div>
+          <span className={`as-choice-action ${view.alreadyWatching ? 'is-remove' : ''}`}>
+            {busy ? '…' : view.alreadyWatching ? 'Remove' : 'Add'}
+          </span>
+        </button>
+
+        {/* Own card — opens the log-position screen */}
+        <button
+          type="button"
+          className="as-choice-card as-choice-own"
+          onClick={onGoToLogPosition}
+          disabled={busy}
+        >
+          <div className="as-choice-icon as-choice-icon-own">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="7" width="18" height="13" rx="2" />
+              <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+            </svg>
+          </div>
+          <div className="as-choice-body">
+            <div className="as-choice-title">I own shares</div>
+            <div className="as-choice-sub">
+              {a?.target_low != null ? `Track P&L vs AI target` : `Track P&L over time`}
+            </div>
+          </div>
+          <span className="as-choice-action as-choice-action-secondary">Log →</span>
+        </button>
+
+        <div className="as-choice-footer">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
+            <circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" />
+          </svg>
+          You can switch between these anytime
+        </div>
+      </>
+    );
+  }
+
+  // ─── Screen 2: log-position ───────────────────────────────────────────
+  return (
+    <LogPositionScreen
+      view={view}
+      shares={shares} setShares={setShares}
+      entryPrice={entryPrice} setEntryPrice={setEntryPrice}
+      notes={notes} setNotes={setNotes}
+      busy={busy}
+      onBackToChoice={onBackToChoice}
+      onLogPosition={onLogPosition}
+      StockHeader={StockHeader}
+    />
+  );
+}
+
+// ----------------------------------------------------------------------------
+// LogPositionScreen — Robinhood-style shares + avg cost form with a live P&L
+// preview pane. Pure presentation; all submit logic lives in the parent's
+// handleLogPosition (preserves the existing /api/paper-trades contract).
+// ----------------------------------------------------------------------------
+function LogPositionScreen({
+  view, shares, setShares, entryPrice, setEntryPrice, notes, setNotes,
+  busy, onBackToChoice, onLogPosition, StockHeader,
+}) {
+  const a = view.alert;
+  const currentPrice = view.currentPrice;
+  const targetLow = a?.target_low != null ? parseFloat(a.target_low) : null;
+  const targetHigh = a?.target_high != null ? parseFloat(a.target_high) : targetLow;
+  const targetMid = targetLow != null && targetHigh != null ? (targetLow + targetHigh) / 2 : null;
+  const stopPrice = a?.stop_loss != null ? parseFloat(a.stop_loss) : null;
+
+  const shareCount = parseInt(shares, 10) || 0;
+  const cost = parseFloat(entryPrice);
+  const validCost = Number.isFinite(cost) && cost > 0;
+  const basis = validCost ? shareCount * cost : 0;
+  const curVal = validCost && currentPrice != null ? shareCount * currentPrice : null;
+  const pnl = curVal != null ? curVal - basis : null;
+  const pnlPct = pnl != null && basis > 0 ? (pnl / basis) * 100 : null;
+  const targetGain = validCost && targetMid != null ? shareCount * (targetMid - cost) : null;
+  const stopLoss = validCost && stopPrice != null ? shareCount * (stopPrice - cost) : null;
+
+  const fmt$ = (n) =>
+    (n < 0 ? '−$' : '$') +
+    Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <>
-      {onChangeTicker && (
-        <button
-          type="button"
-          className="as-change-ticker"
-          onClick={onChangeTicker}
-          aria-label="Change ticker"
-        >
-          {"\u{2190}"} Change ticker
-        </button>
-      )}
-      <div className="as-selected-card">
-        <div className="as-sel-row">
-          <div className="as-logo">{view.ticker.slice(0, 2)}</div>
-          <div className="as-sel-meta">
-            <div className="as-sel-ticker">{view.ticker}</div>
-            <div className="as-sel-company">{view.company || 'Stock'}</div>
+      <button
+        type="button"
+        className="as-change-ticker"
+        onClick={onBackToChoice}
+        aria-label="Back"
+      >
+        {"\u{2190}"} Back
+      </button>
+
+      {StockHeader}
+
+      {/* Shares stepper */}
+      <div className="as-field-block">
+        <div className="as-field-label-row">
+          <span className="as-field-eyebrow">How many shares?</span>
+        </div>
+        <div className="as-stepper">
+          <button
+            type="button"
+            className="as-stepper-btn"
+            onClick={() => setShares(Math.max(1, shareCount - 1))}
+            disabled={busy || shareCount <= 1}
+            aria-label="Decrease shares"
+          >−</button>
+          <div className="as-stepper-value">
+            <input
+              type="number"
+              inputMode="numeric"
+              className="as-stepper-input"
+              value={shareCount}
+              min={1}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                setShares(Number.isFinite(v) && v > 0 ? v : 1);
+              }}
+            />
+            <span className="as-stepper-label">{shareCount === 1 ? 'share' : 'shares'}</span>
           </div>
-          <div className="as-sel-right">
-            {view.currentPrice != null && <div className="as-sel-price">${view.currentPrice.toFixed(2)}</div>}
-            {view.todayPct != null && (
-              <div className={`as-sel-pct ${view.todayPct >= 0 ? 'up' : 'down'}`}>
-                {view.todayPct >= 0 ? '+' : ''}{view.todayPct.toFixed(2)}%
+          <button
+            type="button"
+            className="as-stepper-btn"
+            onClick={() => setShares(shareCount + 1)}
+            disabled={busy}
+            aria-label="Increase shares"
+          >+</button>
+        </div>
+      </div>
+
+      {/* Avg cost input */}
+      <div className="as-field-block">
+        <div className="as-field-label-row">
+          <span className="as-field-eyebrow">Avg cost per share</span>
+          {currentPrice != null && (
+            <button
+              type="button"
+              className="as-use-current"
+              onClick={() => setEntryPrice(String(currentPrice.toFixed(2)))}
+              disabled={busy}
+            >
+              Use ${currentPrice.toFixed(2)}
+            </button>
+          )}
+        </div>
+        <div className="as-cost-input-wrap">
+          <span className="as-cost-input-currency">$</span>
+          <input
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            className="as-cost-input"
+            value={entryPrice}
+            onChange={(e) => setEntryPrice(e.target.value)}
+            placeholder="0.00"
+          />
+        </div>
+      </div>
+
+      {/* Notes — collapsed by default, expands on focus */}
+      <div className="as-field-block">
+        <input
+          type="text"
+          className="as-notes-input"
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Notes (optional) — why this trade?"
+        />
+      </div>
+
+      {/* Live preview */}
+      {validCost && shareCount > 0 && (
+        <div className={`as-preview ${pnl != null && pnl < 0 ? 'is-down' : 'is-up'}`}>
+          <div className="as-preview-eyebrow">Your position so far</div>
+          {pnl != null && pnlPct != null ? (
+            <div className="as-preview-hero">
+              <span className="as-preview-pct">
+                {pnl >= 0 ? '+' : '−'}{Math.abs(pnlPct).toFixed(1)}%
+              </span>
+              <span className="as-preview-dollar">{fmt$(pnl)}</span>
+            </div>
+          ) : (
+            <div className="as-preview-hero as-preview-hero-pending">
+              Live P&L will appear here
+            </div>
+          )}
+          <div className="as-preview-row">
+            <div>
+              <div className="as-preview-label">Cost basis</div>
+              <div className="as-preview-val">{fmt$(basis)}</div>
+            </div>
+            {curVal != null && (
+              <div style={{ textAlign: 'right' }}>
+                <div className="as-preview-label">Current value</div>
+                <div className="as-preview-val">{fmt$(curVal)}</div>
               </div>
             )}
           </div>
-        </div>
-
-        {a ? (
-          <div className="as-ai-banner">
-            <div className="as-ai-icon">AI</div>
-            <div>
-              <div style={{ fontWeight: 700, color: '#e8ecf3', marginBottom: 2 }}>
-                {a.recommendation || 'WATCHING'}
-                {a.entry_low != null && <> · Entry ${a.entry_low}{a.entry_high && a.entry_high !== a.entry_low ? `–${a.entry_high}` : ''}</>}
-                {a.target_low != null && <> · Target ${a.target_low}{a.target_high && a.target_high !== a.target_low ? `–${a.target_high}` : ''}</>}
-                {a.stop_loss != null && <> · Stop ${a.stop_loss}</>}
-              </div>
-              {a.ai_read && <div style={{ color: '#8b95a8', fontSize: 11 }}>{a.ai_read}</div>}
-            </div>
-          </div>
-        ) : (
-          <div className="as-monitor-banner">
-            <strong>🤖 No active AI signal</strong> — we'll monitor {view.ticker} and flag it if chatter emerges across our sources.
-          </div>
-        )}
-
-        {view.alreadyWatching && (
-          <button
-            type="button"
-            className="as-watching-toggle"
-            onClick={onRemoveFromWatchlist}
-            disabled={busy}
-            title="Tap to remove from watchlist"
-          >
-            <span className="as-watching-toggle-check">✓ In your watchlist</span>
-            <span className="as-watching-toggle-action">Tap to remove</span>
-          </button>
-        )}
-      </div>
-
-      <div className="as-actions">
-        {view.alreadyWatching ? (
-          // Already in watchlist — the primary action becomes "Remove" so
-          // the user has a clear, prominent way to take it off (the most
-          // requested missing UX as of 2026-05-12).
-          <button
-            className="as-btn-remove"
-            onClick={onRemoveFromWatchlist}
-            disabled={busy}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
-            </svg>
-            {busy ? 'Removing…' : 'Remove from Watchlist'}
-          </button>
-        ) : (
-          <button
-            className="as-btn-primary"
-            onClick={onAddToWatchlist}
-            disabled={busy}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-            Add to Watchlist
-          </button>
-        )}
-        <button className="as-btn-secondary" onClick={onTogglePosition} disabled={busy}>
-          {showPositionForm ? '← Just watch instead' : 'Log a Position →'}
-        </button>
-      </div>
-
-      {showPositionForm && (
-        <div className="as-pos-form">
-          <div className="as-section-label">Position details</div>
-
-          <div className="as-form-field">
-            <div className="as-field-label">Amount to invest ($)</div>
-            <input
-              type="number"
-              inputMode="decimal"
-              className="as-field-input"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <div className="as-amount-presets">
-              {[100, 500, 1000, 5000].map((v) => (
-                <button
-                  key={v}
-                  className={`as-preset ${Number(amount) === v ? 'selected' : ''}`}
-                  onClick={() => setAmount(v)}
-                >
-                  ${v.toLocaleString()}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="as-form-field">
-            <div className="as-field-label">
-              Entry price ($)
-              {a?.entry_low != null && parseFloat(entryPrice) === parseFloat(a.entry_low) && (
-                <span className="as-ai-pill">AI</span>
+          {(targetGain != null || stopLoss != null) && (
+            <div className="as-preview-scenarios">
+              <div className="as-preview-scenarios-label">If AI signal plays out</div>
+              {targetGain != null && (
+                <div className="as-preview-scenario-row">
+                  <span>Reaches target ${targetMid.toFixed(2)}</span>
+                  <span className={targetGain >= 0 ? 'up' : 'down'}>
+                    {targetGain >= 0 ? '+' : '−'}{fmt$(targetGain).replace('−', '').replace('$', '$')}
+                  </span>
+                </div>
+              )}
+              {stopLoss != null && (
+                <div className="as-preview-scenario-row">
+                  <span>Hits stop ${stopPrice.toFixed(2)}</span>
+                  <span className={stopLoss >= 0 ? 'up' : 'down'}>
+                    {stopLoss >= 0 ? '+' : '−'}{fmt$(stopLoss).replace('−', '').replace('$', '$')}
+                  </span>
+                </div>
               )}
             </div>
-            <input
-              type="number"
-              inputMode="decimal"
-              step="0.01"
-              className="as-field-input"
-              value={entryPrice}
-              onChange={(e) => setEntryPrice(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
-
-          <div className="as-form-field">
-            <div className="as-field-label">Notes (optional)</div>
-            <input
-              type="text"
-              className="as-field-input"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Why are you taking this trade?"
-            />
-          </div>
-
-          {shares != null && (
-            <div className="as-calc">
-              Buys <strong>{shares.toFixed(2)} shares</strong> at <strong>${parseFloat(entryPrice).toFixed(2)}</strong> = <strong>${(shares * parseFloat(entryPrice)).toFixed(2)}</strong>
-            </div>
           )}
-
-          <button className="as-btn-primary" onClick={onLogPosition} disabled={busy}>
-            {busy ? 'Logging…' : 'Confirm Position'}
-          </button>
         </div>
       )}
+
+      <button className="as-btn-primary" onClick={onLogPosition} disabled={busy}>
+        {busy ? 'Saving…' : 'Save position'}
+      </button>
     </>
   );
 }
