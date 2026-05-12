@@ -1948,6 +1948,225 @@ function AISettingsPanel({ settings, onSave }) {
   );
 }
 
+// ── Source Peak-Gain Leaderboard ──
+// For every pick, find the highest price the stock hit within 14 days of
+// the alert (the pick's "peak gain"). Then group by source and report
+// median, average, and hit-rate. Picks tagged with multiple sources are
+// credited to each source. Drops obvious data errors (>500% or <-95%).
+function SourcePeakGainLeaderboard({ alerts }) {
+  const [windowMode, setWindowMode] = useState('mature'); // 'mature' | 'all'
+  const [rankBy, setRankBy] = useState('median'); // 'median' | 'avg' | 'hit20'
+
+  const stats = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 14);
+
+    // Dedupe alerts by (ticker, alert_date) — keep the earliest id per pair
+    // and merge their source strings. Prevents the same physical pick from
+    // counting 5x just because the daily scan inserted dup rows.
+    const dedupMap = new Map();
+    (alerts || []).forEach(a => {
+      if (!a.ticker || !a.alert_date || a.price_at_alert == null) return;
+      const k = `${a.ticker}|${a.alert_date}`;
+      const existing = dedupMap.get(k);
+      if (!existing || a.id < existing.id) {
+        dedupMap.set(k, { ...a, _sources_combined: a.source || 'unknown' });
+      } else {
+        existing._sources_combined = [existing._sources_combined, a.source].filter(Boolean).join(',');
+      }
+    });
+    const deduped = Array.from(dedupMap.values());
+
+    // For each pick: compute peak gain within 14d of alert_date
+    const perPick = [];
+    for (const a of deduped) {
+      const alertDate = new Date(a.alert_date + 'T00:00:00');
+      if (windowMode === 'mature' && alertDate > cutoff) continue; // not mature yet
+
+      const entry = parseFloat(a.price_at_alert);
+      if (!entry || entry <= 0) continue;
+
+      const fourteenAfter = new Date(alertDate); fourteenAfter.setDate(fourteenAfter.getDate() + 14);
+      let peakPrice = entry;
+      let priceCount = 0;
+      for (const p of (a.prices || [])) {
+        if (!p.price_date || p.price == null) continue;
+        const pd = new Date(p.price_date + 'T00:00:00');
+        if (pd < alertDate || pd > fourteenAfter) continue;
+        priceCount++;
+        const pr = parseFloat(p.price);
+        if (pr > peakPrice) peakPrice = pr;
+      }
+      if (priceCount < 1) continue;
+
+      const peakGainPct = ((peakPrice - entry) / entry) * 100;
+      if (peakGainPct > 500 || peakGainPct < -95) continue; // outlier guard
+
+      // Split source string and credit each source individually
+      const rawSources = String(a._sources_combined || a.source || 'unknown')
+        .toLowerCase()
+        .split(',')
+        .map(s => s.trim())
+        .filter(Boolean);
+      const sourceLabels = new Set();
+      rawSources.forEach(rs => sourceLabels.add(getSourceMeta(rs).label));
+      sourceLabels.forEach(label => perPick.push({ source: label, peakGainPct }));
+    }
+
+    // Aggregate per source
+    const grouped = {};
+    for (const row of perPick) {
+      if (!grouped[row.source]) grouped[row.source] = [];
+      grouped[row.source].push(row.peakGainPct);
+    }
+    const out = Object.entries(grouped)
+      .filter(([, arr]) => arr.length >= 3)
+      .map(([source, arr]) => {
+        const sorted = [...arr].sort((a, b) => a - b);
+        const avg = arr.reduce((s, v) => s + v, 0) / arr.length;
+        const mid = Math.floor(sorted.length / 2);
+        const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+        const hit10 = (arr.filter(v => v >= 10).length / arr.length) * 100;
+        const hit20 = (arr.filter(v => v >= 20).length / arr.length) * 100;
+        const best = Math.max(...arr);
+        const worst = Math.min(...arr);
+        const meta = (() => {
+          // Try to recover emoji/cls for the label by matching back through SOURCE_META
+          for (const key of Object.keys(SOURCE_META)) {
+            if (SOURCE_META[key].label === source) return SOURCE_META[key];
+          }
+          return SOURCE_META.unknown;
+        })();
+        return { source, count: arr.length, median, avg, hit10, hit20, best, worst, meta };
+      });
+    return out;
+  }, [alerts, windowMode]);
+
+  const rankKey = rankBy === 'median' ? 'median' : rankBy === 'avg' ? 'avg' : 'hit20';
+  const sorted = useMemo(() =>
+    [...stats].sort((a, b) => b[rankKey] - a[rankKey]),
+    [stats, rankKey]
+  );
+  const maxAbsForBar = useMemo(() => {
+    if (sorted.length === 0) return 1;
+    return Math.max(...sorted.map(s => Math.abs(s[rankKey])), 1);
+  }, [sorted, rankKey]);
+
+  const fmtPctSigned = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
+  const fmtPctRate = (v) => `${Math.round(v)}%`;
+  const colorFor = (v) =>
+    v >= 15 ? '#22c55e' : v >= 5 ? '#84cc16' : v >= 0 ? '#f59e0b' : '#ef4444';
+
+  const matureCount = useMemo(() => {
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() - 14);
+    return (alerts || []).filter(a => a.alert_date && new Date(a.alert_date + 'T00:00:00') <= cutoff).length;
+  }, [alerts]);
+
+  return (
+    <div className="analytics-section">
+      <h3 className="analytics-heading">{"\u{1F3C6}"} Source Performance — Peak Gain (14d)</h3>
+      <p className="analytics-subtitle">
+        For each pick, the highest price the stock hit within 14 days of the alert. Picks credited to multiple sources count for each.
+      </p>
+
+      <div className="spg-controls">
+        <div className="spg-seg" role="tablist" aria-label="Sample window">
+          <button
+            type="button"
+            className={windowMode === 'mature' ? 'on' : ''}
+            onClick={() => setWindowMode('mature')}
+          >Mature picks (14d+)</button>
+          <button
+            type="button"
+            className={windowMode === 'all' ? 'on' : ''}
+            onClick={() => setWindowMode('all')}
+          >All picks</button>
+        </div>
+        <div className="spg-seg" role="tablist" aria-label="Rank by">
+          <button type="button" className={rankBy === 'median' ? 'on' : ''} onClick={() => setRankBy('median')}>Median</button>
+          <button type="button" className={rankBy === 'avg' ? 'on' : ''} onClick={() => setRankBy('avg')}>Average</button>
+          <button type="button" className={rankBy === 'hit20' ? 'on' : ''} onClick={() => setRankBy('hit20')}>Hit +20%</button>
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div className="spg-empty">
+          {windowMode === 'mature' && matureCount === 0
+            ? "No picks are at least 14 days old yet. Check back soon — or switch to 'All picks' for an early look."
+            : "Not enough scored picks per source yet. Each source needs at least 3 picks with price data to appear here."}
+        </div>
+      ) : (
+        <>
+          {/* Bar chart: horizontal bars, color-coded */}
+          <div className="spg-chart" role="img" aria-label={`${rankBy} peak gain by source`}>
+            {sorted.map(s => {
+              const val = s[rankKey];
+              const widthPct = Math.max(2, (Math.abs(val) / maxAbsForBar) * 100);
+              return (
+                <div key={s.source} className="spg-bar-row">
+                  <div className="spg-bar-label">
+                    <span className={`source-badge-sm ${s.meta.cls}`}>{s.meta.emoji} {s.source}</span>
+                    <span className="spg-bar-count">{s.count}</span>
+                  </div>
+                  <div className="spg-bar-track">
+                    <div
+                      className="spg-bar-fill"
+                      style={{ width: `${widthPct}%`, background: colorFor(val) }}
+                    />
+                    <span className="spg-bar-value" style={{ color: colorFor(val) }}>
+                      {rankBy === 'hit20' ? fmtPctRate(val) : fmtPctSigned(val)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Detail table (scrolls horizontally on mobile) */}
+          <div className="spg-table-wrap">
+            <table className="spg-table">
+              <thead>
+                <tr>
+                  <th className="spg-th-source">Source</th>
+                  <th>Picks</th>
+                  <th>Median peak</th>
+                  <th>Avg peak</th>
+                  <th>Hit +10%</th>
+                  <th>Hit +20%</th>
+                  <th>Best</th>
+                  <th>Worst</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sorted.map(s => (
+                  <tr key={s.source}>
+                    <td className="spg-td-source">
+                      <span className={`source-badge-sm ${s.meta.cls}`}>{s.meta.emoji} {s.source}</span>
+                    </td>
+                    <td>{s.count}</td>
+                    <td style={{ color: colorFor(s.median), fontWeight: 700 }}>{fmtPctSigned(s.median)}</td>
+                    <td style={{ color: colorFor(s.avg), fontWeight: 700 }}>{fmtPctSigned(s.avg)}</td>
+                    <td>{fmtPctRate(s.hit10)}</td>
+                    <td style={{ color: colorFor(s.hit20 / 3), fontWeight: 700 }}>{fmtPctRate(s.hit20)}</td>
+                    <td className="spg-pos">+{s.best.toFixed(1)}%</td>
+                    <td className={s.worst < 0 ? 'spg-neg' : ''}>{fmtPctSigned(s.worst)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="spg-foot">
+            Median is the "typical pick" — half did better, half did worse. Average gets pulled by big winners; median is more honest.
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Analytics Tab Component ──
 function AnalyticsTab({ alerts }) {
   // Source performance analysis
@@ -1991,10 +2210,13 @@ function AnalyticsTab({ alerts }) {
 
   return (
     <div className="analytics-content">
-      {/* Source Performance */}
+      {/* NEW: Peak-gain leaderboard (within 14 days of alert) */}
+      <SourcePeakGainLeaderboard alerts={alerts} />
+
+      {/* Source Performance (latest price vs entry) */}
       <div className="analytics-section">
-        <h3 className="analytics-heading">{"\u{1F4E1}"} Source Performance</h3>
-        <p className="analytics-subtitle">Which signal sources are giving the best picks</p>
+        <h3 className="analytics-heading">{"\u{1F4E1}"} Source Performance — Current Return</h3>
+        <p className="analytics-subtitle">Latest price vs entry, plus your thumbs ratings</p>
         <div className="source-stats-grid">
           {sortedSources.map(([name, stats]) => (
             <div key={name} className="source-stat-card">
