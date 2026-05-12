@@ -5763,8 +5763,11 @@ export default function Dashboard() {
           Self-contained: returns null if /api/sector-pulse is empty or errors.
           Existing layout is unchanged when hidden. The dashboard route is
           already gated on profile.status === 'approved' upstream, so any user
-          who reaches this point is allowed to see Sector Pulse. */}
-      {showRecFilter && (
+          who reaches this point is allowed to see Sector Pulse.
+          Hidden on the Portfolio tab (activeTab === 'watchlist') because
+          Sector Pulse reflects market-wide AI buzz, not personal holdings —
+          irrelevant noise when the user is looking at their own positions. */}
+      {showRecFilter && activeTab !== 'watchlist' && (
         <SectorPulseBar
           enabled={!!profile}
           selected={sectorFilter}
@@ -6031,6 +6034,136 @@ export default function Dashboard() {
                     <span className="mystocks-chip-count">{c.count}</span>
                   </button>
                 ))}
+              </div>
+            );
+          })()}
+
+          {/* PORTFOLIO HEALTH (Holding chip only) ─────────────────────────
+              Mobile-first stats block re-added 2026-05-12 after the old
+              standalone PortfolioTab was retired. Shows the user what
+              their open positions are doing right now: current value,
+              cost basis, unrealized P/L, and an annualized rate so they
+              can compare against benchmarks. Only renders when the
+              Holding chip is active and there is at least one open
+              position — keeps the rest of the Portfolio tab clean. */}
+          {activeTab === 'watchlist' && myStocksFilter === 'holding' && (() => {
+            const upper = (t) => String(t || '').toUpperCase();
+            const openTrades = (paperTrades || []).filter((t) => t.status === 'open');
+            if (openTrades.length === 0) return null;
+
+            const getLatestPrice = (ticker) => {
+              const tk = upper(ticker);
+              const live = prices?.[tk]?.price;
+              if (live != null && !Number.isNaN(live)) return live;
+              const alert = alerts.find((a) => upper(a.ticker) === tk);
+              if (alert) {
+                const last = alert.prices?.[alert.prices.length - 1];
+                const p = last?.price ?? parseFloat(alert.price_at_alert);
+                if (p != null && !Number.isNaN(p)) return p;
+              }
+              return null;
+            };
+
+            // Sum invested + current value across open positions only.
+            let invested = 0;
+            let currentValue = 0;
+            let winners = 0;
+            let priced = 0;
+            for (const t of openTrades) {
+              const shares = parseFloat(t.shares);
+              const entryAmount = parseFloat(t.entry_amount);
+              const entryPrice = parseFloat(t.entry_price);
+              invested += entryAmount;
+              const latest = getLatestPrice(t.ticker);
+              if (latest != null) {
+                currentValue += latest * shares;
+                priced++;
+                if (latest > entryPrice) winners++;
+              } else {
+                // No live price — assume break-even so the bucket math
+                // stays honest (we'll show "—" for ROI in that case).
+                currentValue += entryAmount;
+              }
+            }
+            const unrealizedPnl = currentValue - invested;
+            const roiPct = invested > 0 ? (unrealizedPnl / invested) * 100 : 0;
+
+            // Annualized return for the OPEN bucket: weighted-average
+            // days held across positions becomes the denominator.
+            // Skip when the holding window is too short to be meaningful
+            // (<7 days) so we don't show silly 4-digit % numbers.
+            const totalDaysWeighted = openTrades.reduce((acc, t) => {
+              const days = Math.max(1, Math.floor(
+                (Date.now() - new Date(t.entry_date).getTime()) / 86400000));
+              return acc + days * parseFloat(t.entry_amount);
+            }, 0);
+            const avgDaysHeld = invested > 0 ? totalDaysWeighted / invested : 0;
+            const annualizedPct = (() => {
+              if (avgDaysHeld < 7 || invested <= 0) return null;
+              const r = Math.max(-0.9999, roiPct / 100);
+              return (Math.pow(1 + r, 365 / avgDaysHeld) - 1) * 100;
+            })();
+
+            // Earliest entry — gives the user a "since" date so the
+            // annualized number has context (e.g. "over 3 weeks").
+            const earliestEntryMs = Math.min(
+              ...openTrades.map((t) => new Date(t.entry_date).getTime()));
+            const daysSinceEarliest = Math.max(1, Math.floor(
+              (Date.now() - earliestEntryMs) / 86400000));
+            const formatSpan = (d) => {
+              if (d < 14) return `${d} day${d === 1 ? '' : 's'}`;
+              if (d < 60) return `${Math.round(d / 7)} weeks`;
+              if (d < 365) return `${Math.round(d / 30)} months`;
+              const years = (d / 365).toFixed(1);
+              return `${years} year${years === '1.0' ? '' : 's'}`;
+            };
+            const fmt$ = (v) => (v >= 0 ? '+$' : '-$') + Math.abs(v).toFixed(2);
+
+            return (
+              <div className="holdings-health">
+                {/* Hero — unrealized P/L is the headline number */}
+                <div className="pt-hero-card holdings-health-hero">
+                  <div className="pt-hero-label">{"\u{1F4BC}"} Portfolio Health · Open Positions</div>
+                  <div className={`pt-hero-value ${unrealizedPnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+                    {fmt$(unrealizedPnl)}
+                    <span className="pt-hero-pct"> ({unrealizedPnl >= 0 ? '+' : ''}{roiPct.toFixed(2)}%)</span>
+                  </div>
+                  <div className="pt-hero-annualized">
+                    {annualizedPct != null ? (
+                      <span
+                        className={`pt-hero-annualized-chip ${annualizedPct >= 0 ? 'pct-pos' : 'pct-neg'}`}
+                        title={`Annualized = (1 + ${roiPct.toFixed(2)}%)^(365/${Math.round(avgDaysHeld)}) − 1.\nWhat this pace would compound to over a full year (CAGR). Directional only — short windows are noisy.`}
+                      >
+                        {"\u{1F4C8}"} Annualized: {annualizedPct >= 0 ? '+' : ''}{Math.abs(annualizedPct) >= 1000 ? annualizedPct.toFixed(0) : annualizedPct.toFixed(1)}%
+                      </span>
+                    ) : (
+                      <span className="pt-hero-annualized-chip pt-hero-annualized-pending" title="Need at least 7 days of holding history before an annualized rate is meaningful.">
+                        {"\u{23F1}"} Too early to annualize
+                      </span>
+                    )}
+                    <span className="pt-hero-annualized-sub">
+                      over {formatSpan(daysSinceEarliest)} held
+                    </span>
+                  </div>
+                  <div className="pt-hero-meta">
+                    {openTrades.length} open position{openTrades.length === 1 ? '' : 's'}
+                    {priced > 0 && (
+                      <> {"·"} {winners}/{priced} in the green</>
+                    )}
+                  </div>
+                </div>
+
+                {/* Quick stat tiles — invested vs. now worth */}
+                <div className="holdings-health-tiles">
+                  <div className="holdings-health-tile">
+                    <div className="holdings-health-tile-label">Cost basis</div>
+                    <div className="holdings-health-tile-value">${invested.toFixed(2)}</div>
+                  </div>
+                  <div className="holdings-health-tile">
+                    <div className="holdings-health-tile-label">Now worth</div>
+                    <div className="holdings-health-tile-value">${currentValue.toFixed(2)}</div>
+                  </div>
+                </div>
               </div>
             );
           })()}

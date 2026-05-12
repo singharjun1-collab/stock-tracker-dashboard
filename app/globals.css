@@ -2592,6 +2592,51 @@ footer span { color: #4fc3f7; }
   .pt-roi-foot-value { font-size: 1.4rem; }
 }
 
+/* ── Portfolio Health (Holding chip) ──────────────────────────────
+   Re-added 2026-05-12 so users get stats back inside the new unified
+   Portfolio tab. Reuses .pt-hero-* and is mobile-first by default. */
+.holdings-health {
+  margin: 4px 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.holdings-health-hero {
+  margin-bottom: 0;
+  padding: 18px 18px;
+}
+.holdings-health-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.holdings-health-tile {
+  background: linear-gradient(180deg, rgba(15, 28, 45, 0.85), rgba(10, 20, 35, 0.85));
+  border: 1px solid rgba(0, 229, 255, 0.18);
+  border-radius: 12px;
+  padding: 12px 14px;
+  text-align: center;
+}
+.holdings-health-tile-label {
+  color: #7a9bc0;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.holdings-health-tile-value {
+  color: #e6f3ff;
+  font-size: 1.15rem;
+  font-weight: 700;
+  font-family: 'SF Mono', Consolas, monospace;
+  letter-spacing: -0.2px;
+}
+@media (max-width: 640px) {
+  .holdings-health-hero { padding: 16px 14px; }
+  .holdings-health-tile { padding: 10px 12px; }
+  .holdings-health-tile-value { font-size: 1.05rem; }
+}
+
 .pt-ai-accuracy {
   background: rgba(15, 28, 45, 0.6);
   border: 1px solid rgba(0, 229, 255, 0.15);
