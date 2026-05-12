@@ -1991,8 +1991,9 @@ function SourcePeakGainLeaderboard({ alerts }) {
       let peakPrice = entry;
       let priceCount = 0;
       for (const p of (a.prices || [])) {
-        if (!p.price_date || p.price == null) continue;
-        const pd = new Date(p.price_date + 'T00:00:00');
+        // API returns prices with field `date`, not `price_date`
+        if (!p.date || p.price == null) continue;
+        const pd = new Date(p.date + 'T00:00:00');
         if (pd < alertDate || pd > fourteenAfter) continue;
         priceCount++;
         const pr = parseFloat(p.price);
