@@ -4803,6 +4803,60 @@ footer span { color: #4fc3f7; }
   background: rgba(0,0,0,0.18);
   color: #0a0e14;
 }
+
+/* ─── HOLDINGS CHIP ACCENT (2026-05-12 v3) ───
+   The "Holdings" chip represents real open positions, so it gets a green
+   accent treatment to read as the standout in the row. Unselected: subtle
+   green border + green icon hue so users notice it sitting among the
+   neutral chips. Selected: full green fill (matches BUY-green in the app)
+   instead of the cyan used by other chips. */
+.mystocks-chip-icon {
+  font-size: 0.95rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+.mystocks-chip.mystocks-chip-holdings {
+  background: rgba(34, 197, 94, 0.08);
+  border-color: rgba(34, 197, 94, 0.45);
+  color: #6ee7a4;
+  /* Pulse only the unselected accent border so the chip subtly tugs the
+     eye on first paint without being annoying. Pauses on hover/select. */
+  animation: holdings-chip-pulse 2.4s ease-in-out 2;
+}
+.mystocks-chip.mystocks-chip-holdings:hover {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.7);
+  color: #b6f4cd;
+  animation: none;
+}
+.mystocks-chip.mystocks-chip-holdings .mystocks-chip-count {
+  background: rgba(34, 197, 94, 0.22);
+  color: #b6f4cd;
+}
+.mystocks-chip.mystocks-chip-holdings.selected {
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
+  border-color: #16a34a;
+  color: #0a0e14;
+  animation: none;
+  box-shadow: 0 2px 10px rgba(34, 197, 94, 0.35);
+}
+.mystocks-chip.mystocks-chip-holdings.selected:hover {
+  background: linear-gradient(180deg, #2ad06a 0%, #1bb358 100%);
+}
+.mystocks-chip.mystocks-chip-holdings.selected .mystocks-chip-count {
+  background: rgba(0, 0, 0, 0.22);
+  color: #0a0e14;
+}
+@keyframes holdings-chip-pulse {
+  0%, 100% { border-color: rgba(34, 197, 94, 0.45); }
+  50%      { border-color: rgba(34, 197, 94, 0.95); }
+}
+/* Respect prefers-reduced-motion — kill the pulse for users who opted out */
+@media (prefers-reduced-motion: reduce) {
+  .mystocks-chip.mystocks-chip-holdings { animation: none; }
+}
+
 @media (max-width: 640px) {
   .mystocks-chips { padding: 8px 16px 14px; }
 }

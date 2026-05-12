@@ -6092,10 +6092,15 @@ export default function Dashboard() {
               else if (hasClosed) counts.sold++;
               else counts.watching++;
             }
+            // 2026-05-12 v3 — The "Holding" chip is the only one in this row
+            // that maps to real money on the line, so we give it a distinct
+            // visual treatment (💰 prefix, "Holdings" plural, green accent)
+            // so users immediately see where their actual positions live.
+            // The other chips stay neutral so Holdings reads as the standout.
             const chips = [
               { id: 'all', label: 'All', count: counts.all },
               { id: 'watching', label: 'Watching', count: counts.watching },
-              { id: 'holding', label: 'Holding', count: counts.holding },
+              { id: 'holding', label: 'Holdings', count: counts.holding, accent: 'holdings', icon: '\u{1F4B0}' },
               { id: 'sold', label: 'Sold', count: counts.sold },
             ];
             return (
@@ -6106,9 +6111,11 @@ export default function Dashboard() {
                     role="tab"
                     type="button"
                     aria-selected={myStocksFilter === c.id}
-                    className={`mystocks-chip${myStocksFilter === c.id ? ' selected' : ''}`}
+                    className={`mystocks-chip${c.accent ? ' mystocks-chip-' + c.accent : ''}${myStocksFilter === c.id ? ' selected' : ''}`}
                     onClick={() => setMyStocksFilter(c.id)}
+                    title={c.id === 'holding' ? 'Stocks you actually own (open paper positions)' : undefined}
                   >
+                    {c.icon && <span className="mystocks-chip-icon" aria-hidden="true">{c.icon}</span>}
                     {c.label}
                     <span className="mystocks-chip-count">{c.count}</span>
                   </button>
