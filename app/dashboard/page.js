@@ -4445,17 +4445,28 @@ export default function Dashboard() {
   //   filter behaviour is unchanged when sectorFilter === 'ALL'.
   const [tickerMetaMap, setTickerMetaMap] = useState({});
   const [sectorFilter, setSectorFilter] = useState('ALL');
-  // Collapsible Sector Pulse (2026-05-12). Hidden by default to keep the
-  // top of the dashboard clean; the user opens it via the "📊 Sector
-  // Pulse" chip under the tabs. Choice is remembered in localStorage so
-  // power-users can have it open every load.
-  const [sectorPulseOpen, setSectorPulseOpen] = useState(false);
+  // Sector Pulse inline accordion was retired 2026-05-12 v2 — see the
+  // "Filters & Sectors" panel below. localStorage key `sectorPulseOpen`
+  // is now ignored; left orphaned for users who had it set, no harm.
+
+  // ─── Filters & Sectors panel (2026-05-12) ─────────────────────────
+  // The Market Cap slider and Sector Pulse bar used to live inline in
+  // the chip row / accordion right below the tabs. On mobile they ate
+  // valuable real estate, and the Sector Pulse fetch made the inline
+  // expand feel laggy. Both filters are now hidden behind one entry in
+  // the ⋯ kebab menu ("Filters & Sectors"), and the Sector Pulse data
+  // is preloaded on dashboard mount so the panel snaps open instantly.
+  const [showFiltersPanel, setShowFiltersPanel] = useState(false);
+  const [preloadedSectorPulse, setPreloadedSectorPulse] = useState(null);
   useEffect(() => {
-    try {
-      const stored = typeof window !== 'undefined' ? localStorage.getItem('sectorPulseOpen') : null;
-      if (stored === '1') setSectorPulseOpen(true);
-    } catch {}
-  }, []);
+    if (!profile) return;
+    let cancelled = false;
+    fetch('/api/sector-pulse', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (!cancelled && d?.sectors) setPreloadedSectorPulse(d.sectors); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [profile]);
 
   // ─── Portfolio sub-filter (Phase 8 — 2026-05-12) ────────────────────
   // Filter chip selection inside the unified Portfolio tab — replaces
@@ -5503,6 +5514,25 @@ export default function Dashboard() {
                   <span className="kebab-label">The Surge Scout</span>
                 </a>
                 <div className="kebab-divider" />
+                {/* Filters & Sectors (2026-05-12) — combines the Market Cap
+                    slider and the Sector Pulse bar (which used to live inline
+                    under the tabs) into one tucked-away surface so the mobile
+                    feed stays clean. Opens an in-page panel like AI Settings. */}
+                <button
+                  className={`kebab-item${showFiltersPanel ? ' active' : ''}`}
+                  onClick={() => {
+                    const next = !showFiltersPanel;
+                    setShowFiltersPanel(next);
+                    setKebabOpen(false);
+                    if (next) setTimeout(() => document.getElementById('filters-sectors-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+                  }}
+                >
+                  <span className="kebab-ic">{"\u{1F39B}\u{FE0F}"}</span>
+                  <span className="kebab-label">Filters &amp; Sectors</span>
+                  {(mcapRange[0] > 0 || mcapRange[1] < 5000 || sectorFilter !== 'ALL') && (
+                    <span className="kebab-badge">ON</span>
+                  )}
+                </button>
                 <button
                   className={`kebab-item${showAISettings ? ' active' : ''}`}
                   onClick={() => {
@@ -5774,10 +5804,11 @@ export default function Dashboard() {
           analytics). Counts update live per tab so users see what's available
           before tapping.
 
-          2026-05-12 — alongside the Buy/Hold/Trim/Exit/Sell chips, we now
-          surface the MarketCapSlider here too. This is its new home after
-          being evicted from the hero search bar. Both are card-level
-          filters so they belong together. */}
+          2026-05-12 (v2) — the Market Cap slider USED to sit alongside these
+          chips. On mobile that row got too dense, and the slider is a niche
+          control most users never touch. It now lives in the new "Filters &
+          Sectors" panel reachable from the ⋯ kebab menu (along with Sector
+          Pulse), keeping this row tight and one-tap. */}
       {showRecFilter && (
         <div className="card-filter-row">
           <RecommendationFilter
@@ -5785,58 +5816,43 @@ export default function Dashboard() {
             onChange={setRecFilter}
             counts={recCounts}
           />
-          <div className="card-filter-row-mcap">
-            <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
-          </div>
         </div>
       )}
 
-      {/* SECTOR PULSE BAR (rolled out to all approved users 2026-05-09).
-          Self-contained: returns null if /api/sector-pulse is empty or errors.
-          Existing layout is unchanged when hidden. The dashboard route is
-          already gated on profile.status === 'approved' upstream, so any user
-          who reaches this point is allowed to see Sector Pulse.
-          Hidden on the Portfolio tab (activeTab === 'watchlist') because
-          Sector Pulse reflects market-wide AI buzz, not personal holdings —
-          irrelevant noise when the user is looking at their own positions.
+      {/* SECTOR PULSE BAR (rolled out 2026-05-09; moved 2026-05-12 v2)
+          Previously rendered as an inline collapsible accordion below the
+          rec-chip row. It loaded its data on first expand, so tapping the
+          chip felt laggy ("a few seconds to load"). It now lives behind
+          the "Filters & Sectors" entry in the ⋯ kebab menu — the dashboard
+          preloads /api/sector-pulse on mount so the panel renders instantly
+          when the user opens it. */}
 
-          2026-05-12 — wrapped in a collapsible disclosure so it doesn't
-          steal screen real estate from the hero search bar / tabs. Default
-          collapsed; user toggles via the "📊 Sector Pulse" chip. Choice
-          remembered in localStorage so power users can keep it open. */}
-      {showRecFilter && activeTab !== 'watchlist' && (
-        <div className="sector-pulse-accordion">
-          <button
-            type="button"
-            className={`sector-pulse-toggle${sectorPulseOpen ? ' is-open' : ''}`}
-            onClick={() => {
-              setSectorPulseOpen((v) => {
-                const next = !v;
-                try { localStorage.setItem('sectorPulseOpen', next ? '1' : '0'); } catch {}
-                return next;
-              });
-            }}
-            aria-expanded={sectorPulseOpen}
-            aria-controls="sector-pulse-panel"
-          >
-            <span className="sector-pulse-toggle-ic">{"\u{1F4CA}"}</span>
-            <span className="sector-pulse-toggle-label">Sector Pulse</span>
-            {sectorFilter !== 'ALL' && (
-              <span className="sector-pulse-toggle-chip">{sectorFilter}</span>
-            )}
-            <span className={`sector-pulse-toggle-caret${sectorPulseOpen ? ' open' : ''}`}>{"\u{25BE}"}</span>
-          </button>
-          {sectorPulseOpen && (
-            <div id="sector-pulse-panel" className="sector-pulse-panel">
-              <SectorPulseBar
-                enabled={!!profile}
-                selected={sectorFilter}
-                onSelect={setSectorFilter}
-                tickerMeta={tickerMetaMap}
-              />
-            </div>
+      {/* Active filter banner: shows when either Market Cap or Sector is set,
+          so the user knows the feed is filtered even though the controls are
+          hidden in the kebab menu. Tapping the banner re-opens the panel. */}
+      {showRecFilter && (mcapRange[0] > 0 || mcapRange[1] < 5000 || sectorFilter !== 'ALL') && (
+        <button
+          type="button"
+          className="active-filters-banner"
+          onClick={() => {
+            setShowFiltersPanel(true);
+            setTimeout(() => document.getElementById('filters-sectors-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+          }}
+        >
+          <span className="active-filters-banner-ic">{"\u{1F39B}\u{FE0F}"}</span>
+          <span className="active-filters-banner-label">Filters active:</span>
+          {(mcapRange[0] > 0 || mcapRange[1] < 5000) && (
+            <span className="active-filters-banner-chip">
+              Market Cap {mcapRange[0] >= 1000 ? `$${(mcapRange[0]/1000).toFixed(1)}T` : `$${mcapRange[0]}B`}
+              {"–"}
+              {mcapRange[1] >= 1000 ? `$${(mcapRange[1]/1000).toFixed(1)}T` : `$${mcapRange[1]}B`}
+            </span>
           )}
-        </div>
+          {sectorFilter !== 'ALL' && (
+            <span className="active-filters-banner-chip">{sectorFilter}</span>
+          )}
+          <span className="active-filters-banner-edit">Edit {"›"}</span>
+        </button>
       )}
 
       {/* SOURCE HEALTH BANNER - admin-only; silently no-ops for everyone else.
@@ -6567,6 +6583,53 @@ export default function Dashboard() {
               </tbody>
             </table>
           </div>
+        )}
+      </div>
+
+      {/* FILTERS & SECTORS PANEL (2026-05-12 v2)
+          Home for the Market Cap slider + Sector Pulse bar. Used to live
+          inline below the rec-chip row; moved here to free up mobile
+          real estate and avoid the laggy "expand and wait for sector
+          pulse to fetch" pattern. Sector pulse data is preloaded on
+          dashboard mount so this section renders instantly. */}
+      <div className="archive-section" id="filters-sectors-section">
+        {showFiltersPanel && (
+          <>
+            <p className="section-title" style={{ marginLeft: 0 }}>
+              {"\u{1F39B}\u{FE0F}"} Filters &amp; Sectors
+              <button className="section-close-btn" onClick={() => setShowFiltersPanel(false)}>{"\u{2715}"} Close</button>
+            </p>
+
+            <div className="filters-panel">
+              {/* Market Cap */}
+              <div className="filters-panel-block">
+                <div className="filters-panel-block-head">
+                  <span className="filters-panel-block-title">{"\u{1F3E2}"} Market Cap</span>
+                  <span className="filters-panel-block-sub">Filter visible picks by company size.</span>
+                </div>
+                <div className="filters-panel-mcap">
+                  <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
+                </div>
+              </div>
+
+              {/* Sector Pulse */}
+              {activeTab !== 'watchlist' && (
+                <div className="filters-panel-block">
+                  <div className="filters-panel-block-head">
+                    <span className="filters-panel-block-title">{"\u{1F4CA}"} Sector Pulse</span>
+                    <span className="filters-panel-block-sub">Today&rsquo;s AI read across sectors. Tap a chip to filter the feed.</span>
+                  </div>
+                  <SectorPulseBar
+                    enabled={!!profile}
+                    selected={sectorFilter}
+                    onSelect={setSectorFilter}
+                    tickerMeta={tickerMetaMap}
+                    preloadedSectors={preloadedSectorPulse}
+                  />
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
 

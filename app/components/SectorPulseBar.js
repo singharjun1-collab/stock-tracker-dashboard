@@ -54,20 +54,41 @@ function fmtPct(p) {
   return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
 }
 
-export default function SectorPulseBar({ enabled, selected = 'ALL', onSelect, tickerMeta }) {
-  const [sectors, setSectors] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function SectorPulseBar({
+  enabled,
+  selected = 'ALL',
+  onSelect,
+  tickerMeta,
+  // Optional pre-fetched data from the parent (2026-05-12). When provided
+  // we skip the local fetch entirely so the bar renders instantly — the
+  // dashboard now preloads /api/sector-pulse on mount so opening the
+  // Filters & Sectors panel doesn't show a perceptible loading lag.
+  preloadedSectors = null,
+}) {
+  const [sectors, setSectors] = useState(preloadedSectors || []);
+  const [loading, setLoading] = useState(preloadedSectors == null);
   const [errored, setErrored] = useState(false);
+
+  // Keep local state in sync if the parent pushes a fresh preloaded payload
+  // (e.g. after the dashboard refetches sector pulse).
+  useEffect(() => {
+    if (preloadedSectors != null) {
+      setSectors(preloadedSectors);
+      setLoading(false);
+      setErrored(false);
+    }
+  }, [preloadedSectors]);
 
   useEffect(() => {
     if (!enabled) return;
+    if (preloadedSectors != null) return;   // parent already supplied data
     let cancelled = false;
     fetch('/api/sector-pulse', { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
       .then((d) => { if (!cancelled) { setSectors(d.sectors || []); setLoading(false); } })
       .catch(() => { if (!cancelled) { setErrored(true); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [enabled]);
+  }, [enabled, preloadedSectors]);
 
   // Map { industry → count of active cards } from ticker_meta + alerts.
   // tickerMeta is { TICKER: { industry } } — passed in from the page.

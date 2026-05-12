@@ -30,7 +30,10 @@ const VERTICAL_LOCK_THRESHOLD = 8;// if y > x by this much, treat as vertical sc
 export default function SwipeToRemove({
   ticker,
   onRemove,           // (ticker) => Promise|void — parent handles the actual removal
-  confirm = true,     // if true, show window.confirm before calling onRemove
+  confirm = false,    // if true, show window.confirm before calling onRemove.
+                      // Default false — swipe-then-tap is already a 2-step
+                      // gesture, so an additional confirm popup is friction the
+                      // user explicitly asked us to remove (2026-05-12).
   children,
 }) {
   const [dx, setDx] = useState(0);

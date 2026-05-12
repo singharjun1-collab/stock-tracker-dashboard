@@ -1519,6 +1519,119 @@ footer span { color: #4fc3f7; }
   .sector-pulse-accordion { padding: 0 16px; }
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   ACTIVE FILTERS BANNER (2026-05-12 v2)
+   Replaces the inline Market Cap + Sector Pulse controls under the
+   rec-chip row. When Market Cap and/or Sector are filtering the feed,
+   this slim banner surfaces that state and acts as a tap target back
+   into the Filters & Sectors panel. Hidden when no filter is set.
+   ───────────────────────────────────────────────────────────────── */
+.active-filters-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 40px 8px;
+  padding: 8px 14px;
+  background: linear-gradient(135deg, rgba(79,195,247,0.10), rgba(38,208,124,0.10));
+  border: 1px solid #2a4a6a;
+  border-radius: 12px;
+  color: #cfe1f5;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  width: calc(100% - 80px);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, transform 0.06s;
+}
+.active-filters-banner:hover {
+  border-color: #4fc3f7;
+  background: linear-gradient(135deg, rgba(79,195,247,0.18), rgba(38,208,124,0.14));
+}
+.active-filters-banner:active { transform: scale(0.99); }
+.active-filters-banner-ic { font-size: 1rem; }
+.active-filters-banner-label {
+  color: #9fb9d5;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+.active-filters-banner-chip {
+  background: rgba(79,195,247,0.18);
+  color: #4fc3f7;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+.active-filters-banner-edit {
+  margin-left: auto;
+  color: #4fc3f7;
+  font-weight: 700;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .active-filters-banner {
+    margin: 4px 16px 8px;
+    width: calc(100% - 32px);
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .active-filters-banner-edit { font-size: 0.74rem; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   FILTERS & SECTORS PANEL (2026-05-12 v2)
+   Home for the Market Cap slider + Sector Pulse bar. Reached from the
+   ⋯ kebab menu so it doesn't compete with the main feed on mobile.
+   ───────────────────────────────────────────────────────────────── */
+.filters-panel {
+  background: linear-gradient(135deg, rgba(10,14,26,0.95), rgba(15,25,45,0.95));
+  border: 1px solid #1e3a5f;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.filters-panel-block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.filters-panel-block + .filters-panel-block {
+  padding-top: 20px;
+  border-top: 1px solid #1e3a5f;
+}
+.filters-panel-block-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.filters-panel-block-title {
+  color: #e1edff;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.filters-panel-block-sub {
+  color: #7a9bc0;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+.filters-panel-mcap .mcap-filter-wrapper { width: 100%; }
+.filters-panel-mcap .mcap-filter-toggle {
+  width: 100%;
+  text-align: left;
+  justify-content: flex-start;
+}
+@media (max-width: 768px) {
+  .filters-panel { padding: 16px; }
+}
+
 /* ── AI Settings Panel ── */
 .ai-settings-toggle { border-color: #2a4a6a !important; }
 .ai-settings-toggle:hover { border-color: #4fc3f7 !important; }
