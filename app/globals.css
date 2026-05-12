@@ -213,14 +213,24 @@ body {
 }
 
 /* Wrapper around QuickTable when it's rendered as the dashboard's main
-   feed (Table view). Adds breathing room and lets the table scroll
-   horizontally on phones without breaking the rest of the layout. */
+   feed (Table view). Matches the cards-grid horizontal padding so the
+   table aligns visually with the rest of the dashboard at every
+   breakpoint, while still letting the table scroll horizontally inside
+   itself on phones. */
 .dashboard-table-wrap {
   width: 100%;
   margin-top: 12px;
+  padding: 0 40px;
+  box-sizing: border-box;
 }
 @media (max-width: 640px) {
-  .dashboard-table-wrap { margin-top: 8px; }
+  .dashboard-table-wrap {
+    margin-top: 8px;
+    padding: 0 12px;
+  }
+}
+@media (max-width: 380px) {
+  .dashboard-table-wrap { padding: 0 8px; }
 }
 
 .section-close-btn {
@@ -2368,11 +2378,48 @@ footer span { color: #4fc3f7; }
 
 .quicktable-wrap {
   overflow-x: auto;
+  overflow-y: auto;
   border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(0, 0, 0, 0.25);
   max-height: 620px;
-  overflow-y: auto;
+  /* Smooth, native momentum scrolling on iOS so swipes feel like Robinhood. */
+  -webkit-overflow-scrolling: touch;
+  /* Right-edge fade hint — tells users there's more content to scroll to.
+     The mask layers on top of the table; the gradient is "attached" to the
+     scroll container so it disappears when the user reaches the right edge.
+     Implemented as a CSS background-image on the wrap, with `background-
+     attachment: local` so it scrolls with the content (so the fade
+     "consumes" once you reach the end). */
+  background-image:
+    linear-gradient(to right, rgba(0,0,0,0.25), rgba(0,0,0,0.25)),
+    linear-gradient(to right, rgba(0,0,0,0.25), rgba(0,0,0,0.25)),
+    linear-gradient(to right, rgba(0,0,0,0.6), rgba(0,0,0,0)),
+    linear-gradient(to left,  rgba(0,0,0,0.6), rgba(0,0,0,0));
+  background-position: left center, right center, left center, right center;
+  background-size: 20px 100%, 20px 100%, 14px 100%, 14px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+/* Always-visible, slim scrollbar so mobile users know the table is
+   horizontally scrollable. Default iOS/Android scrollbars fade out
+   immediately after touch which makes scrollable tables undiscoverable. */
+.quicktable-wrap::-webkit-scrollbar { height: 8px; width: 8px; }
+.quicktable-wrap::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+}
+.quicktable-wrap::-webkit-scrollbar-thumb {
+  background: rgba(0, 229, 255, 0.35);
+  border-radius: 4px;
+}
+.quicktable-wrap::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 229, 255, 0.55);
+}
+/* Firefox */
+.quicktable-wrap {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 229, 255, 0.35) rgba(0, 0, 0, 0.25);
 }
 .quicktable {
   width: 100%;
@@ -3145,6 +3192,102 @@ footer span { color: #4fc3f7; }
   .quicktable thead th { padding: 8px 8px; }
   .qt-company-btn { max-width: 140px; }
   .quicktable-search { min-width: 180px; }
+}
+
+/* ── Quick Scan table — phone polish ──
+   Reworks the section for narrow viewports: tighter padding, stacked
+   controls (search row, then filter+columns row), and a "swipe to see
+   more" hint pill that sits above the table. Combined with the always-
+   visible scrollbar + right-edge fade defined on .quicktable-wrap, this
+   gives a Robinhood-quality horizontal-scroll experience on phones. */
+@media (max-width: 640px) {
+  .quicktable-section {
+    margin: 12px 0 20px;
+    padding: 14px 12px 8px;
+    border-radius: 12px;
+  }
+  .quicktable-header {
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .quicktable-title { font-size: 1.05rem; }
+  .quicktable-controls {
+    width: 100%;
+    gap: 8px;
+  }
+  /* Search bar takes a full row on its own so the input is comfortably
+     tappable; status filter + columns button share the row below. */
+  .quicktable-search {
+    width: 100%;
+    min-width: 0;
+    flex: 1 1 100%;
+  }
+  .qt-status-filter,
+  .qt-col-settings-wrap { flex: 1 1 0; }
+  .qt-status-filter,
+  .qt-col-settings-btn {
+    width: 100%;
+    font-size: 0.8rem;
+    padding: 8px 10px;
+  }
+  /* Inject a "Swipe to see more →" hint above the scrollable table.
+     Pure CSS so it disappears when the table content fits, and it sits
+     visually inside the table card to feel native (not bolted on). */
+  .quicktable-wrap {
+    position: relative;
+    max-height: 70vh;
+  }
+  .quicktable-wrap::before {
+    content: "Swipe to see more \2192";
+    display: block;
+    position: sticky;
+    top: 0;
+    left: 0;
+    z-index: 10;
+    width: max-content;
+    margin: 6px 0 0 8px;
+    padding: 3px 9px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+    color: #0a1728;
+    background: rgba(0, 229, 255, 0.85);
+    border-radius: 10px;
+    pointer-events: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  /* Beef up the bottom scrollbar so it's obviously a scroll affordance. */
+  .quicktable-wrap::-webkit-scrollbar { height: 10px; }
+  .quicktable-wrap::-webkit-scrollbar-thumb {
+    background: rgba(0, 229, 255, 0.55);
+  }
+  /* Sticky star + ticker columns stay readable while the rest scrolls. */
+  .quicktable .qt-sticky-star { width: 32px; }
+  .quicktable .qt-sticky-ticker { left: 32px; }
+  .qt-ticker-btn { font-size: 0.85rem; }
+  .qt-company-btn { max-width: 110px; font-size: 0.78rem; }
+}
+
+/* Even tighter for very small phones (iPhone SE / Android small). */
+@media (max-width: 380px) {
+  .quicktable-section { padding: 12px 8px 6px; }
+  .quicktable-title { font-size: 0.95rem; }
+  .quicktable-title-wrap { gap: 8px; }
+  .qt-collapse-btn { width: 28px; height: 28px; }
+  .quicktable tbody td,
+  .quicktable thead th { padding: 7px 6px; }
+}
+
+/* Constrain the Columns dropdown so it never overflows the viewport
+   on phones. Caps it at 88vw and anchors to the right edge of the table
+   section instead of the button (which is half-width on phones). */
+@media (max-width: 640px) {
+  .qt-col-dropdown {
+    min-width: 220px;
+    max-width: 88vw;
+    right: 0;
+  }
 }
 
 /* ============================================================
