@@ -5,7 +5,7 @@ import '../globals.css';
 import { SIGNAL_WEIGHTS, SIGNAL_BUCKETS, bucketFor } from '../lib/signalStrength';
 import SectorPulseBar from '../components/SectorPulseBar';
 import AddStockSheet from '../components/AddStockSheet';
-import AddStockFab from '../components/AddStockFab';
+import SwipeToRemove from '../components/SwipeToRemove';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock meta batch fetching.
@@ -4445,6 +4445,17 @@ export default function Dashboard() {
   //   filter behaviour is unchanged when sectorFilter === 'ALL'.
   const [tickerMetaMap, setTickerMetaMap] = useState({});
   const [sectorFilter, setSectorFilter] = useState('ALL');
+  // Collapsible Sector Pulse (2026-05-12). Hidden by default to keep the
+  // top of the dashboard clean; the user opens it via the "📊 Sector
+  // Pulse" chip under the tabs. Choice is remembered in localStorage so
+  // power-users can have it open every load.
+  const [sectorPulseOpen, setSectorPulseOpen] = useState(false);
+  useEffect(() => {
+    try {
+      const stored = typeof window !== 'undefined' ? localStorage.getItem('sectorPulseOpen') : null;
+      if (stored === '1') setSectorPulseOpen(true);
+    } catch {}
+  }, []);
 
   // ─── Portfolio sub-filter (Phase 8 — 2026-05-12) ────────────────────
   // Filter chip selection inside the unified Portfolio tab — replaces
@@ -5593,18 +5604,20 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* ─── PRIMARY NAVIGATION: SEARCH + FILTERS + TABS (sticky) ─── */}
-      {/* Search + Market Cap + Collapse-all. The old "Signal (All)" dropdown
-          was retired 2026-04-21 — replaced by the Buy/Hold/Trim/Exit/Sell
-          quick-chip row that appears below the tabs. */}
-      <div className="search-bar-container">
-        <div className="search-bar">
-          <span className="search-icon">{"\u{1F50D}"}</span>
+      {/* ─── HERO SEARCH BAR ─── (redesigned 2026-05-12)
+          The search bar is now the single hero affordance for finding +
+          adding stocks — replacing the old FAB. Taller, bolder, focus
+          glow, and a clean "Add a new ticker too" hint baked into the
+          placeholder. Market Cap filter moved down to the filter chip
+          row; Collapse all retired. */}
+      <div className="hero-search-container">
+        <div className="hero-search-bar">
+          <span className="hero-search-icon">{"\u{1F50D}"}</span>
           <input
             type="text"
-            className="search-input"
-            placeholder="Search any stock — ticker or company name"
-            title="Searches across your watchlist AND every stock Stock Chatter knows about. Tap a result to view it."
+            className="hero-search-input"
+            placeholder="Search or add any stock — ticker or company"
+            title="Search your watchlist and the wider Stock Chatter universe. Type a ticker the AI hasn't flagged yet and choose Track to add it."
             aria-label="Search your watchlist and the wider Stock Chatter universe"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -5617,7 +5630,7 @@ export default function Dashboard() {
             }}
           />
           {searchQuery && (
-            <button className="search-clear" onClick={() => { setSearchQuery(''); setSearchFocused(false); }}>{"\u{2715}"}</button>
+            <button className="hero-search-clear" onClick={() => { setSearchQuery(''); setSearchFocused(false); }} aria-label="Clear search">{"\u{2715}"}</button>
           )}
         </div>
 
@@ -5684,8 +5697,13 @@ export default function Dashboard() {
             )}
           </div>
         )}
-        <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
-        {activeTab !== 'analytics' && (
+        {/* Market Cap + Collapse all (2026-05-12): both moved out of the
+            hero search bar. Market Cap is now reachable from the filter
+            chip on the rec-chip row below the tabs. Collapse all retired
+            entirely. The blocks below render `null` because their wrappers
+            were turned off, but kept here as no-op guards while we settle
+            on the new layout. */}
+        {false && (
           <button
             className="collapse-all-btn collapse-all-inline"
             onClick={() => {
@@ -5712,9 +5730,12 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Search-bar helper: tells the user where the unified search reaches
-          and how to bring in a fresh ticker. Updated 2026-05-12 when search
-          stopped being a "watchlist filter" and became a discovery hub. */}
+      {/* Search-bar helper retired 2026-05-12. The hero search bar's
+          placeholder + the "Track ticker" affordance inside the dropdown
+          make the wording self-evident; the extra paragraph just added
+          noise above the tabs. AI Settings remains reachable from the
+          kebab menu in the header. */}
+      {false && (
       <p
         className="search-bar-hint"
         style={{
@@ -5727,6 +5748,7 @@ export default function Dashboard() {
       >
         {"ℹ️"} Tap any result to view the stock. To pull in a brand-new ticker the AI hasn&rsquo;t flagged yet, type its symbol and choose <strong style={{ color: '#9fc3e6' }}>Track</strong> — or adjust your <strong style={{ color: '#9fc3e6' }}>AI engine settings</strong>.
       </p>
+      )}
 
       {/* Sticky tabs wrapper — tabs stay pinned to top as user scrolls */}
       <div id="tabs-anchor" />
@@ -5750,13 +5772,23 @@ export default function Dashboard() {
       {/* Robinhood-style quick filter: one-tap filter by recommendation.
           Hidden on tabs that don't show pick cards (portfolio, leaderboard,
           analytics). Counts update live per tab so users see what's available
-          before tapping. */}
+          before tapping.
+
+          2026-05-12 — alongside the Buy/Hold/Trim/Exit/Sell chips, we now
+          surface the MarketCapSlider here too. This is its new home after
+          being evicted from the hero search bar. Both are card-level
+          filters so they belong together. */}
       {showRecFilter && (
-        <RecommendationFilter
-          value={recFilter}
-          onChange={setRecFilter}
-          counts={recCounts}
-        />
+        <div className="card-filter-row">
+          <RecommendationFilter
+            value={recFilter}
+            onChange={setRecFilter}
+            counts={recCounts}
+          />
+          <div className="card-filter-row-mcap">
+            <MarketCapSlider range={mcapRange} onChange={setMcapRange} />
+          </div>
+        </div>
       )}
 
       {/* SECTOR PULSE BAR (rolled out to all approved users 2026-05-09).
@@ -5766,14 +5798,45 @@ export default function Dashboard() {
           who reaches this point is allowed to see Sector Pulse.
           Hidden on the Portfolio tab (activeTab === 'watchlist') because
           Sector Pulse reflects market-wide AI buzz, not personal holdings —
-          irrelevant noise when the user is looking at their own positions. */}
+          irrelevant noise when the user is looking at their own positions.
+
+          2026-05-12 — wrapped in a collapsible disclosure so it doesn't
+          steal screen real estate from the hero search bar / tabs. Default
+          collapsed; user toggles via the "📊 Sector Pulse" chip. Choice
+          remembered in localStorage so power users can keep it open. */}
       {showRecFilter && activeTab !== 'watchlist' && (
-        <SectorPulseBar
-          enabled={!!profile}
-          selected={sectorFilter}
-          onSelect={setSectorFilter}
-          tickerMeta={tickerMetaMap}
-        />
+        <div className="sector-pulse-accordion">
+          <button
+            type="button"
+            className={`sector-pulse-toggle${sectorPulseOpen ? ' is-open' : ''}`}
+            onClick={() => {
+              setSectorPulseOpen((v) => {
+                const next = !v;
+                try { localStorage.setItem('sectorPulseOpen', next ? '1' : '0'); } catch {}
+                return next;
+              });
+            }}
+            aria-expanded={sectorPulseOpen}
+            aria-controls="sector-pulse-panel"
+          >
+            <span className="sector-pulse-toggle-ic">{"\u{1F4CA}"}</span>
+            <span className="sector-pulse-toggle-label">Sector Pulse</span>
+            {sectorFilter !== 'ALL' && (
+              <span className="sector-pulse-toggle-chip">{sectorFilter}</span>
+            )}
+            <span className={`sector-pulse-toggle-caret${sectorPulseOpen ? ' open' : ''}`}>{"\u{25BE}"}</span>
+          </button>
+          {sectorPulseOpen && (
+            <div id="sector-pulse-panel" className="sector-pulse-panel">
+              <SectorPulseBar
+                enabled={!!profile}
+                selected={sectorFilter}
+                onSelect={setSectorFilter}
+                tickerMeta={tickerMetaMap}
+              />
+            </div>
+          )}
+        </div>
       )}
 
       {/* SOURCE HEALTH BANNER - admin-only; silently no-ops for everyone else.
@@ -6170,29 +6233,56 @@ export default function Dashboard() {
 
           {/* Cards grid */}
           <div className={`cards-grid${allCompact && compactNonce > 0 ? ' grid-all-compact' : ''}`}>
-            {getTabData().length > 0 ? getTabData().map((alert, idx) => (
-              <AlertCard
-                key={alert.id || idx}
-                alert={alert}
-                index={idx}
-                sectionPrefix={activeTab}
-                watchlist={watchlist}
-                sharedPrices={prices}
-                forceCompact={allCompact}
-                forceCompactNonce={compactNonce}
-                onToggleWatchlist={handleToggleWatchlist}
-                onRate={handleRate}
-                onDismiss={handleDismiss}
-                onSaveNote={handleSaveNote}
-                userNote={userNotes[alert.ticker]}
-                openPosition={openTradeFor(alert.ticker)}
-                onOpenBuyModal={handleOpenBuyModal}
-                onOpenSellModal={handleOpenSellModal}
-                tickerMeta={tickerMetaMap[String(alert.ticker).toUpperCase()] || null}
-                onOpenAddSheet={openAddSheet}
-                serverWatchlist={serverWatchlist}
-              />
-            )) : (
+            {getTabData().length > 0 ? getTabData().map((alert, idx) => {
+              const card = (
+                <AlertCard
+                  key={alert.id || idx}
+                  alert={alert}
+                  index={idx}
+                  sectionPrefix={activeTab}
+                  watchlist={watchlist}
+                  sharedPrices={prices}
+                  forceCompact={allCompact}
+                  forceCompactNonce={compactNonce}
+                  onToggleWatchlist={handleToggleWatchlist}
+                  onRate={handleRate}
+                  onDismiss={handleDismiss}
+                  onSaveNote={handleSaveNote}
+                  userNote={userNotes[alert.ticker]}
+                  openPosition={openTradeFor(alert.ticker)}
+                  onOpenBuyModal={handleOpenBuyModal}
+                  onOpenSellModal={handleOpenSellModal}
+                  tickerMeta={tickerMetaMap[String(alert.ticker).toUpperCase()] || null}
+                  onOpenAddSheet={openAddSheet}
+                  serverWatchlist={serverWatchlist}
+                />
+              );
+              // On the Portfolio tab, if the card is in the user's
+              // watchlist, wrap it in SwipeToRemove so they can swipe-left
+              // to reveal a red Remove button (Robinhood/Apple-Mail style).
+              // Other tabs render the card untouched — swipe should only
+              // mean "remove from my list" on lists the user owns.
+              const tk = String(alert.ticker || '').toUpperCase();
+              const isOnWatchlist = (serverWatchlist || []).some((w) => String(w.ticker || '').toUpperCase() === tk);
+              if (activeTab === 'watchlist' && isOnWatchlist) {
+                return (
+                  <SwipeToRemove
+                    key={alert.id || idx}
+                    ticker={tk}
+                    onRemove={async () => {
+                      await fetch(`/api/watchlist?ticker=${encodeURIComponent(tk)}`, {
+                        method: 'DELETE',
+                        credentials: 'include',
+                      });
+                      refreshServerWatchlist();
+                    }}
+                  >
+                    {card}
+                  </SwipeToRemove>
+                );
+              }
+              return card;
+            }) : (
               <p style={{ color: '#4a6a85', padding: '20px 0', fontSize: '0.9rem' }}>
                 {searchQuery ? `No results for "${searchQuery}" in this tab.` : 'No picks match current filters.'}
               </p>
@@ -6227,8 +6317,8 @@ export default function Dashboard() {
                     const price = w.current_price;
                     const pct = w.today_pct;
                     const hasPosition = !!openTrade;
-                    return (
-                      <div key={`monitor-${tk}`} className="monitor-card">
+                    const monitorCard = (
+                      <div className="monitor-card">
                         <div className="monitor-head">
                           <div className="monitor-logo">{tk.slice(0, 2)}</div>
                           <div className="monitor-meta">
@@ -6295,6 +6385,21 @@ export default function Dashboard() {
                           </button>
                         </div>
                       </div>
+                    );
+                    return (
+                      <SwipeToRemove
+                        key={`monitor-${tk}`}
+                        ticker={tk}
+                        onRemove={async () => {
+                          await fetch(`/api/watchlist?ticker=${encodeURIComponent(tk)}`, {
+                            method: 'DELETE',
+                            credentials: 'include',
+                          });
+                          refreshServerWatchlist();
+                        }}
+                      >
+                        {monitorCard}
+                      </SwipeToRemove>
                     );
                   })}
                 </>
@@ -6537,10 +6642,12 @@ export default function Dashboard() {
         </button>
       </nav>
 
-      {/* ─── ADD STOCK FAB ───
-          Big blue + button — primary entry point for adding/finding a stock.
-          Robinhood-style elevated FAB. Opens the unified AddStockSheet. */}
-      <AddStockFab onClick={() => openAddSheet()} />
+      {/* ─── ADD STOCK FAB removed 2026-05-12 ───
+          The hero search bar at the top of the dashboard is now the
+          single, primary way to add a stock — it filters existing
+          watchlist + AI feed and offers "Track {ticker}" for unknown
+          tickers. Killing the duplicate + button cleans up the bottom
+          nav and matches Robinhood/Public/Webull conventions. */}
 
       {/* ─── ADD STOCK SHEET ───
           Single bottom-sheet that handles: searching for a stock, adding to

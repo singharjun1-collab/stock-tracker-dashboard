@@ -1332,6 +1332,193 @@ footer span { color: #4fc3f7; }
   .ai-mcap-presets { grid-template-columns: repeat(2, 1fr); }
 }
 
+/* ─────────────────────────────────────────────────────────────────
+   HERO SEARCH BAR (2026-05-12)
+   The primary affordance for finding + adding stocks. Replaces the
+   FAB + smaller search input combo. Mobile-first: full-width, tall
+   tap target, focus glow that draws the eye.
+   ───────────────────────────────────────────────────────────────── */
+.hero-search-container {
+  position: relative;
+  padding: 16px 40px 12px;
+  margin: 4px 0 8px;
+}
+.hero-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(180deg, #0f2137 0%, #0c1a2c 100%);
+  border: 1.5px solid #1e3a5f;
+  border-radius: 14px;
+  padding: 14px 18px;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  box-shadow: 0 1px 0 rgba(255,255,255,0.02) inset;
+}
+.hero-search-bar:focus-within {
+  border-color: #4fc3f7;
+  background: linear-gradient(180deg, #112846 0%, #0c1a2c 100%);
+  box-shadow: 0 0 0 4px rgba(79, 195, 247, 0.12);
+}
+.hero-search-icon {
+  font-size: 1.15rem;
+  color: #7a9bc0;
+  flex-shrink: 0;
+}
+.hero-search-input {
+  flex: 1;
+  background: none;
+  border: none;
+  outline: none;
+  color: #e0e6f0;
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+}
+.hero-search-input::placeholder {
+  color: #4a6a85;
+  font-weight: 500;
+}
+.hero-search-clear {
+  background: #1a2744;
+  border: none;
+  color: #9fb9d5;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 0.78rem;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.hero-search-clear:hover { background: #2a3a5a; color: #fff; }
+
+/* The unified search dropdown floats below the hero bar */
+.hero-search-container .search-results-dropdown {
+  margin-top: 8px;
+}
+
+@media (max-width: 768px) {
+  .hero-search-container {
+    padding: 12px 16px 8px;
+  }
+  .hero-search-bar {
+    padding: 13px 14px;
+    border-radius: 12px;
+  }
+  .hero-search-input {
+    font-size: 0.95rem;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   CARD FILTER ROW (2026-05-12)
+   Wraps the rec-pill chip row + Market Cap dropdown so both card
+   filters live together below the tabs. On mobile, mcap drops below
+   the chips so neither has to truncate.
+   ───────────────────────────────────────────────────────────────── */
+.card-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 40px;
+  margin: 4px 0 8px;
+  flex-wrap: wrap;
+}
+.card-filter-row .rec-filter-row {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.card-filter-row-mcap {
+  flex: 0 0 auto;
+}
+.card-filter-row-mcap .mcap-filter-toggle {
+  padding: 7px 14px;
+  font-size: 0.78rem;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+@media (max-width: 768px) {
+  .card-filter-row {
+    padding: 0 16px;
+    gap: 8px;
+  }
+  .card-filter-row-mcap {
+    flex: 1 1 100%;
+  }
+  .card-filter-row-mcap .mcap-filter-toggle {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SECTOR PULSE ACCORDION (2026-05-12)
+   Collapsed by default — keeps the top of the dashboard clean. The
+   toggle chip shows the currently-selected sector when one is active
+   so users always know what's filtering the cards even when the
+   panel is closed.
+   ───────────────────────────────────────────────────────────────── */
+.sector-pulse-accordion {
+  padding: 0 40px;
+  margin: 6px 0 8px;
+}
+.sector-pulse-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  background: #0f1d30;
+  border: 1px solid #1e3a5f;
+  border-radius: 20px;
+  color: #9fb9d5;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  font-family: inherit;
+}
+.sector-pulse-toggle:hover {
+  background: #1a2744;
+  border-color: #4fc3f7;
+  color: #4fc3f7;
+}
+.sector-pulse-toggle.is-open {
+  background: #1a2744;
+  border-color: #4fc3f7;
+  color: #4fc3f7;
+}
+.sector-pulse-toggle-ic { font-size: 1rem; }
+.sector-pulse-toggle-label { letter-spacing: 0.02em; }
+.sector-pulse-toggle-chip {
+  background: rgba(79, 195, 247, 0.18);
+  color: #4fc3f7;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.sector-pulse-toggle-caret {
+  transition: transform 0.2s ease;
+  display: inline-block;
+  font-size: 0.7rem;
+  color: inherit;
+}
+.sector-pulse-toggle-caret.open { transform: rotate(180deg); }
+.sector-pulse-panel {
+  margin-top: 8px;
+  animation: sector-pulse-fade 0.18s ease;
+}
+@keyframes sector-pulse-fade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@media (max-width: 768px) {
+  .sector-pulse-accordion { padding: 0 16px; }
+}
+
 /* ── AI Settings Panel ── */
 .ai-settings-toggle { border-color: #2a4a6a !important; }
 .ai-settings-toggle:hover { border-color: #4fc3f7 !important; }

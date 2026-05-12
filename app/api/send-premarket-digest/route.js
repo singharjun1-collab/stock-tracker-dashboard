@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/app/lib/supabase/admin';
 import { sendEmail } from '@/app/lib/email';
 import { makeUnsubscribeUrl } from '@/app/lib/unsubscribe-token';
+import { buildMorningBrief } from '@/app/lib/morning_brief';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -82,6 +83,12 @@ async function loadDigestData() {
   const resignalCutoffIso = new Date(
     Date.now() - RESIGNAL_WINDOW_HOURS * 60 * 60 * 1000,
   ).toISOString();
+
+  // Morning brief (futures snapshot + AI mood line) is fetched in parallel
+  // with the Supabase queries so it adds zero wall-clock time to the digest
+  // build. If it fails internally it returns ok:false — never throws — and
+  // the email template just skips the Market Mood card.
+  const morningBriefPromise = buildMorningBrief();
 
   const [
     recipientsRes,
@@ -171,6 +178,8 @@ async function loadDigestData() {
     );
   }
 
+  const morningBrief = await morningBriefPromise;
+
   return {
     recipients: recipientsRes.data || [],
     emailToUserId,
@@ -180,6 +189,7 @@ async function loadDigestData() {
     activePicks: activePicksRes.data || [],
     openTrades: openTradesRes.data || [],
     prices: pricesByTicker,
+    morningBrief,
   };
 }
 
@@ -192,6 +202,46 @@ function fmtPct(n) {
   if (n == null || isNaN(n)) return '—';
   const sign = n >= 0 ? '+' : '';
   return `${sign}${Number(n).toFixed(1)}%`;
+}
+
+// Renders the Market Mood card — pre-market futures snapshot + AI sentiment
+// sentence at the very top of the email. Returns an empty string (renders
+// nothing) if the brief failed to build, so a futures-fetch hiccup never
+// blocks the digest from going out.
+function renderMarketMoodCard(brief) {
+  if (!brief || !brief.ok) return '';
+  const display = (brief.display || []).filter((d) => d.ok && d.pct != null);
+  if (display.length === 0) return '';
+
+  const futuresRow = display
+    .map((d) => {
+      const positive = d.pct >= 0;
+      const color = positive ? '#22c55e' : '#ef4444';
+      const arrow = positive ? '▲' : '▼';
+      const sign = positive ? '+' : '';
+      return `
+        <td align="center" style="padding:8px 6px;">
+          <div style="font-size:11px;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase;font-weight:600;">${d.label}</div>
+          <div style="font-size:16px;font-weight:700;color:${color};margin-top:4px;white-space:nowrap;">
+            ${arrow} ${sign}${d.pct.toFixed(2)}%
+          </div>
+        </td>`;
+    })
+    .join('');
+
+  const summaryBlock = brief.summary
+    ? `<div style="font-size:14px;line-height:1.55;color:#e2e8f0;margin-top:14px;">🌅 ${brief.summary}</div>`
+    : '';
+
+  return `<tr><td style="padding:16px 24px 0 24px;">
+    <div style="background:linear-gradient(135deg,#0f172a 0%,#0b1426 100%);border:1px solid #1e293b;border-radius:12px;padding:16px;">
+      <div style="font-size:11px;font-weight:700;letter-spacing:.08em;color:#4fc3f7;text-transform:uppercase;margin-bottom:10px;">Pre-market mood</div>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+        <tr>${futuresRow}</tr>
+      </table>
+      ${summaryBlock}
+    </div>
+  </td></tr>`;
 }
 
 function recColor(rec) {
@@ -313,6 +363,8 @@ function buildHtml({ data, recipientEmail }) {
           </tr>
         </table>
       </td></tr>
+
+      ${renderMarketMoodCard(data.morningBrief)}
 
       <tr><td style="padding:16px 24px 8px 24px;">
         <p style="margin:0;font-size:16px;line-height:1.55;color:#cbd5e1;">${topOfMind}</p>
@@ -478,6 +530,22 @@ function buildText({ data, recipientEmail }) {
   const lines = [];
   lines.push(`Stock Chatter — Pre-market digest · ${shortET()}`);
   lines.push('');
+
+  // Pre-market mood — futures snapshot + AI sentiment (mirrors HTML card).
+  const brief = data.morningBrief;
+  if (brief && brief.ok) {
+    const usable = (brief.display || []).filter((d) => d.ok && d.pct != null);
+    if (usable.length > 0) {
+      lines.push('PRE-MARKET MOOD');
+      const futuresLine = usable
+        .map((d) => `${d.label} ${d.pct >= 0 ? '+' : ''}${d.pct.toFixed(2)}%`)
+        .join(' · ');
+      lines.push(futuresLine);
+      if (brief.summary) lines.push(brief.summary);
+      lines.push('');
+    }
+  }
+
   if (recChanges.length > 0) {
     lines.push(`${recChanges.length} recommendation flips since yesterday:`);
     for (const c of recChanges) {

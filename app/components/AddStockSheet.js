@@ -213,6 +213,30 @@ export default function AddStockSheet({
     }
   };
 
+  // Remove from watchlist (called when user taps the new "Remove" button on
+  // the selected stock panel). DELETEs the row server-side, then bubbles up
+  // via onAdded() so the parent dashboard refreshes its watchlist state.
+  const handleRemoveFromWatchlist = async () => {
+    if (!selectedView || busy) return;
+    setBusy(true);
+    setFeedback(null);
+    try {
+      const r = await fetch(`/api/watchlist?ticker=${encodeURIComponent(selectedView.ticker)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!r.ok) throw new Error('Failed');
+      setFeedback({ type: 'success', message: `Removed ${selectedView.ticker} from your watchlist` });
+      onAdded?.(); // parent refreshes watchlist
+      setTimeout(() => onClose?.(), 900);
+    } catch (e) {
+      console.error(e);
+      setFeedback({ type: 'error', message: 'Could not remove. Try again?' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const handleLogPosition = async () => {
     if (!selectedView || busy) return;
     const price = parseFloat(entryPrice);
@@ -386,6 +410,7 @@ export default function AddStockSheet({
               notes={notes} setNotes={setNotes}
               busy={busy}
               onAddToWatchlist={handleAddToWatchlist}
+              onRemoveFromWatchlist={handleRemoveFromWatchlist}
               onLogPosition={handleLogPosition}
               onChangeTicker={() => {
                 // Restore the search bar + clear the selected stock. Lets
@@ -693,6 +718,58 @@ export default function AddStockSheet({
           display: flex; align-items: center; gap: 6px;
         }
 
+        /* Tappable "In your watchlist" pill — replaces the static green chip.
+           Whole row is a button: tap anywhere to remove. The right-aligned
+           "Tap to remove" hint signals that this is an action, not a label. */
+        .as-watching-toggle {
+          margin-top: 12px;
+          padding: 10px 14px;
+          background: rgba(0,200,83,0.08);
+          border: 1px solid rgba(0,200,83,0.25);
+          border-radius: 10px;
+          font-size: 12px;
+          font-weight: 600;
+          display: flex; align-items: center; justify-content: space-between;
+          gap: 10px;
+          width: 100%;
+          cursor: pointer;
+          font-family: inherit;
+          transition: background 0.15s, border-color 0.15s;
+        }
+        .as-watching-toggle:active:not(:disabled) {
+          background: rgba(255,59,48,0.1);
+          border-color: rgba(255,59,48,0.3);
+        }
+        .as-watching-toggle:disabled { opacity: 0.5; cursor: not-allowed; }
+        .as-watching-toggle-check { color: #00c853; }
+        .as-watching-toggle-action {
+          font-size: 11px;
+          color: #8b95a8;
+          font-weight: 500;
+          letter-spacing: 0.02em;
+        }
+
+        /* Destructive primary button — used as the main CTA when the stock
+           is already on the watchlist, replacing the disabled "✓ Already
+           watching" affordance. Red tone signals removal; matches iOS
+           "destructive action" conventions. */
+        .as-btn-remove {
+          width: 100%;
+          padding: 15px;
+          background: rgba(255,59,48,0.12);
+          color: #ff3b30;
+          border: 1px solid rgba(255,59,48,0.3);
+          border-radius: 12px;
+          font-size: 15px; font-weight: 700;
+          cursor: pointer; font-family: inherit;
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .as-btn-remove:active:not(:disabled) {
+          background: rgba(255,59,48,0.22);
+          border-color: rgba(255,59,48,0.45);
+        }
+        .as-btn-remove:disabled { opacity: 0.5; cursor: not-allowed; }
+
         .as-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
         .as-btn-primary {
           width: 100%;
@@ -914,7 +991,7 @@ function SearchResults({ results, alertByTicker, onPickWatched, onPickAlert, onP
 function SelectedStockPanel({
   view, showPositionForm, onTogglePosition,
   amount, setAmount, entryPrice, setEntryPrice, notes, setNotes,
-  busy, onAddToWatchlist, onLogPosition,
+  busy, onAddToWatchlist, onRemoveFromWatchlist, onLogPosition,
   // Optional. Tapping the "← Change" link inside the selected card calls
   // this to clear the parent's selection and re-show the search input.
   onChangeTicker,
@@ -977,25 +1054,46 @@ function SelectedStockPanel({
         )}
 
         {view.alreadyWatching && (
-          <div className="as-already-watching">✓ Already in your watchlist</div>
+          <button
+            type="button"
+            className="as-watching-toggle"
+            onClick={onRemoveFromWatchlist}
+            disabled={busy}
+            title="Tap to remove from watchlist"
+          >
+            <span className="as-watching-toggle-check">✓ In your watchlist</span>
+            <span className="as-watching-toggle-action">Tap to remove</span>
+          </button>
         )}
       </div>
 
       <div className="as-actions">
-        <button
-          className="as-btn-primary"
-          onClick={onAddToWatchlist}
-          disabled={busy || view.alreadyWatching}
-        >
-          {view.alreadyWatching ? '✓ Already watching' : (
-            <>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
-                <path d="M12 5v14M5 12h14" />
-              </svg>
-              Add to Watchlist
-            </>
-          )}
-        </button>
+        {view.alreadyWatching ? (
+          // Already in watchlist — the primary action becomes "Remove" so
+          // the user has a clear, prominent way to take it off (the most
+          // requested missing UX as of 2026-05-12).
+          <button
+            className="as-btn-remove"
+            onClick={onRemoveFromWatchlist}
+            disabled={busy}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M6 6l1 14a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-14" />
+            </svg>
+            {busy ? 'Removing…' : 'Remove from Watchlist'}
+          </button>
+        ) : (
+          <button
+            className="as-btn-primary"
+            onClick={onAddToWatchlist}
+            disabled={busy}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            Add to Watchlist
+          </button>
+        )}
         <button className="as-btn-secondary" onClick={onTogglePosition} disabled={busy}>
           {showPositionForm ? '← Just watch instead' : 'Log a Position →'}
         </button>
