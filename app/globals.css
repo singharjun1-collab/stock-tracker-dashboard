@@ -257,33 +257,6 @@ body {
   .header-tool-btn { padding: 8px 10px; }
 }
 
-/* ── STATS BAR ── */
-.stats-bar { display: flex; gap: 16px; padding: 20px 40px; flex-wrap: wrap; }
-.stat-card {
-  background: #0f1d30; border: 1px solid #1e3a5f;
-  border-radius: 12px; padding: 16px 24px;
-  flex: 1; min-width: 120px; text-align: center;
-}
-.stat-card-click {
-  cursor: pointer; transition: transform 0.15s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-}
-.stat-card-click:hover {
-  transform: translateY(-2px);
-  border-color: #4fc3f7;
-  box-shadow: 0 4px 16px rgba(79, 195, 247, 0.15);
-}
-.stat-card-click:active { transform: translateY(0); }
-.stat-card-active {
-  border-color: #4fc3f7 !important;
-  box-shadow: 0 0 12px rgba(79, 195, 247, 0.25);
-}
-.rec-filter-chip {
-  background: #1e3a5f; color: #4fc3f7; border: 1px solid #4fc3f7;
-  border-radius: 20px; padding: 4px 14px; font-size: 0.8rem;
-  cursor: pointer; transition: background 0.15s ease;
-}
-.rec-filter-chip:hover { background: #264a70; }
-
 /* ─────────────────────────────────────────────────────────────────
    RECOMMENDATION QUICK-FILTER ROW (Buy / Hold / Trim / Exit / Sell)
    Robinhood-style chip row that lives under the tabs. One tap to
@@ -437,12 +410,6 @@ body {
     min-width: 20px;
   }
 }
-.stat-value { font-size: 1.8rem; font-weight: 800; color: #4fc3f7; }
-.stat-label {
-  font-size: 0.75rem; color: #7a9bc0; margin-top: 4px;
-  text-transform: uppercase; letter-spacing: 0.5px;
-}
-
 /* ── SEARCH BAR ── */
 .search-bar-container {
   display: flex; gap: 12px; padding: 0 40px; margin: 16px 0 8px;
@@ -1207,7 +1174,6 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
   0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
   50%      { box-shadow: 0 0 0 4px rgba(239,68,68,0); }
 }
-.stat-buy-glow { border-color: rgba(34,197,94,0.4); box-shadow: 0 0 12px rgba(34,197,94,0.15); }
 .disclaimer { margin-top: 12px; font-size: 0.65rem; color: #2a4560; font-style: italic; }
 
 /* ── ANALYTICS TAB ── */
@@ -1367,33 +1333,6 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
 .source-ratings-row { display: flex; gap: 12px; margin-top: 8px; font-size: 0.78rem; }
 .source-rating-item { color: #7a9bc0; }
 
-/* Ratings summary */
-.ratings-summary-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 12px; margin-bottom: 20px;
-}
-.rating-summary-card {
-  background: #0f1d30; border: 1px solid #1e3a5f; border-radius: 12px;
-  padding: 16px; text-align: center;
-}
-.rating-summary-value { font-size: 1.6rem; font-weight: 800; color: #4fc3f7; }
-.rating-summary-label { font-size: 0.72rem; color: #7a9bc0; margin-top: 4px; }
-
-/* Rated picks list */
-.rated-picks-list { margin-top: 16px; }
-.rated-picks-title { font-size: 0.85rem; font-weight: 700; color: #b8d4f0; margin-bottom: 10px; }
-.no-ratings-msg { font-size: 0.82rem; color: #4a6a85; font-style: italic; }
-.rated-picks-scroll { display: flex; flex-direction: column; gap: 6px; max-height: 300px; overflow-y: auto; }
-.rated-pick-row {
-  display: flex; align-items: center; gap: 12px;
-  background: #0f1d30; border: 1px solid #1e3a5f; border-radius: 8px;
-  padding: 8px 14px;
-}
-.rated-pick-ticker { font-weight: 800; color: #e0e6f0; font-size: 0.85rem; min-width: 60px; }
-.rated-pick-company { color: #7a9bc0; font-size: 0.75rem; flex: 1; }
-.rated-pick-pct { font-weight: 700; font-size: 0.82rem; min-width: 70px; text-align: right; }
-.rated-pick-rating { font-size: 1rem; min-width: 28px; text-align: center; }
-
 /* ── DISTRIBUTION LIST ── */
 .dist-list-section { margin-top: 16px; }
 .dist-list-form {
@@ -1462,9 +1401,6 @@ footer span { color: #4fc3f7; }
   .section-title { margin: 24px 16px 12px; }
   .sources-row { margin: 0 16px 12px; }
   .archive-section { margin: 24px 16px; }
-  .stats-bar { padding: 16px; gap: 8px; }
-  .stat-card { min-width: 90px; padding: 12px 8px; }
-  .stat-value { font-size: 1.4rem; }
   .filter-bar { padding: 0 16px; }
   .header { padding: 20px 16px; }
   .pin-input-row { gap: 6px; }
@@ -1509,7 +1445,6 @@ footer span { color: #4fc3f7; }
   .tab-btn { padding: 10px 12px; font-size: 0.78rem; }
   .analytics-content { padding: 16px; }
   .source-stats-grid { grid-template-columns: 1fr; }
-  .ratings-summary-grid { grid-template-columns: repeat(2, 1fr); }
   /* Market Cap + Signal dropdowns: anchor to the viewport edges on mobile
      so they never overflow. Signal dropdown only needs ~200px. */
   .mcap-filter-dropdown { min-width: 0; left: 0; right: 0; width: calc(100vw - 32px); max-width: 360px; }
@@ -2139,45 +2074,6 @@ footer span { color: #4fc3f7; }
 .mcap-unknown {
   color: #4a6a85; background: rgba(30,58,95,0.3);
   border: 1px solid #1e3a5f;
-}
-
-/* ── TOP MOVERS (Gainers / Losers) ── */
-.movers-row {
-  display: flex; gap: 16px; padding: 0 40px; margin: 16px 0 0;
-}
-.movers-card {
-  flex: 1; background: #0f1d30; border: 1px solid #1e3a5f;
-  border-radius: 14px; padding: 20px 24px; min-width: 0;
-}
-.movers-heading {
-  font-size: 1rem; font-weight: 700; margin-bottom: 14px;
-  letter-spacing: 0.3px;
-}
-.movers-gainers-heading { color: #22c55e; }
-.movers-losers-heading { color: #ef4444; }
-.movers-list { display: flex; flex-direction: column; gap: 8px; }
-.movers-item {
-  display: flex; align-items: center; gap: 10px;
-  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 8px; padding: 10px 14px;
-  transition: background 0.2s;
-}
-.movers-item:hover { background: rgba(255,255,255,0.06); }
-.movers-rank {
-  font-size: 0.7rem; font-weight: 700; color: #4a6a85;
-  width: 18px; text-align: center; flex-shrink: 0;
-}
-.movers-ticker {
-  font-size: 0.95rem; font-weight: 700; color: #e0e6f0;
-  flex: 1;
-}
-.movers-pct {
-  font-size: 1rem; font-weight: 800; text-align: right;
-  min-width: 80px;
-}
-
-@media (max-width: 768px) {
-  .movers-row { flex-direction: column; padding: 0 16px; }
 }
 
 /* ────────────────────────────────────
@@ -5373,64 +5269,6 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   .tabs-container::after { opacity: 1; }
 }
 
-/* ── COLLAPSIBLE SECTION HEADERS (shared style for Stats + Movers) ── */
-.section-collapse-header {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; padding: 10px 40px 0;
-}
-.section-collapse-btn {
-  display: flex; align-items: center; gap: 10px;
-  background: none; border: none; color: #b8d4f0;
-  font-size: 0.88rem; font-weight: 700; letter-spacing: 0.3px;
-  cursor: pointer; padding: 6px 8px; border-radius: 8px;
-  transition: background 0.15s;
-  flex: 1; min-width: 0;
-}
-.section-collapse-btn:hover { background: rgba(79, 195, 247, 0.06); }
-.section-collapse-title { color: #b8d4f0; white-space: nowrap; }
-.section-collapse-summary {
-  color: #7a9bc0; font-size: 0.78rem; font-weight: 500;
-  margin-left: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.section-caret {
-  display: inline-block; color: #4fc3f7; font-size: 0.7rem;
-  transition: transform 0.2s ease;
-}
-.section-caret.collapsed { transform: rotate(-90deg); }
-
-/* Stats section — collapse just hides the cards, header stays */
-.stats-section { margin-top: 6px; }
-.stats-section.stats-collapsed .stats-bar { display: none; }
-
-/* Movers section — collapse hides row, header stays */
-.movers-section { margin-top: 6px; }
-.movers-section.movers-collapsed .movers-row { display: none; }
-.movers-section .movers-row { margin-top: 8px; }
-
-/* ── MOBILE GAINERS/LOSERS TOGGLE ──
-   On desktop: side-by-side, toggle hidden.
-   On mobile:  one at a time, toggle shown. */
-.movers-mobile-toggle { display: none; gap: 4px; }
-.movers-toggle-btn {
-  padding: 6px 12px; border-radius: 18px; font-size: 0.75rem; font-weight: 700;
-  background: #0f1d30; color: #7a9bc0; border: 1px solid #1e3a5f;
-  cursor: pointer; transition: all 0.2s;
-  white-space: nowrap;
-}
-.movers-toggle-btn.active {
-  background: rgba(79, 195, 247, 0.12); color: #4fc3f7; border-color: #4fc3f7;
-}
-
-@media (max-width: 768px) {
-  .movers-mobile-toggle { display: flex; }
-  /* Only show one card at a time on mobile, based on toggle state */
-  .movers-row .movers-card { display: none; }
-  .movers-row .movers-card.movers-mobile-visible { display: block; }
-  /* Hide the individual card heading on mobile since the toggle shows which is which */
-  .movers-row .movers-card .movers-heading { display: none; }
-  .section-collapse-header { padding: 10px 16px 0; flex-wrap: wrap; }
-}
-
 /* ── MOBILE BOTTOM NAV BAR ── */
 .mobile-bottom-nav {
   display: none; /* shown only on mobile via media query */
@@ -5494,13 +5332,6 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
 
 /* ── SMALL SCREEN TIGHTENING (<=600px) ── */
 @media (max-width: 600px) {
-  .section-collapse-header { padding: 8px 16px 0; }
-  .section-collapse-title { font-size: 0.82rem; }
-  .section-collapse-summary { font-size: 0.72rem; }
-  .stats-bar { padding: 12px 16px; }
-  .stat-card { min-width: 0; flex: 1 1 calc(50% - 8px); padding: 10px 8px; }
-  .stat-value { font-size: 1.3rem; }
-  .stat-label { font-size: 0.68rem; }
   /* Make the tab row a bit more compact so more fit in view */
   .tab-btn { padding: 10px 10px; font-size: 0.75rem; }
   .tab-count { font-size: 0.62rem; padding: 1px 6px; }
