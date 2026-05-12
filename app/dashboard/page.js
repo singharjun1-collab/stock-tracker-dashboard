@@ -1948,14 +1948,17 @@ function AISettingsPanel({ settings, onSave }) {
   );
 }
 
-// ── Source Peak-Gain Leaderboard ──
-// For every pick, find the highest price the stock hit within 14 days of
-// the alert (the pick's "peak gain"). Then group by source and report
-// median, average, and hit-rate. Picks tagged with multiple sources are
-// credited to each source. Drops obvious data errors (>500% or <-95%).
-function SourcePeakGainLeaderboard({ alerts }) {
+// ── Source Performance Leaderboard (Peak Gain or Worst Drawdown) ──
+// `mode='peak'`     → max price within 14 days → "peak gain"
+// `mode='drawdown'` → min price within 14 days → "worst drawdown"
+// Both share the same plumbing: dedupe picks, split source string, group.
+// Picks tagged with multiple sources are credited to each source.
+// Drops obvious data errors (>500% or <-95%).
+function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
+  const isPeak = mode === 'peak';
   const [windowMode, setWindowMode] = useState('mature'); // 'mature' | 'all'
   const [rankBy, setRankBy] = useState('median'); // 'median' | 'avg' | 'hit20'
+  const [showHelp, setShowHelp] = useState(false);
 
   const stats = useMemo(() => {
     const today = new Date();
@@ -1988,7 +1991,9 @@ function SourcePeakGainLeaderboard({ alerts }) {
       if (!entry || entry <= 0) continue;
 
       const fourteenAfter = new Date(alertDate); fourteenAfter.setDate(fourteenAfter.getDate() + 14);
-      let peakPrice = entry;
+      // Peak mode: track MAX price (best moment). Drawdown mode: track MIN
+      // price (worst moment). Same window, opposite extreme.
+      let extremePrice = entry;
       let priceCount = 0;
       for (const p of (a.prices || [])) {
         // API returns prices with field `date`, not `price_date`
@@ -1997,11 +2002,11 @@ function SourcePeakGainLeaderboard({ alerts }) {
         if (pd < alertDate || pd > fourteenAfter) continue;
         priceCount++;
         const pr = parseFloat(p.price);
-        if (pr > peakPrice) peakPrice = pr;
+        if (isPeak ? pr > extremePrice : pr < extremePrice) extremePrice = pr;
       }
       if (priceCount < 1) continue;
 
-      const peakGainPct = ((peakPrice - entry) / entry) * 100;
+      const peakGainPct = ((extremePrice - entry) / entry) * 100;
       if (peakGainPct > 500 || peakGainPct < -95) continue; // outlier guard
 
       // Split source string and credit each source individually
@@ -2028,8 +2033,15 @@ function SourcePeakGainLeaderboard({ alerts }) {
         const avg = arr.reduce((s, v) => s + v, 0) / arr.length;
         const mid = Math.floor(sorted.length / 2);
         const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-        const hit10 = (arr.filter(v => v >= 10).length / arr.length) * 100;
-        const hit20 = (arr.filter(v => v >= 20).length / arr.length) * 100;
+        // Hit-rate semantics flip with mode:
+        //   peak     → % of picks that gained at least +10% / +20%
+        //   drawdown → % of picks that dropped at least −10% / −20%
+        const hit10 = isPeak
+          ? (arr.filter(v => v >= 10).length / arr.length) * 100
+          : (arr.filter(v => v <= -10).length / arr.length) * 100;
+        const hit20 = isPeak
+          ? (arr.filter(v => v >= 20).length / arr.length) * 100
+          : (arr.filter(v => v <= -20).length / arr.length) * 100;
         const best = Math.max(...arr);
         const worst = Math.min(...arr);
         const meta = (() => {
@@ -2042,12 +2054,18 @@ function SourcePeakGainLeaderboard({ alerts }) {
         return { source, count: arr.length, median, avg, hit10, hit20, best, worst, meta };
       });
     return out;
-  }, [alerts, windowMode]);
+  }, [alerts, windowMode, isPeak]);
 
   const rankKey = rankBy === 'median' ? 'median' : rankBy === 'avg' ? 'avg' : 'hit20';
+  // Ranking direction:
+  //   peak + median/avg     → higher first  (best gains on top)
+  //   peak + hit20          → higher first  (most winners on top)
+  //   drawdown + median/avg → lower first   (worst drops on top)
+  //   drawdown + hit20      → higher first  (most -20% drops on top — also "worst" first)
+  const sortDescending = isPeak || rankBy === 'hit20';
   const sorted = useMemo(() =>
-    [...stats].sort((a, b) => b[rankKey] - a[rankKey]),
-    [stats, rankKey]
+    [...stats].sort((a, b) => sortDescending ? b[rankKey] - a[rankKey] : a[rankKey] - b[rankKey]),
+    [stats, rankKey, sortDescending]
   );
   const maxAbsForBar = useMemo(() => {
     if (sorted.length === 0) return 1;
@@ -2056,8 +2074,20 @@ function SourcePeakGainLeaderboard({ alerts }) {
 
   const fmtPctSigned = (v) => `${v >= 0 ? '+' : ''}${v.toFixed(1)}%`;
   const fmtPctRate = (v) => `${Math.round(v)}%`;
-  const colorFor = (v) =>
-    v >= 15 ? '#22c55e' : v >= 5 ? '#84cc16' : v >= 0 ? '#f59e0b' : '#ef4444';
+  // Color mapping is mode-aware:
+  //   peak     → green = bigger gain
+  //   drawdown → red = bigger drop
+  const colorFor = (v) => {
+    if (isPeak) {
+      return v >= 15 ? '#22c55e' : v >= 5 ? '#84cc16' : v >= 0 ? '#f59e0b' : '#ef4444';
+    }
+    // Drawdown mode: 0 is amber, deeper red as drop worsens
+    return v <= -15 ? '#ef4444' : v <= -5 ? '#f97316' : v <= 0 ? '#f59e0b' : '#22c55e';
+  };
+  // Hit-rate "alarm" color (drawdown only): high % is BAD for downside hit-rate
+  const hitRateColorFor = (v) =>
+    isPeak ? colorFor(v / 3) // re-use peak coloring scale
+           : v >= 40 ? '#ef4444' : v >= 20 ? '#f97316' : v >= 10 ? '#f59e0b' : '#22c55e';
 
   const matureCount = useMemo(() => {
     const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -2065,12 +2095,39 @@ function SourcePeakGainLeaderboard({ alerts }) {
     return (alerts || []).filter(a => a.alert_date && new Date(a.alert_date + 'T00:00:00') <= cutoff).length;
   }, [alerts]);
 
+  // Mode-dependent UI strings
+  const ui = isPeak ? {
+    icon: '\u{1F3C6}',                                              // trophy
+    title: 'Source Performance — Peak Gain (14d)',
+    subtitle: 'For each pick, the highest price the stock hit within 14 days of the alert. Picks credited to multiple sources count for each.',
+    hit20Label: 'Hit +20%',
+    medianCol: 'Median peak',
+    avgCol: 'Avg peak',
+    hit10Col: 'Hit +10%',
+    hit20Col: 'Hit +20%',
+    bestCol: 'Best',
+    worstCol: 'Worst',
+    footnote: 'Median is the "typical pick" — half did better, half did worse. Average gets pulled by big winners; median is more honest.',
+    barAria: 'peak gain by source',
+  } : {
+    icon: '\u{26A0}\u{FE0F}',                                       // ⚠️ warning
+    title: 'Source Performance — Worst Drawdown (14d)',
+    subtitle: 'For each pick, the LOWEST price the stock dropped to within 14 days of the alert. Same window as Peak Gain — this is the downside twin.',
+    hit20Label: 'Hit \u{2212}20%',
+    medianCol: 'Median drop',
+    avgCol: 'Avg drop',
+    hit10Col: 'Hit \u{2212}10%',
+    hit20Col: 'Hit \u{2212}20%',
+    bestCol: 'Shallowest',
+    worstCol: 'Deepest',
+    footnote: 'Sources ranked worst-first. Median drop is the "typical bottom" — half the source\'s picks fell further, half didn\'t.',
+    barAria: 'worst drawdown by source',
+  };
+
   return (
     <div className="analytics-section">
-      <h3 className="analytics-heading">{"\u{1F3C6}"} Source Performance — Peak Gain (14d)</h3>
-      <p className="analytics-subtitle">
-        For each pick, the highest price the stock hit within 14 days of the alert. Picks credited to multiple sources count for each.
-      </p>
+      <h3 className="analytics-heading">{ui.icon} {ui.title}</h3>
+      <p className="analytics-subtitle">{ui.subtitle}</p>
 
       <div className="spg-controls">
         <div className="spg-seg" role="tablist" aria-label="Sample window">
@@ -2088,9 +2145,57 @@ function SourcePeakGainLeaderboard({ alerts }) {
         <div className="spg-seg" role="tablist" aria-label="Rank by">
           <button type="button" className={rankBy === 'median' ? 'on' : ''} onClick={() => setRankBy('median')}>Median</button>
           <button type="button" className={rankBy === 'avg' ? 'on' : ''} onClick={() => setRankBy('avg')}>Average</button>
-          <button type="button" className={rankBy === 'hit20' ? 'on' : ''} onClick={() => setRankBy('hit20')}>Hit +20%</button>
+          <button type="button" className={rankBy === 'hit20' ? 'on' : ''} onClick={() => setRankBy('hit20')}>{ui.hit20Label}</button>
         </div>
+        <button
+          type="button"
+          className={`spg-help-btn${showHelp ? ' on' : ''}`}
+          onClick={() => setShowHelp(v => !v)}
+          aria-expanded={showHelp}
+          aria-controls="spg-help-panel"
+        >
+          {showHelp ? '\u{2715} Hide help' : '? How to read this'}
+        </button>
       </div>
+
+      {showHelp && (
+        <div id="spg-help-panel" className="spg-help-panel" role="region" aria-label="Glossary">
+          <dl className="spg-help-dl">
+            <dt>{isPeak ? 'Peak gain' : 'Drawdown'}</dt>
+            <dd>{isPeak
+              ? 'For each pick, the highest price the stock reached within 14 days of the alert, expressed as % above the entry price. Captures "did the AI catch a move?"'
+              : 'For each pick, the lowest price the stock fell to within 14 days of the alert, expressed as % below the entry price. Captures "how painful was the dip before any rebound?"'}</dd>
+
+            <dt>Median</dt>
+            <dd>The "typical" pick — half a source's picks did {isPeak ? 'better' : 'worse'}, half did {isPeak ? 'worse' : 'better'}. More honest than the average because one giant {isPeak ? 'winner' : 'loser'} can't skew it.</dd>
+
+            <dt>Average</dt>
+            <dd>Plain mean across all the source's scored picks. Useful but easily pulled by outliers — a single +100% pick can lift a source's average 10 points.</dd>
+
+            <dt>{isPeak ? 'Hit +10% / Hit +20%' : 'Hit \u{2212}10% / Hit \u{2212}20%'}</dt>
+            <dd>{isPeak
+              ? 'The % of a source’s picks that reached at least +10% (or +20%) at some point in the 14-day window. A "winners" rate.'
+              : 'The % of a source’s picks that fell to −1% (or −20%) or worse at some point in the 14-day window. A "pain rate."'}</dd>
+
+            <dt>{isPeak ? 'Best / Worst' : 'Shallowest / Deepest'}</dt>
+            <dd>{isPeak
+              ? 'The single best peak gain in the source’s history (Best) and the lowest peak gain — i.e. the pick that came closest to going nowhere (Worst).'
+              : 'The shallowest drawdown is the source’s pick that dipped least; the deepest is the one that fell furthest.'}</dd>
+
+            <dt>Mature picks (14d+)</dt>
+            <dd>Only picks that are at least 14 days old, so every pick had a full window to {isPeak ? 'peak' : 'bottom'}. Fair apples-to-apples comparison.</dd>
+
+            <dt>All picks</dt>
+            <dd>Includes recent picks whose 14-day window isn't complete yet. Useful for early signals but not statistically comparable.</dd>
+
+            <dt>Attribution</dt>
+            <dd>If a pick was flagged by multiple sources (e.g. "wsb,apewisdom"), each source gets credit. Duplicate alert rows for the same ticker on the same day are merged before scoring.</dd>
+
+            <dt>What's filtered out</dt>
+            <dd>Picks with no price snapshots in the window. Outlier returns above +500% or below −95% (almost always entry-price data errors). Sources with fewer than 3 scorable picks.</dd>
+          </dl>
+        </div>
+      )}
 
       {sorted.length === 0 ? (
         <div className="spg-empty">
@@ -2101,10 +2206,11 @@ function SourcePeakGainLeaderboard({ alerts }) {
       ) : (
         <>
           {/* Bar chart: horizontal bars, color-coded */}
-          <div className="spg-chart" role="img" aria-label={`${rankBy} peak gain by source`}>
+          <div className="spg-chart" role="img" aria-label={`${rankBy} ${ui.barAria}`}>
             {sorted.map(s => {
               const val = s[rankKey];
               const widthPct = Math.max(2, (Math.abs(val) / maxAbsForBar) * 100);
+              const barColor = rankBy === 'hit20' ? hitRateColorFor(val) : colorFor(val);
               return (
                 <div key={s.source} className="spg-bar-row">
                   <div className="spg-bar-label">
@@ -2114,9 +2220,9 @@ function SourcePeakGainLeaderboard({ alerts }) {
                   <div className="spg-bar-track">
                     <div
                       className="spg-bar-fill"
-                      style={{ width: `${widthPct}%`, background: colorFor(val) }}
+                      style={{ width: `${widthPct}%`, background: barColor }}
                     />
-                    <span className="spg-bar-value" style={{ color: colorFor(val) }}>
+                    <span className="spg-bar-value" style={{ color: barColor }}>
                       {rankBy === 'hit20' ? fmtPctRate(val) : fmtPctSigned(val)}
                     </span>
                   </div>
@@ -2132,12 +2238,12 @@ function SourcePeakGainLeaderboard({ alerts }) {
                 <tr>
                   <th className="spg-th-source">Source</th>
                   <th>Picks</th>
-                  <th>Median peak</th>
-                  <th>Avg peak</th>
-                  <th>Hit +10%</th>
-                  <th>Hit +20%</th>
-                  <th>Best</th>
-                  <th>Worst</th>
+                  <th>{ui.medianCol}</th>
+                  <th>{ui.avgCol}</th>
+                  <th>{ui.hit10Col}</th>
+                  <th>{ui.hit20Col}</th>
+                  <th>{ui.bestCol}</th>
+                  <th>{ui.worstCol}</th>
                 </tr>
               </thead>
               <tbody>
@@ -2150,8 +2256,8 @@ function SourcePeakGainLeaderboard({ alerts }) {
                     <td style={{ color: colorFor(s.median), fontWeight: 700 }}>{fmtPctSigned(s.median)}</td>
                     <td style={{ color: colorFor(s.avg), fontWeight: 700 }}>{fmtPctSigned(s.avg)}</td>
                     <td>{fmtPctRate(s.hit10)}</td>
-                    <td style={{ color: colorFor(s.hit20 / 3), fontWeight: 700 }}>{fmtPctRate(s.hit20)}</td>
-                    <td className="spg-pos">+{s.best.toFixed(1)}%</td>
+                    <td style={{ color: hitRateColorFor(s.hit20), fontWeight: 700 }}>{fmtPctRate(s.hit20)}</td>
+                    <td className={isPeak ? 'spg-pos' : ''}>{fmtPctSigned(s.best)}</td>
                     <td className={s.worst < 0 ? 'spg-neg' : ''}>{fmtPctSigned(s.worst)}</td>
                   </tr>
                 ))}
@@ -2159,9 +2265,7 @@ function SourcePeakGainLeaderboard({ alerts }) {
             </table>
           </div>
 
-          <div className="spg-foot">
-            Median is the "typical pick" — half did better, half did worse. Average gets pulled by big winners; median is more honest.
-          </div>
+          <div className="spg-foot">{ui.footnote}</div>
         </>
       )}
     </div>
@@ -2200,8 +2304,11 @@ function AnalyticsTab({ alerts }) {
 
   return (
     <div className="analytics-content">
-      {/* NEW: Peak-gain leaderboard (within 14 days of alert) */}
-      <SourcePeakGainLeaderboard alerts={alerts} />
+      {/* Peak-gain leaderboard (best moment within 14 days of alert) */}
+      <SourcePerformanceLeaderboard alerts={alerts} mode="peak" />
+
+      {/* Worst-drawdown leaderboard (worst moment within 14 days of alert) */}
+      <SourcePerformanceLeaderboard alerts={alerts} mode="drawdown" />
 
       {/* Source Performance (latest price vs entry) */}
       <div className="analytics-section">
@@ -5781,7 +5888,12 @@ export default function Dashboard() {
           adding stocks — replacing the old FAB. Taller, bolder, focus
           glow, and a clean "Add a new ticker too" hint baked into the
           placeholder. Market Cap filter moved down to the filter chip
-          row; Collapse all retired. */}
+          row; Collapse all retired.
+
+          Hidden on the Analytics tab (2026-05-12): adding stocks is
+          out-of-context when the user is reviewing source performance,
+          and the bar was just visual noise above the leaderboard. */}
+      {activeTab !== 'analytics' && (
       <div className="hero-search-container">
         <div className="hero-search-bar">
           <span className="hero-search-icon">{"\u{1F50D}"}</span>
@@ -5901,6 +6013,7 @@ export default function Dashboard() {
           </button>
         )}
       </div>
+      )}
 
       {/* Search-bar helper retired 2026-05-12. The hero search bar's
           placeholder + the "Track ticker" affordance inside the dropdown
@@ -5922,8 +6035,13 @@ export default function Dashboard() {
       </p>
       )}
 
-      {/* Sticky tabs wrapper — tabs stay pinned to top as user scrolls */}
+      {/* Sticky tabs wrapper — tabs stay pinned to top as user scrolls.
+          Hidden on Analytics (2026-05-12): the workflow tabs (New /
+          Active / Portfolio / Leaderboard) aren't context-relevant to
+          analytics review. Users return via the ⋯ More menu (desktop)
+          or the mobile bottom nav. */}
       <div id="tabs-anchor" />
+      {activeTab !== 'analytics' && (
       <div className="tabs-sticky-wrap">
         <div className="tabs-container">
           <div className="tabs-row">
@@ -5940,6 +6058,7 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Robinhood-style quick filter: one-tap filter by recommendation.
           Hidden on tabs that don't show pick cards (portfolio, leaderboard,
