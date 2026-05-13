@@ -125,12 +125,15 @@ function pctClass(pct) {
 function fmtPct(pct) {
   return (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
 }
+// Recommendation chip labels. The .rec-{buy|sell|trim|exit|hold} CSS class
+// already color-codes the chip (green BUY, red SELL, etc.) so we don't need
+// redundant colored-dot emojis — Robinhood-style restraint. TRIM/EXIT get a
+// small Lucide glyph for at-a-glance differentiation since they share neutral
+// (amber) coloring.
 function recLabel(rec) {
-  if (rec === 'BUY')  return '\u{1F7E2} BUY';
-  if (rec === 'SELL') return '\u{1F534} SELL';
-  if (rec === 'TRIM') return '\u{2702}\u{FE0F} TRIM';
-  if (rec === 'EXIT') return '\u{1F3C1} EXIT';
-  return '\u{1F7E1} HOLD';
+  if (rec === 'TRIM') return <><Ico name="scissors" size={11} /> TRIM</>;
+  if (rec === 'EXIT') return <><Ico name="flag" size={11} /> EXIT</>;
+  return rec; // BUY / SELL / HOLD — color says it all
 }
 function recClass(rec) {
   if (rec === 'BUY')  return 'rec-buy';
@@ -964,7 +967,11 @@ function AlertCard({
   };
   const cancelNote = () => { setNoteDraft(userNote || ''); setNoteEditing(false); };
 
-  const recDisplay = rec === 'EXIT' ? '\u{1F3C1} EXIT' : rec;
+  const recDisplay = rec === 'EXIT'
+    ? <><Ico name="flag" size={12} /> EXIT</>
+    : rec === 'TRIM'
+    ? <><Ico name="scissors" size={12} /> TRIM</>
+    : rec;
 
   return (
     <div
@@ -1549,13 +1556,16 @@ function MarketCapSlider({ range, onChange }) {
 // acts on. Lives in its own row under the tabs with live counts per pill, and
 // horizontally scrolls on narrow screens.
 function RecommendationFilter({ value, onChange, counts }) {
+  // Dropped colored-dot emojis 2026-05-13 — the pill's own background already
+  // color-codes the recommendation. Robinhood-style: let the color carry the
+  // meaning, no redundant glyph.
   const options = [
-    { key: 'ALL',  label: 'All',  cls: 'rec-pill--all',  dot: null },
-    { key: 'BUY',  label: 'Buy',  cls: 'rec-pill--buy',  dot: '\u{1F7E2}' },
-    { key: 'HOLD', label: 'Hold', cls: 'rec-pill--hold', dot: '\u{1F7E1}' },
-    { key: 'TRIM', label: 'Trim', cls: 'rec-pill--trim', dot: '\u{1F7E0}' },
-    { key: 'EXIT', label: 'Exit', cls: 'rec-pill--exit', dot: '\u{1F535}' },
-    { key: 'SELL', label: 'Sell', cls: 'rec-pill--sell', dot: '\u{1F534}' },
+    { key: 'ALL',  label: 'All',  cls: 'rec-pill--all'  },
+    { key: 'BUY',  label: 'Buy',  cls: 'rec-pill--buy'  },
+    { key: 'HOLD', label: 'Hold', cls: 'rec-pill--hold' },
+    { key: 'TRIM', label: 'Trim', cls: 'rec-pill--trim' },
+    { key: 'EXIT', label: 'Exit', cls: 'rec-pill--exit' },
+    { key: 'SELL', label: 'Sell', cls: 'rec-pill--sell' },
   ];
   return (
     <div
@@ -1576,7 +1586,6 @@ function RecommendationFilter({ value, onChange, counts }) {
             onClick={() => onChange(opt.key)}
             title={opt.key === 'ALL' ? 'Show all picks' : `Show only ${opt.label.toUpperCase()} picks`}
           >
-            {opt.dot && <span className="rec-pill-dot" aria-hidden="true">{opt.dot}</span>}
             <span className="rec-pill-label">{opt.label}</span>
             <span className="rec-pill-count">{count}</span>
           </button>
@@ -3978,7 +3987,11 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
               const entry = parseFloat(a.price_at_alert);
               const upside = entry > 0 ? ((fc.price - entry) / entry) * 100 : 0;
               const pickStatus = a.status || 'active';
-              const pickLabel = pickStatus === 'new' ? '\u{1F195} NEW' : pickStatus === 'dropped' ? '\u{1F4E6} DROPPED' : '\u{1F7E2} ACTIVE';
+              const pickLabel = pickStatus === 'new'
+                ? <><Ico name="plus" size={11} /> NEW</>
+                : pickStatus === 'dropped'
+                ? <><Ico name="trash" size={11} /> DROPPED</>
+                : <><Ico name="activity" size={11} /> ACTIVE</>;
               const srcMeta = getSourceMeta(a.source);
               const dh = daysHeld(a);
               const dtf = daysToForecast(a);
@@ -5564,12 +5577,14 @@ export default function Dashboard() {
   // analytics and internal predicates; the LABEL is "Portfolio" and the tab
   // contains sub-pills All · Watching · Holding · Sold so users get one
   // home for everything personal (formerly two tabs: My Stocks + Portfolio).
+  // Top tab row + mobile bottom nav share the same icon set — Lucide thin-outline
+  // icons (2026-05-13). Active state colored via .tab-btn.active in globals.css.
   const tabs = [
-    { id: 'new', label: '\u{1F195} New', count: newPicks.length },
-    { id: 'chatter', label: '\u{1F4AC} Chatter', count: chatterPicks.length },
-    { id: 'active', label: '\u{1F525} Active', count: activePicks.length },
-    { id: 'watchlist', label: '\u{1F4BC} Portfolio', count: watchlistPicks.length },
-    { id: 'leaderboard', label: '\u{1F3C6} Leaderboard', count: null },
+    { id: 'new',         label: <><Ico name="plus" size={14} /> New</>,        count: newPicks.length },
+    { id: 'chatter',     label: <><Ico name="chat" size={14} /> Chatter</>,    count: chatterPicks.length },
+    { id: 'active',      label: <><Ico name="flame" size={14} /> Active</>,    count: activePicks.length },
+    { id: 'watchlist',   label: <><Ico name="briefcase" size={14} /> Portfolio</>, count: watchlistPicks.length },
+    { id: 'leaderboard', label: <><Ico name="trophy" size={14} /> Leaderboard</>, count: null },
   ];
 
   // Current tab data
@@ -6641,7 +6656,11 @@ export default function Dashboard() {
                     const pct = latest?.pct_change || 0;
                     const perfStatus = getStatus(pct);
                     const pickStatus = alert.status || 'active';
-                    const pickLabel = pickStatus === 'new' ? '\u{1F195} NEW' : pickStatus === 'dropped' ? '\u{1F4E6} DROPPED' : '\u{1F7E2} ACTIVE';
+                    const pickLabel = pickStatus === 'new'
+                ? <><Ico name="plus" size={11} /> NEW</>
+                : pickStatus === 'dropped'
+                ? <><Ico name="trash" size={11} /> DROPPED</>
+                : <><Ico name="activity" size={11} /> ACTIVE</>;
                     const isWatched = watchlist.includes(alert.ticker);
                     const srcMeta = getSourceMeta(alert.source);
                     const signalChange = alert.latest_signal_change;
@@ -6812,7 +6831,7 @@ export default function Dashboard() {
           onClick={() => { setActiveTab('new'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           aria-label="New picks"
         >
-          <span className="mb-nav-icon">{"\u{1F195}"}</span>
+          <span className="mb-nav-icon"><Ico name="plus" size={22} strokeWidth={1.75} /></span>
           <span className="mb-nav-label">New</span>
           {newPicks.length > 0 && <span className="mb-nav-badge">{newPicks.length}</span>}
         </button>
@@ -6821,7 +6840,7 @@ export default function Dashboard() {
           onClick={() => { setActiveTab('chatter'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           aria-label="Chatter"
         >
-          <span className="mb-nav-icon">{"\u{1F4AC}"}</span>
+          <span className="mb-nav-icon"><Ico name="chat" size={22} strokeWidth={1.75} /></span>
           <span className="mb-nav-label">Chatter</span>
           {chatterPicks.length > 0 && <span className="mb-nav-badge">{chatterPicks.length}</span>}
         </button>
@@ -6830,7 +6849,7 @@ export default function Dashboard() {
           onClick={() => { setActiveTab('active'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           aria-label="Active picks"
         >
-          <span className="mb-nav-icon">{"\u{1F525}"}</span>
+          <span className="mb-nav-icon"><Ico name="flame" size={22} strokeWidth={1.75} /></span>
           <span className="mb-nav-label">Active</span>
         </button>
         <button
@@ -6838,7 +6857,7 @@ export default function Dashboard() {
           onClick={() => { setActiveTab('watchlist'); setMyStocksFilter('watching'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
           aria-label="Portfolio"
         >
-          <span className="mb-nav-icon">{"\u{1F4BC}"}</span>
+          <span className="mb-nav-icon"><Ico name="briefcase" size={22} strokeWidth={1.75} /></span>
           <span className="mb-nav-label">Portfolio</span>
           {watchlistPicks.length > 0 && <span className="mb-nav-badge">{watchlistPicks.length}</span>}
         </button>

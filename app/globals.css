@@ -5403,7 +5403,14 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   width: 32px; height: 3px;
   background: #4fc3f7; border-radius: 0 0 3px 3px;
 }
-.mb-nav-icon { font-size: 1.15rem; line-height: 1; }
+.mb-nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  height: 22px;
+}
+.mb-nav-icon .ico { vertical-align: 0; }
 .mb-nav-label {
   font-size: 0.68rem; font-weight: 700;
   letter-spacing: 0.3px; line-height: 1;
