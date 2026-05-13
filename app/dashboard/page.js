@@ -6798,7 +6798,11 @@ export default function Dashboard() {
 
       {/* ─── MOBILE BOTTOM NAV BAR ───
           Fixed thumb-reachable nav for phones. Hidden on desktop via CSS.
-          Mirrors the most commonly used tabs so users don't have to scroll back up. */}
+          Mirrors the most commonly used tabs so users don't have to scroll back up.
+          Order matches the top tab row (New → Chatter → Active → Portfolio).
+          Leaderboard moved out of the bottom nav 2026-05-13 — it's a "check
+          weekly" view, whereas Chatter is daily; Leaderboard stays accessible
+          via the top tab row + the ⋯ kebab menu. */}
       <nav className="mobile-bottom-nav mobile-bottom-nav-4" aria-label="Primary">
         <button
           className={`mb-nav-btn${activeTab === 'new' ? ' active' : ''}`}
@@ -6808,6 +6812,15 @@ export default function Dashboard() {
           <span className="mb-nav-icon">{"\u{1F195}"}</span>
           <span className="mb-nav-label">New</span>
           {newPicks.length > 0 && <span className="mb-nav-badge">{newPicks.length}</span>}
+        </button>
+        <button
+          className={`mb-nav-btn${activeTab === 'chatter' ? ' active' : ''}`}
+          onClick={() => { setActiveTab('chatter'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Chatter"
+        >
+          <span className="mb-nav-icon">{"\u{1F4AC}"}</span>
+          <span className="mb-nav-label">Chatter</span>
+          {chatterPicks.length > 0 && <span className="mb-nav-badge">{chatterPicks.length}</span>}
         </button>
         <button
           className={`mb-nav-btn${activeTab === 'active' ? ' active' : ''}`}
@@ -6825,14 +6838,6 @@ export default function Dashboard() {
           <span className="mb-nav-icon">{"\u{1F4BC}"}</span>
           <span className="mb-nav-label">Portfolio</span>
           {watchlistPicks.length > 0 && <span className="mb-nav-badge">{watchlistPicks.length}</span>}
-        </button>
-        <button
-          className={`mb-nav-btn${activeTab === 'leaderboard' ? ' active' : ''}`}
-          onClick={() => { setActiveTab('leaderboard'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          aria-label="Leaderboard"
-        >
-          <span className="mb-nav-icon">{"\u{1F3C6}"}</span>
-          <span className="mb-nav-label">Leaders</span>
         </button>
       </nav>
 
