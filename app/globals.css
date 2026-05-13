@@ -709,12 +709,17 @@ body {
 }
 .src-wsb       { background: #7c2d12; color: #fed7aa; border: 1px solid #c2410c; }
 .src-reddit    { background: #7f1d1d; color: #fecaca; border: 1px solid #dc2626; }
+/* Niche subreddit badges — distinct hues so users can spot the source at a glance */
+.src-reddit-biotech  { background: #134e4a; color: #99f6e4; border: 1px solid #0d9488; }
+.src-reddit-squeeze  { background: #7f1d1d; color: #fecaca; border: 1px solid #ef4444; }
+.src-reddit-vitards  { background: #44403c; color: #d6d3d1; border: 1px solid #78716c; }
 .src-ape       { background: #713f12; color: #fde68a; border: 1px solid #ca8a04; }
 .src-poly      { background: #1e3a6e; color: #bae6fd; border: 1px solid #2563eb; }
 .src-kalshi    { background: #0c4a6e; color: #a5f3fc; border: 1px solid #0891b2; }
 .src-yahoo     { background: #4c1d95; color: #ddd6fe; border: 1px solid #7c3aed; }
 .src-yahoo-pm  { background: #6b21a8; color: #e9d5ff; border: 1px solid #a855f7; }
 .src-sec       { background: #164e63; color: #cffafe; border: 1px solid #0e7490; }
+.src-insider   { background: #052e16; color: #bbf7d0; border: 1px solid #16a34a; }  /* Form 4 insider buys — money-green */
 .src-fda       { background: #134e4a; color: #99f6e4; border: 1px solid #14b8a6; }
 .src-halt      { background: #7f1d1d; color: #fecaca; border: 1px solid #b91c1c; }
 .src-google    { background: #14532d; color: #bbf7d0; border: 1px solid #16a34a; }
@@ -4720,12 +4725,16 @@ footer span { color: #4fc3f7; }
 }
 .ac-b-source.src-wsb { background: rgba(255,107,53,0.18); color: #ff6b35; }
 .ac-b-source.src-reddit { background: rgba(255,107,53,0.18); color: #ff6b35; }
+.ac-b-source.src-reddit-biotech { background: rgba(20,184,166,0.18); color: #5eead4; }
+.ac-b-source.src-reddit-squeeze { background: rgba(239,68,68,0.20); color: #fca5a5; }
+.ac-b-source.src-reddit-vitards { background: rgba(120,113,108,0.22); color: #d6d3d1; }
 .ac-b-source.src-ape { background: rgba(251,191,36,0.18); color: #fbbf24; }
 .ac-b-source.src-poly { background: rgba(59,130,246,0.18); color: #60a5fa; }
 .ac-b-source.src-kalshi { background: rgba(34,211,238,0.15); color: #22d3ee; }
 .ac-b-source.src-yahoo { background: rgba(168,85,247,0.15); color: #c084fc; }
 .ac-b-source.src-yahoo-pm { background: rgba(192,132,252,0.22); color: #d8b4fe; }
 .ac-b-source.src-sec { background: rgba(14,116,144,0.22); color: #67e8f9; }
+.ac-b-source.src-insider { background: rgba(22,163,74,0.22); color: #86efac; }
 .ac-b-source.src-fda { background: rgba(20,184,166,0.20); color: #5eead4; }
 .ac-b-source.src-halt { background: rgba(220,38,38,0.18); color: #fca5a5; }
 .ac-b-source.src-google { background: rgba(34,197,94,0.15); color: #22c55e; }

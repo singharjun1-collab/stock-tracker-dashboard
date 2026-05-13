@@ -143,12 +143,18 @@ function recClass(rec) {
 const SOURCE_META = {
   wsb: { label: 'WallStreetBets', emoji: '\u{1F7E0}', cls: 'src-wsb' },
   reddit: { label: 'Reddit', emoji: '\u{1F534}', cls: 'src-reddit' },
+  // Niche subreddits (added 2026-05-13) — each gets a distinct emoji so users can
+  // tell at a glance which sub flagged the ticker. All share the src-reddit CSS class.
+  reddit_biotech: { label: 'r/biotechplays', emoji: '\u{1F9EC}', cls: 'src-reddit-biotech' },
+  reddit_shortsqueeze: { label: 'r/Shortsqueeze', emoji: '\u{1FA73}', cls: 'src-reddit-squeeze' },
+  reddit_vitards: { label: 'r/Vitards', emoji: '\u{2699}\u{FE0F}', cls: 'src-reddit-vitards' },
   apewisdom: { label: 'ApeWisdom', emoji: '\u{1F435}', cls: 'src-ape' },
   polymarket: { label: 'Polymarket', emoji: '\u{1F535}', cls: 'src-poly' },
   kalshi: { label: 'Kalshi', emoji: '\u{1F537}', cls: 'src-kalshi' },
   yahoo: { label: 'Yahoo Finance', emoji: '\u{1F7E3}', cls: 'src-yahoo' },
   yahoo_premarket: { label: 'Yahoo Pre-market', emoji: '\u{1F305}', cls: 'src-yahoo-pm' },
   sec_edgar: { label: 'SEC 8-K', emoji: '\u{1F4C4}', cls: 'src-sec' },
+  sec_form4: { label: 'Insider Buy', emoji: '\u{1F4B0}', cls: 'src-insider' },
   biopharmcatalyst: { label: 'FDA Catalyst', emoji: '\u{1F489}', cls: 'src-fda' },
   nasdaq_halt: { label: 'NASDAQ Halt', emoji: '\u{23F8}', cls: 'src-halt' },
   google: { label: 'Google Finance', emoji: '\u{1F7E2}', cls: 'src-google' },
@@ -160,11 +166,17 @@ function getSourceMeta(source) {
   const key = source.toLowerCase().replace(/\s+/g, '');
   // More specific matches first
   if (key.includes('yahoo_premarket') || key.includes('yahoopm') || key.includes('yahoopremarket')) return SOURCE_META.yahoo_premarket;
+  // sec_form4 must be checked BEFORE sec_edgar (otherwise 'sec_' substring grabs it)
+  if (key.includes('sec_form4') || key.includes('form4') || key.includes('insider')) return SOURCE_META.sec_form4;
   if (key.includes('sec_edgar') || key.includes('secedgar') || key.includes('sec8k')) return SOURCE_META.sec_edgar;
   if (key.includes('biopharm') || key.includes('fda') || key.includes('catalystalert')) return SOURCE_META.biopharmcatalyst;
   if (key.includes('apewisdom') || key.includes('apewis')) return SOURCE_META.apewisdom;
   if (key.includes('nasdaq_halt') || key.includes('halt')) return SOURCE_META.nasdaq_halt;
   if (key.includes('wsb') || key.includes('wallstreetbets')) return SOURCE_META.wsb;
+  // Niche reddit subs — check before generic 'reddit' fallthrough
+  if (key.includes('reddit_biotech') || key.includes('biotechplays')) return SOURCE_META.reddit_biotech;
+  if (key.includes('reddit_shortsqueeze') || key.includes('shortsqueeze')) return SOURCE_META.reddit_shortsqueeze;
+  if (key.includes('reddit_vitards') || key.includes('vitards')) return SOURCE_META.reddit_vitards;
   if (key.includes('reddit')) return SOURCE_META.reddit;
   if (key.includes('poly')) return SOURCE_META.polymarket;
   if (key.includes('kalshi')) return SOURCE_META.kalshi;
