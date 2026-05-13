@@ -5194,8 +5194,13 @@ export default function Dashboard() {
   }, []);
 
   const handleJumpToCard = useCallback((alert) => {
+    // Active picks may live in the Chatter tab if they had a recent
+    // recommendation flip — route to the same tab the card actually renders in.
+    const isChatter = alert.status === 'active' && hasRecentFlip(alert);
     const tab = alert.status === 'dropped' ? 'dropped'
-      : alert.status === 'new' ? 'new' : 'active';
+      : alert.status === 'new' ? 'new'
+      : isChatter ? 'chatter'
+      : 'active';
     setActiveTab(tab);
     setSearchQuery('');
     setRecFilter('ALL');
@@ -5284,17 +5289,34 @@ export default function Dashboard() {
   // Dismissed rows drop out of the normal tabs (they reappear in the Archive section).
   const notDismissed = (a) => !a.dismissed_at;
 
-  // Re-signal window — when the daily scan re-detects an already-active ticker,
-  // we set `last_resignal_at` on its row. For RESIGNAL_WINDOW_HOURS the card
-  // surfaces in the "New" tab with a Fresh Signal chip. After the window it
-  // returns to "Active" automatically — keeps each pick in exactly one tab.
-  // See SKILL.md Section 3.95 for the write side and Section 3 of this file
-  // for the matching email-digest split.
-  const RESIGNAL_WINDOW_HOURS = 18;
-  const isRecentResignal = (a) => {
-    if (!a.last_resignal_at) return false;
-    const cutoffMs = Date.now() - RESIGNAL_WINDOW_HOURS * 60 * 60 * 1000;
-    return new Date(a.last_resignal_at).getTime() >= cutoffMs;
+  // Tab routing rules (2026-05-13):
+  //   - New     → status='new' only. Truly brand-new overnight picks.
+  //   - Chatter → status='active' AND the AI's recommendation flipped
+  //               (e.g. HOLD→BUY) in the last 24h. Carved out of Active so
+  //               each card lives in exactly one tab.
+  //   - Active  → status='active' AND no recent flip. Still tracked, quiet.
+  //   - Dropped → status='dropped'.
+  // The 6:30 AM email digest has its own split ("Brand-new picks" vs.
+  // "Fresh signals on existing picks") and is unaffected by tab routing.
+
+  // hasRecentFlip — drives Chatter tab. Returns true if any signal change
+  // in the last 24h actually changed the recommendation (old !== new), so
+  // pure re-detections without a call change don't count.
+  const FLIP_WINDOW_HOURS = 24;
+  const hasRecentFlip = (a) => {
+    const cutoffMs = Date.now() - FLIP_WINDOW_HOURS * 60 * 60 * 1000;
+    const isFlip = (sc) => {
+      if (!sc) return false;
+      const ts = new Date(sc.change_date || sc.created_at || 0).getTime();
+      if (!(ts >= cutoffMs)) return false;
+      return sc.old_recommendation && sc.new_recommendation
+        && sc.old_recommendation !== sc.new_recommendation;
+    };
+    if (isFlip(a.latest_signal_change)) return true;
+    if (Array.isArray(a.signal_change_history)) {
+      for (const sc of a.signal_change_history) if (isFlip(sc)) return true;
+    }
+    return false;
   };
 
   // ────────────────────────────────────────────────────────────────────
@@ -5361,13 +5383,13 @@ export default function Dashboard() {
   }, [alerts]);
 
   const newPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
-    notDismissed(a) && (
-      a.status === 'new' ||
-      (a.status === 'active' && isRecentResignal(a))
-    )
+    a.status === 'new' && notDismissed(a)
+  )), [dedupedAlerts]);
+  const chatterPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
+    a.status === 'active' && notDismissed(a) && hasRecentFlip(a)
   )), [dedupedAlerts]);
   const activePicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
-    a.status === 'active' && notDismissed(a) && !isRecentResignal(a)
+    a.status === 'active' && notDismissed(a) && !hasRecentFlip(a)
   )), [dedupedAlerts]);
   const droppedPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a => a.status === 'dropped' && notDismissed(a))), [dedupedAlerts]);
   // My Stocks tab data (was: watchlist tab). Includes any ticker that is
@@ -5398,6 +5420,7 @@ export default function Dashboard() {
   }, [dedupedAlerts, watchlist, paperTrades, myStocksFilter]);
 
   const filteredNew = useMemo(() => applyAllFilters(newPicks), [newPicks, applyAllFilters]);
+  const filteredChatter = useMemo(() => applyAllFilters(chatterPicks), [chatterPicks, applyAllFilters]);
   const filteredActive = useMemo(() => applyAllFilters(activePicks), [activePicks, applyAllFilters]);
   const filteredDropped = useMemo(() => applyAllFilters(droppedPicks), [droppedPicks, applyAllFilters]);
   const filteredWatchlist = useMemo(() => applyAllFilters(watchlistPicks), [watchlistPicks, applyAllFilters]);
@@ -5479,12 +5502,13 @@ export default function Dashboard() {
   const currentTabPicks = useMemo(() => {
     switch (activeTab) {
       case 'new':       return newPicks;
+      case 'chatter':   return chatterPicks;
       case 'watchlist': return watchlistPicks;
       case 'dropped':   return droppedPicks;
       case 'active':    return activePicks;
       default:          return [];
     }
-  }, [activeTab, newPicks, activePicks, watchlistPicks, droppedPicks]);
+  }, [activeTab, newPicks, chatterPicks, activePicks, watchlistPicks, droppedPicks]);
 
   const recCounts = useMemo(() => {
     const c = { ALL: 0, BUY: 0, HOLD: 0, TRIM: 0, EXIT: 0, SELL: 0 };
@@ -5497,9 +5521,12 @@ export default function Dashboard() {
   }, [currentTabPicks]);
 
   // Hide the rec-filter row on tabs that don't show pick cards.
-  const showRecFilter = ['new', 'active', 'watchlist', 'dropped'].includes(activeTab);
+  const showRecFilter = ['new', 'chatter', 'active', 'watchlist', 'dropped'].includes(activeTab);
 
-  const currentPicks = [...newPicks, ...activePicks];
+  // Global stats (totalCurrent / buys / sells / avgPct) — fold in chatter
+  // picks since they're carved out of activePicks but still represent
+  // "live, in-play" calls the user is acting on.
+  const currentPicks = [...newPicks, ...chatterPicks, ...activePicks];
   const totalCurrent = currentPicks.length;
   const buys = currentPicks.filter(a => a.recommendation === 'BUY').length;
   const sells = currentPicks.filter(a => a.recommendation === 'SELL').length;
@@ -5521,6 +5548,7 @@ export default function Dashboard() {
   // home for everything personal (formerly two tabs: My Stocks + Portfolio).
   const tabs = [
     { id: 'new', label: '\u{1F195} New', count: newPicks.length },
+    { id: 'chatter', label: '\u{1F4AC} Chatter', count: chatterPicks.length },
     { id: 'active', label: '\u{1F525} Active', count: activePicks.length },
     { id: 'watchlist', label: '\u{1F4BC} Portfolio', count: watchlistPicks.length },
     { id: 'leaderboard', label: '\u{1F3C6} Leaderboard', count: null },
@@ -5530,6 +5558,7 @@ export default function Dashboard() {
   const getTabData = () => {
     switch (activeTab) {
       case 'new': return filteredNew;
+      case 'chatter': return filteredChatter;
       case 'active': return filteredActive;
       case 'dropped': return filteredDropped;
       case 'watchlist': return filteredWatchlist;
@@ -6004,7 +6033,7 @@ export default function Dashboard() {
             {tabs.map(tab => (
               <button
                 key={tab.id}
-                className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${tab.id === 'new' && newPicks.length > 0 ? 'tab-glow' : ''}`}
+                className={`tab-btn ${activeTab === tab.id ? 'active' : ''} ${(tab.id === 'new' && newPicks.length > 0) || (tab.id === 'chatter' && chatterPicks.length > 0) ? 'tab-glow' : ''}`}
                 onClick={() => { setActiveTab(tab.id); setRecFilter('ALL'); }}
               >
                 {tab.label}
@@ -6117,7 +6146,8 @@ export default function Dashboard() {
         <>
           {/* Tab description */}
           <p className="section-hint" style={{ marginLeft: '40px', marginTop: '8px' }}>
-            {activeTab === 'new' && 'Fresh signals detected today. Worth investigating before they move.'}
+            {activeTab === 'new' && 'Brand-new picks from the last overnight scan. Look here first each morning.'}
+            {activeTab === 'chatter' && 'Active picks where the AI changed its call in the last 24h. Worth a fresh look.'}
             {activeTab === 'active' && 'Current picks being tracked. Sorted by performance.'}
             {activeTab === 'dropped' && 'Previously tracked stocks where the signal has faded.'}
             {activeTab === 'watchlist' && 'Everything personal — your watchlist, open positions, and closed trades. Filter with the chips below.'}
