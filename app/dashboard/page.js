@@ -1904,7 +1904,7 @@ function AISettingsPanel({ settings, onSave }) {
               <tr>
                 <td>Unique sources</td>
                 <td>{Math.round(SIGNAL_WEIGHTS.source_count * 100)}%</td>
-                <td>Distinct platforms mentioning the ticker (Reddit, WSB, StockTwits, Yahoo, Polymarket, Kalshi, analyst reports)</td>
+                <td>Distinct platforms mentioning the ticker across 14 feeds &mdash; SEC 8-K, SEC Form 4 insider buys, FDA catalysts, Yahoo pre-market, ApeWisdom, r/biotechplays, r/Shortsqueeze, r/Vitards, NASDAQ halts, WSB, Yahoo trending, Polymarket, Kalshi, Stooq. More sources stacking on one ticker = stronger signal.</td>
               </tr>
               <tr>
                 <td>Mention volume</td>

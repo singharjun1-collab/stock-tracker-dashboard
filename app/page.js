@@ -109,7 +109,7 @@ export default function LandingPage() {
             )}
 
             <div className="lp-trust-row">
-              <div className="lp-trust-item"><strong>10</strong><span>signal sources</span></div>
+              <div className="lp-trust-item"><strong>14</strong><span>signal sources</span></div>
               <div className="lp-trust-item"><strong>5-state</strong><span>AI engine</span></div>
               <div className="lp-trust-item"><strong>Pre-market</strong><span>daily digest</span></div>
             </div>
@@ -194,8 +194,8 @@ export default function LandingPage() {
             <h3>We scan everything</h3>
             <p>
               Every 30 minutes during market hours, our scanner pulls fresh data
-              from 10 independent signal sources &mdash; from SEC filings to
-              wallstreetbets to FDA catalysts.
+              from 14 independent signal sources &mdash; from SEC filings and
+              insider open-market buys to wallstreetbets to FDA catalysts.
             </p>
           </div>
           <div className="lp-how-step">
