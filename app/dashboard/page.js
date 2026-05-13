@@ -4292,19 +4292,25 @@ function planPill(u) {
 //   < 24h    → green   (active)
 //   1–7d     → amber   (slipping)
 //   8d+ or null → red  (cold / never logged in)
+//
+// Prefer profiles.last_active_at (bumped on every authed request) over
+// auth.users.last_sign_in_at (only updates on a fresh login event) so the
+// column reflects true app activity, not session age.
 function lastActiveCell(u) {
-  const ts = u.last_sign_in_at;
+  const ts = u.last_active_at || u.last_sign_in_at;
+  const source = u.last_active_at ? 'Last active' : 'Last sign-in';
   if (!ts) {
     return <span className="admin-active admin-active-cold" title="Never signed in">● Never</span>;
   }
   const diffMs = Date.now() - new Date(ts).getTime();
+  const diffMinutes = diffMs / 60_000;
   const diffHours = diffMs / 3_600_000;
   const diffDays = diffMs / 86_400_000;
   let cls = 'admin-active-warm';
   let label;
-  if (diffHours < 1) label = 'Just now';
+  if (diffMinutes < 5) label = 'Just now';
+  else if (diffHours < 1) label = `${Math.floor(diffMinutes)}m ago`;
   else if (diffHours < 24) label = `${Math.floor(diffHours)}h ago`;
-  else if (diffDays < 7) label = `${Math.floor(diffDays)}d ago`;
   else label = `${Math.floor(diffDays)}d ago`;
 
   if (diffHours < 24) cls = 'admin-active-warm';
@@ -4312,7 +4318,7 @@ function lastActiveCell(u) {
   else cls = 'admin-active-cold';
 
   const tip = new Date(ts).toLocaleString();
-  return <span className={`admin-active ${cls}`} title={`Last sign-in: ${tip}`}>● {label}</span>;
+  return <span className={`admin-active ${cls}`} title={`${source}: ${tip}`}>● {label}</span>;
 }
 
 function UsersAdminTab({ currentUserId }) {
@@ -4440,8 +4446,11 @@ function UsersAdminTab({ currentUserId }) {
     if (u.plan === 'paid') acc.paid += 1;
     else if (u.plan === 'trial') acc.trial += 1;
     else if (u.plan === 'expired') acc.expired += 1;
-    if (u.last_sign_in_at) {
-      const days = (now - new Date(u.last_sign_in_at).getTime()) / 86_400_000;
+    // Prefer the real activity timestamp; fall back to sign-in for users
+    // who haven't yet been bumped since the last_active_at rollout.
+    const activityTs = u.last_active_at || u.last_sign_in_at;
+    if (activityTs) {
+      const days = (now - new Date(activityTs).getTime()) / 86_400_000;
       if (days <= 7) acc.active7d += 1;
     }
     return acc;

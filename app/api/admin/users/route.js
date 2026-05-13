@@ -17,7 +17,9 @@ async function requireAdmin() {
 //   • is_subscribed   — alert_distribution_list membership (by email)
 //   • plan            — 'paid' | 'trial' | 'expired' | 'free'
 //   • trial_days_left — int, when plan === 'trial'
-//   • last_sign_in_at — ISO timestamp from auth.users
+//   • last_sign_in_at — ISO timestamp from auth.users (auth event, may be stale)
+//   • last_active_at  — ISO timestamp from profiles, bumped on every authed
+//                       request — the "true" activity signal for the UI
 //   • subscription    — { status, ends_at } when present
 //
 // Plan derivation:
