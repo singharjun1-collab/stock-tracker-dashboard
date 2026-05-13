@@ -21,11 +21,11 @@ const SITE_URL = 'https://stocktracker.getfamilyfinance.com';
 export const metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Stock Chatter — AI Stock Signals From 10 Leading Sources | Daily Pre-Market Watchlist',
+    default: 'Stock Chatter — AI Stock Signals From 14 Leading Sources | Daily Pre-Market Watchlist',
     template: '%s | Stock Chatter',
   },
   description:
-    'Stock Chatter is an AI-first stock scanner that fuses SEC 8-K filings, FDA catalysts, pre-market movers, Reddit chatter and prediction markets into a daily watchlist with entry, target and stop on every pick. AUD $199/yr — 7-day free trial, no credit card required.',
+    'Stock Chatter is an AI-first stock scanner that fuses SEC 8-K filings, insider open-market buys, FDA catalysts, pre-market movers, niche Reddit chatter and prediction markets into a daily watchlist with entry, target and stop on every pick. AUD $199/yr — 7-day free trial, no credit card required.',
   applicationName: 'Stock Chatter',
   authors: [{ name: 'Stock Chatter', url: SITE_URL }],
   generator: 'Next.js',
@@ -35,9 +35,14 @@ export const metadata = {
     'pre-market stock scanner',
     'daily stock watchlist',
     'SEC 8-K stock alerts',
+    'SEC Form 4 insider buying',
+    'insider buying stock signals',
     'FDA catalyst stocks',
+    'biotech catalyst calendar',
     'prediction market stocks',
     'Reddit stock chatter',
+    'r/biotechplays signals',
+    'short squeeze stocks',
     'stock alerts service',
     'AI trading signals',
     'small cap stock screener',
@@ -64,13 +69,13 @@ export const metadata = {
     siteName: 'Stock Chatter',
     title: 'Stock Chatter — Catch the move before it happens',
     description:
-      'AI-first stock signals from 10 leading-indicator sources. Daily pre-market digest at 6:30 AM ET. Mobile-first dashboard. AUD $199/yr — 7-day free trial.',
+      'AI-first stock signals from 14 leading-indicator sources including SEC filings, insider buys, FDA catalysts and niche Reddit subs. Daily pre-market digest at 6:30 AM ET. Mobile-first dashboard. AUD $199/yr — 7-day free trial.',
     images: [
       {
         url: '/logo.png',
         width: 1200,
         height: 630,
-        alt: 'Stock Chatter — AI stock signals from 10 leading sources',
+        alt: 'Stock Chatter — AI stock signals from 14 leading sources',
       },
     ],
   },
@@ -131,7 +136,7 @@ const JSON_LD = {
         'https://x.com/StockChatter',
       ],
       description:
-        'AI-first stock scanner that fuses SEC filings, FDA catalysts, pre-market movers, Reddit chatter and prediction markets into a daily watchlist.',
+        'AI-first stock scanner that fuses SEC filings, insider open-market buys, FDA catalysts, pre-market movers, niche Reddit chatter and prediction markets into a daily watchlist.',
     },
     {
       '@type': 'WebSite',
@@ -164,7 +169,7 @@ const JSON_LD = {
         'BUY / HOLD / TRIM / EXIT / SELL recommendation engine',
         'Entry, target and stop price on every pick',
         'Pre-market email digest at 6:30 AM ET',
-        '10 leading-indicator signal sources',
+        '14 leading-indicator signal sources',
         'Mobile-first dashboard',
         '7-day free trial — no credit card required',
       ],
@@ -178,7 +183,7 @@ const JSON_LD = {
           name: 'What is Stock Chatter?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Stock Chatter is an AI-first stock scanner that fuses 10 leading-indicator sources (SEC 8-K filings, FDA catalysts, pre-market movers, Reddit chatter, prediction markets and more) into a daily watchlist with a clear BUY / HOLD / TRIM / EXIT / SELL signal plus entry, target and stop on every pick.',
+            text: 'Stock Chatter is an AI-first stock scanner that fuses 14 leading-indicator sources (SEC 8-K filings, SEC Form 4 insider open-market buys, FDA catalysts, pre-market movers, broad and niche Reddit chatter including r/biotechplays and r/Shortsqueeze, prediction markets and more) into a daily watchlist with a clear BUY / HOLD / TRIM / EXIT / SELL signal plus entry, target and stop on every pick.',
           },
         },
         {

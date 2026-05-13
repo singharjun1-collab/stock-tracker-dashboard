@@ -191,7 +191,7 @@ For the next week you have full access to:
   • The daily AI watchlist (BUY / HOLD / TRIM / EXIT / SELL)
   • Pre-market email digest at 6:30 AM ET
   • Mobile dashboard with full signal history
-  • All 10 leading-indicator signal sources
+  • All 14 leading-indicator signal sources (incl. insider buys & niche subs)
 
 No credit card required — if Stock Chatter isn't for you, just walk away on day 8 and you'll never be charged.
 
@@ -215,7 +215,7 @@ ${checkoutUrl}
     <li>Daily AI watchlist with BUY / HOLD / TRIM / EXIT / SELL signals</li>
     <li>Pre-market email digest at 6:30 AM ET</li>
     <li>Mobile-first dashboard with full signal history</li>
-    <li>All 10 leading-indicator signal sources</li>
+    <li>All 14 leading-indicator signal sources (incl. insider buys & niche subs)</li>
   </ul>
   <p style="margin-top:24px;">
     <a href="${dashboardUrl}" style="display:inline-block; background:linear-gradient(135deg,#1565c0,#4fc3f7); color:#fff; padding:14px 28px; border-radius:8px; text-decoration:none; font-weight:700; font-size:15px;">Open my dashboard →</a>

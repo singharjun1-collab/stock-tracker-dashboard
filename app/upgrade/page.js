@@ -143,7 +143,7 @@ export default function UpgradePage() {
             <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>Daily AI watchlist with BUY / HOLD / TRIM / EXIT / SELL</li>
             <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>Pre-market email digest at 6:30 AM ET</li>
             <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>Mobile dashboard with full signal history</li>
-            <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>All 10 leading-indicator signal sources</li>
+            <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>All 14 leading-indicator signal sources (incl. insider buys & niche subs)</li>
           </ul>
         </div>
 

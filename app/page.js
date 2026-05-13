@@ -81,10 +81,10 @@ export default function LandingPage() {
               Catch the move <span className="lp-grad">before</span> it happens.
             </h1>
             <p className="lp-hero-sub">
-              Stock Chatter is an always-on AI scanner that fuses 10 leading-indicator
-              sources &mdash; SEC 8-Ks, FDA catalysts, pre-market movers, Reddit chatter,
-              prediction markets &mdash; and turns the noise into a daily watchlist with
-              entry, target, and stop on every pick.
+              Stock Chatter is an always-on AI scanner that fuses 14 leading-indicator
+              sources &mdash; SEC 8-Ks, insider open-market buys, FDA catalysts, pre-market
+              movers, niche Reddit chatter, prediction markets &mdash; and turns the noise
+              into a daily watchlist with entry, target, and stop on every pick.
             </p>
 
             <div className="lp-cta-row">
@@ -141,7 +141,7 @@ export default function LandingPage() {
               <span className="lp-pulse" /> WSB mention spike +180%
             </div>
             <div className="lp-floating-pill lp-fp-2">
-              SEC 8-K filed 11 min ago
+              Insider bought $1.4M of stock
             </div>
             <div className="lp-floating-pill lp-fp-3">
               Pre-market +6.8%
@@ -171,7 +171,7 @@ export default function LandingPage() {
             <div className="lp-compare-tag lp-tag-us">Stock Chatter</div>
             <h3>Leading-indicator AI</h3>
             <ul>
-              <li>Scans 10 sources every 30 minutes</li>
+              <li>Scans 14 sources every 30 minutes</li>
               <li>Anti-surge filter: never chases +20% moves</li>
               <li>Entry / target / stop on every pick</li>
               <li>Pre-market FDA, 8-K &amp; pre-market mover digest</li>
@@ -246,9 +246,9 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* ─────────────── The 10 sources (the moat) ─────────────── */}
+      {/* ─────────────── The 14 sources (the moat) ─────────────── */}
       <section id="sources" className="lp-section lp-sources-section">
-        <h2 className="lp-section-title">10 signal sources, fused into one watchlist</h2>
+        <h2 className="lp-section-title">14 signal sources, fused into one watchlist</h2>
         <p className="lp-section-sub">
           The leading indicators institutional desks watch &mdash; finally available to retail.
         </p>
@@ -356,7 +356,7 @@ export default function LandingPage() {
             <li><span className="lp-check">✓</span> Mobile dashboard with full signal history</li>
             <li><span className="lp-check">✓</span> Personal market-cap filter + watchlist notes</li>
             <li><span className="lp-check">✓</span> Live source-health monitoring</li>
-            <li><span className="lp-check">✓</span> 10 signal sources updated every 30 min</li>
+            <li><span className="lp-check">✓</span> 14 signal sources updated every 30 min</li>
           </ul>
 
           <a
@@ -421,7 +421,7 @@ export default function LandingPage() {
               <span className="lp-logo-text">Stock <span>Chatter</span></span>
             </a>
             <p className="lp-footer-tagline">
-              AI-first stock signals from 10 leading-indicator sources.
+              AI-first stock signals from 14 leading-indicator sources.
             </p>
           </div>
           <div className="lp-footer-links">
@@ -613,7 +613,9 @@ function MobileFeedMockup() {
         <span className="lp-fc">TRIM</span>
       </div>
       <MiniSignalRow ticker="TOVX" company="Theriva Biologics" rec="BUY"  price="$3.42" todayPct="+8.4%" source="FDA"  srcClass="lp-src-fda" />
+      <MiniSignalRow ticker="RLAY" company="Relay Therapeutics" rec="BUY" price="$11.20" todayPct="+5.7%" source="r/biotechplays" srcClass="lp-src-biotech" />
       <MiniSignalRow ticker="CMND" company="Clearmind Medicine" rec="BUY"  price="$1.87" todayPct="+12.6%" source="ApeWisdom" srcClass="lp-src-ape" />
+      <MiniSignalRow ticker="HLF"  company="Herbalife Ltd."     rec="BUY"  price="$13.85" todayPct="+2.1%" source="Insider Buy" srcClass="lp-src-insider" />
       <MiniSignalRow ticker="WLDS" company="Wearable Devices"   rec="HOLD" price="$0.94" todayPct="-3.1%" source="WSB"  srcClass="lp-src-wsb" />
       <MiniSignalRow ticker="ENVB" company="Enveric Biosciences" rec="TRIM" price="$2.11" todayPct="+4.2%" source="SEC 8-K" srcClass="lp-src-sec" />
       <PhoneBottomNav active="active" />
@@ -808,9 +810,13 @@ function PerformanceChart() {
 
 const SOURCES = [
   { key: 'sec',     name: 'SEC EDGAR 8-K',     desc: 'Material event filings, parsed in 6h windows.', tier: 'leading',  tierLabel: 'Leading', icon: '📜' },
+  { key: 'form4',   name: 'SEC Form 4 Insider Buys', desc: 'Directors & officers putting their own cash into the stock — mega buys & clusters.', tier: 'leading', tierLabel: 'Leading', icon: '💰' },
   { key: 'fda',     name: 'FDA Catalyst Cal.', desc: 'PDUFA dates 3–14 days out, surfaced before the run.', tier: 'leading',  tierLabel: 'Leading', icon: '💊' },
   { key: 'premkt',  name: 'Yahoo Pre-Market',  desc: 'Day gainers + small-cap movers, 4–9:30 AM ET.', tier: 'leading',  tierLabel: 'Leading', icon: '🌅' },
   { key: 'ape',     name: 'ApeWisdom',         desc: 'Multi-sub Reddit + 4chan mention deltas.', tier: 'leading',  tierLabel: 'Leading', icon: '📈' },
+  { key: 'biotech', name: 'r/biotechplays',    desc: 'Niche biotech sub — pairs with FDA catalysts for gold-tier signals.', tier: 'leading', tierLabel: 'Leading', icon: '🧬' },
+  { key: 'squeeze', name: 'r/Shortsqueeze',    desc: 'Building short-interest narratives, often 1–3 days ahead of WSB.', tier: 'leading', tierLabel: 'Leading', icon: '🩳' },
+  { key: 'vitards', name: 'r/Vitards',         desc: 'Quiet cyclicals/steel/industrials sub the meme crowds ignore.', tier: 'leading', tierLabel: 'Leading', icon: '⚙️' },
   { key: 'halt',    name: 'NASDAQ Halts',      desc: 'T1/T2/T12 halts surfaced via RSS in real time.', tier: 'leading',  tierLabel: 'Leading', icon: '⏸️' },
   { key: 'wsb',     name: 'WallStreetBets',    desc: 'Hot + rising threads, mention velocity.', tier: 'lagging',  tierLabel: 'Confirming', icon: '💬' },
   { key: 'yahoo',   name: 'Yahoo Trending',    desc: 'Live screener of unusual interest.', tier: 'lagging',  tierLabel: 'Confirming', icon: '📊' },
