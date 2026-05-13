@@ -566,7 +566,7 @@ function PhoneBottomNav({ active }) {
   // Robinhood-style monochrome tab bar — thin-line Lucide icons. The active
   // tab inherits green via .lp-bn-active in landing.css.
   const tabs = [
-    { id: 'new',         icon: 'plus',      label: 'New', badge: 3 },
+    { id: 'new',         icon: 'belldot',   label: 'New', badge: 3 },
     { id: 'active',      icon: 'flame',     label: 'Active' },
     { id: 'watchlist',   icon: 'eye',       label: 'Watch', badge: 5 },
     { id: 'portfolio',   icon: 'briefcase', label: 'Portfolio' },

@@ -39,6 +39,7 @@ import {
   Activity,
   Gift,
   Star,
+  BellDot,
   // Landing-page features
   Smartphone,
   Mail,
@@ -86,6 +87,7 @@ const REGISTRY = {
   activity: Activity,
   gift: Gift,
   star: Star,
+  belldot: BellDot,    // "new picks today" — used in bottom nav + status chips
   phone: Smartphone,
   mail: Mail,
   shieldoff: ShieldOff,
