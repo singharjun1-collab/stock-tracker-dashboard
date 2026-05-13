@@ -133,7 +133,7 @@ Welcome aboard.`;
   const html = `
 <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1a2332;">
   <img src="${appUrl}/logo-email.png" alt="Stock Chatter" width="48" height="48" style="display:block;margin-bottom:16px;border:0;outline:none;" />
-  <h2 style="margin-top:0; color:#0b2540;">You're in! 🎉</h2>
+  <h2 style="margin-top:0; color:#0b2540;">You're in.</h2>
   <p>Hi ${escapeHtml(firstName)},</p>
   <p>Good news — your access to <strong>Stock Chatter</strong> has just been approved.</p>
   <p style="margin-top:24px;">
@@ -206,7 +206,7 @@ ${checkoutUrl}
   const html = `
 <div style="font-family: -apple-system, BlinkMacSystemFont, sans-serif; max-width: 560px; margin: 0 auto; padding: 24px; color: #1a2332;">
   <img src="${appUrl}/logo-email.png" alt="Stock Chatter" width="48" height="48" style="display:block;margin-bottom:16px;border:0;outline:none;" />
-  <h2 style="margin-top:0; color:#0b2540;">Welcome — your 7-day trial just started 🎉</h2>
+  <h2 style="margin-top:0; color:#0b2540;">Welcome — your 7-day trial just started.</h2>
   <p>Hi ${escapeHtml(firstName)},</p>
   <p>You're all set. For the next 7 days you have full access to <strong>Stock Chatter</strong> — no credit card required.</p>
   ${endsLine ? `<p style="background:#e8f4ff; padding:12px 16px; border-radius:8px; color:#0b2540; font-weight:600;">Your trial ends on <strong>${escapeHtml(endsLine)}</strong>.</p>` : ''}

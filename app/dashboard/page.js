@@ -6,6 +6,7 @@ import { SIGNAL_WEIGHTS, SIGNAL_BUCKETS, bucketFor } from '../lib/signalStrength
 import SectorPulseBar from '../components/SectorPulseBar';
 import AddStockSheet from '../components/AddStockSheet';
 import SwipeToRemove from '../components/SwipeToRemove';
+import { Ico } from '../components/Icon';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Stock meta batch fetching.
@@ -140,26 +141,27 @@ function recClass(rec) {
 }
 
 // ── Source helpers ──
+// `icon` is the name passed to <Ico name=…/> (Lucide thin-outline icon registry
+// in components/Icon.js). Replaced colored emoji dots 2026-05-13 to match the
+// Robinhood design language: monochrome, geometric, premium.
 const SOURCE_META = {
-  wsb: { label: 'WallStreetBets', emoji: '\u{1F7E0}', cls: 'src-wsb' },
-  reddit: { label: 'Reddit', emoji: '\u{1F534}', cls: 'src-reddit' },
-  // Niche subreddits (added 2026-05-13) — each gets a distinct emoji so users can
-  // tell at a glance which sub flagged the ticker. All share the src-reddit CSS class.
-  reddit_biotech: { label: 'r/biotechplays', emoji: '\u{1F9EC}', cls: 'src-reddit-biotech' },
-  reddit_shortsqueeze: { label: 'r/Shortsqueeze', emoji: '\u{1FA73}', cls: 'src-reddit-squeeze' },
-  reddit_vitards: { label: 'r/Vitards', emoji: '\u{2699}\u{FE0F}', cls: 'src-reddit-vitards' },
-  apewisdom: { label: 'ApeWisdom', emoji: '\u{1F435}', cls: 'src-ape' },
-  polymarket: { label: 'Polymarket', emoji: '\u{1F535}', cls: 'src-poly' },
-  kalshi: { label: 'Kalshi', emoji: '\u{1F537}', cls: 'src-kalshi' },
-  yahoo: { label: 'Yahoo Finance', emoji: '\u{1F7E3}', cls: 'src-yahoo' },
-  yahoo_premarket: { label: 'Yahoo Pre-market', emoji: '\u{1F305}', cls: 'src-yahoo-pm' },
-  sec_edgar: { label: 'SEC 8-K', emoji: '\u{1F4C4}', cls: 'src-sec' },
-  sec_form4: { label: 'Insider Buy', emoji: '\u{1F4B0}', cls: 'src-insider' },
-  biopharmcatalyst: { label: 'FDA Catalyst', emoji: '\u{1F489}', cls: 'src-fda' },
-  nasdaq_halt: { label: 'NASDAQ Halt', emoji: '\u{23F8}', cls: 'src-halt' },
-  google: { label: 'Google Finance', emoji: '\u{1F7E2}', cls: 'src-google' },
-  stocktwits: { label: 'StockTwits', emoji: '\u{1F534}', cls: 'src-st' },
-  unknown: { label: 'Unknown', emoji: '\u{26AA}', cls: 'src-unknown' },
+  wsb: { label: 'WallStreetBets', icon: 'chat', cls: 'src-wsb' },
+  reddit: { label: 'Reddit', icon: 'chat', cls: 'src-reddit' },
+  reddit_biotech: { label: 'r/biotechplays', icon: 'dna', cls: 'src-reddit-biotech' },
+  reddit_shortsqueeze: { label: 'r/Shortsqueeze', icon: 'trend', cls: 'src-reddit-squeeze' },
+  reddit_vitards: { label: 'r/Vitards', icon: 'cog', cls: 'src-reddit-vitards' },
+  apewisdom: { label: 'ApeWisdom', icon: 'activity', cls: 'src-ape' },
+  polymarket: { label: 'Polymarket', icon: 'target', cls: 'src-poly' },
+  kalshi: { label: 'Kalshi', icon: 'globe', cls: 'src-kalshi' },
+  yahoo: { label: 'Yahoo Finance', icon: 'bar', cls: 'src-yahoo' },
+  yahoo_premarket: { label: 'Yahoo Pre-market', icon: 'sunrise', cls: 'src-yahoo-pm' },
+  sec_edgar: { label: 'SEC 8-K', icon: 'file', cls: 'src-sec' },
+  sec_form4: { label: 'Insider Buy', icon: 'dollar', cls: 'src-insider' },
+  biopharmcatalyst: { label: 'FDA Catalyst', icon: 'pill', cls: 'src-fda' },
+  nasdaq_halt: { label: 'NASDAQ Halt', icon: 'warning', cls: 'src-halt' },
+  google: { label: 'Google Finance', icon: 'search', cls: 'src-google' },
+  stocktwits: { label: 'StockTwits', icon: 'chat', cls: 'src-st' },
+  unknown: { label: 'Unknown', icon: 'eye', cls: 'src-unknown' },
 };
 function getSourceMeta(source) {
   if (!source) return SOURCE_META.unknown;
@@ -1063,12 +1065,12 @@ function AlertCard({
       {/* BADGES — source, market cap, volume spike, sector */}
       <div className="ac-badges">
         <span className={`ac-b ac-b-source ${sourceMeta.cls}${wsbArrow}`}>
-          {sourceMeta.emoji} {sourceMeta.label}
+          <Ico name={sourceMeta.icon} /> {sourceMeta.label}
         </span>
-        {mcLabel && <span className="ac-b ac-b-mcap">🏢 {mcLabel}</span>}
+        {mcLabel && <span className="ac-b ac-b-mcap"><Ico name="building" /> {mcLabel}</span>}
         {volSpike && (
           <span className="ac-b ac-b-vol">
-            🔥 {parseFloat(alert.volume_ratio).toFixed(1)}× vol
+            <Ico name="flame" /> {parseFloat(alert.volume_ratio).toFixed(1)}× vol
           </span>
         )}
         {/* Sector chip — only shown when ticker_meta has been classified.
@@ -1105,13 +1107,13 @@ function AlertCard({
             )}
             {alert.target_low != null && (
               <div className={`ac-plan-item ac-plan-target${targetHit ? ' hit' : ''}`}>
-                <span className="ac-plan-lbl">🎯 {targetHit ? 'Hit ✓' : 'Target'}</span>
+                <span className="ac-plan-lbl"><Ico name="target" size={11} /> {targetHit ? <>Hit <Ico name="check" size={11} /></> : 'Target'}</span>
                 <span className="ac-plan-val">{fmtRange(alert.target_low, alert.target_high)}</span>
               </div>
             )}
             {alert.stop_loss != null && (
               <div className={`ac-plan-item ac-plan-stop${stopHit ? ' hit' : ''}`}>
-                <span className="ac-plan-lbl">{stopHit ? 'Stop hit ✓' : 'Stop'}</span>
+                <span className="ac-plan-lbl">{stopHit ? <>Stop hit <Ico name="check" size={11} /></> : 'Stop'}</span>
                 <span className="ac-plan-val">{fmtP(alert.stop_loss)}</span>
               </div>
             )}
@@ -1122,7 +1124,7 @@ function AlertCard({
       {/* AI READ — one-line call-explanation from the daily job */}
       {(alert.ai_read || alert.recommendation_reason) && (
         <div className={`ac-ai-read ${aiReadTone}`}>
-          <span className="ac-ai-icon">🧠</span>
+          <span className="ac-ai-icon"><Ico name="sparkles" size={15} /></span>
           <span><b>AI read:</b> {alert.ai_read || alert.recommendation_reason}</span>
         </div>
       )}
@@ -1179,7 +1181,7 @@ function AlertCard({
               tabIndex={hasMore ? 0 : undefined}
               aria-expanded={hasMore ? sigHistOpen : undefined}
             >
-              <span className="ac-sig-icon">📢</span>
+              <span className="ac-sig-icon"><Ico name="megaphone" size={13} /></span>
               <span className="ac-sig-label">Signal changed:</span>
               <span className={`ac-mini-chip ${recClass(latest.old_recommendation)}`}>
                 {latest.old_recommendation}
@@ -1191,7 +1193,7 @@ function AlertCard({
               <span className="ac-sig-date">{fmtDate(latest)}</span>
               {hasMore && (
                 <span className="ac-sig-chevron" aria-hidden="true">
-                  {sigHistOpen ? '▲' : '▼'}
+                  <Ico name={sigHistOpen ? 'chevronup' : 'chevrondown'} size={11} />
                 </span>
               )}
             </div>
@@ -1230,7 +1232,7 @@ function AlertCard({
               <>
                 <div className="paper-trade-holding">
                   <div className="pth-top">
-                    <span className="pth-label">💼 PAPER POSITION</span>
+                    <span className="pth-label"><Ico name="briefcase" size={12} /> PAPER POSITION</span>
                     <span className={`pth-pnl ${pnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
                       {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
                     </span>
@@ -1241,7 +1243,7 @@ function AlertCard({
                   </div>
                 </div>
                 <button className="paper-trade-btn paper-trade-sell" onClick={() => onOpenSellModal(openPosition, currentPrice)}>
-                  💰 Paper Sell
+                  <Ico name="dollar" size={14} /> Paper Sell
                 </button>
               </>
             );
@@ -1250,7 +1252,7 @@ function AlertCard({
               className="paper-trade-btn paper-trade-buy"
               onClick={() => onOpenBuyModal(alert, price ?? parseFloat(alert.price_at_alert))}
             >
-              📈 Paper Buy
+              <Ico name="trend" size={14} /> Paper Buy
             </button>
           )}
         </div>
@@ -2103,7 +2105,7 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
 
   // Mode-dependent UI strings
   const ui = isPeak ? {
-    icon: '\u{1F3C6}',                                              // trophy
+    iconName: 'trophy',
     title: 'Source Performance — Peak Gain (14d)',
     subtitle: 'Sources ranked by median peak gain — the typical highest price each source\'s picks reached within 14 days of the alert. Picks credited to multiple sources count for each.',
     medianCol: 'Median peak',
@@ -2114,7 +2116,7 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
     worstCol: 'Worst',
     footnote: 'Median is the "typical pick" — half did better, half did worse. Average gets pulled by big winners; median is more honest.',
   } : {
-    icon: '\u{26A0}\u{FE0F}',                                       // ⚠️ warning
+    iconName: 'warning',
     title: 'Source Performance — Worst Drawdown (14d)',
     subtitle: 'Sources ranked worst-first by median drop — the typical lowest price each source\'s picks fell to within 14 days. Downside twin of Peak Gain.',
     medianCol: 'Median drop',
@@ -2128,7 +2130,7 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
 
   return (
     <div className="analytics-section">
-      <h3 className="analytics-heading">{ui.icon} {ui.title}</h3>
+      <h3 className="analytics-heading"><Ico name={ui.iconName} size={16} /> {ui.title}</h3>
       <p className="analytics-subtitle">{ui.subtitle}</p>
 
       <div className="spg-controls">
@@ -2222,7 +2224,7 @@ function SourcePerformanceLeaderboard({ alerts, mode = 'peak' }) {
                 {sorted.map(s => (
                   <tr key={s.source}>
                     <td className="spg-td-source" data-label="Source">
-                      <span className={`source-badge-sm ${s.meta.cls}`}>{s.meta.emoji} {s.source}</span>
+                      <span className={`source-badge-sm ${s.meta.cls}`}><Ico name={s.meta.icon} /> {s.source}</span>
                     </td>
                     <td data-label="Picks">{s.count}</td>
                     <td data-label={ui.medianCol} style={{ color: colorFor(s.median), fontWeight: 700 }}>{fmtPctSigned(s.median)}</td>
@@ -2252,7 +2254,7 @@ function AnalyticsTab({ alerts }) {
     alerts.forEach(a => {
       const src = getSourceMeta(a.source);
       const key = src.label;
-      if (!stats[key]) stats[key] = { total: 0, wins: 0, losses: 0, neutral: 0, avgPct: 0, totalPct: 0, thumbsUp: 0, thumbsDown: 0, emoji: src.emoji, cls: src.cls };
+      if (!stats[key]) stats[key] = { total: 0, wins: 0, losses: 0, neutral: 0, avgPct: 0, totalPct: 0, thumbsUp: 0, thumbsDown: 0, icon: src.icon, cls: src.cls };
       stats[key].total++;
       const latest = a.prices[a.prices.length - 1];
       const pct = latest?.pct_change || 0;
@@ -2290,7 +2292,7 @@ function AnalyticsTab({ alerts }) {
           {sortedSources.map(([name, stats]) => (
             <div key={name} className="source-stat-card">
               <div className="source-stat-header">
-                <span className={`source-badge-sm ${stats.cls}`}>{stats.emoji} {name}</span>
+                <span className={`source-badge-sm ${stats.cls}`}><Ico name={stats.icon} /> {name}</span>
                 <span className="source-stat-count">{stats.total} picks</span>
               </div>
               <div className="source-stat-metrics">
@@ -3223,7 +3225,7 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
               fontWeight: isStale ? 600 : 400,
             }}
           >
-            {isStale && <span aria-hidden="true">{'⚠️'}</span>}
+            {isStale && <Ico name="warning" size={13} style={{ color: '#f5a623' }} />}
             {isStale ? 'Prices may be stale — last updated' : 'Prices updated'}{' '}
             {fmtAgo(pricesFreshestAt)}
           </span>
@@ -3988,7 +3990,7 @@ function QuickTable({ alerts, watchlist, onToggleWatchlist, onJumpToCard }) {
                 status: <td key="status"><span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span></td>,
                 alert_date: <td key="alert_date" className="qt-muted tbl-alert-date">{a.alert_date}</td>,
                 days_held: <td key="days_held" className="qt-muted">{dh}d</td>,
-                source: <td key="source"><span className={`source-badge-sm ${srcMeta.cls}`}>{srcMeta.emoji} {srcMeta.label}</span></td>,
+                source: <td key="source"><span className={`source-badge-sm ${srcMeta.cls}`}><Ico name={srcMeta.icon} /> {srcMeta.label}</span></td>,
                 signal_type: <td key="signal_type"><span className="signal-chip">{a.signal_type}</span></td>,
                 signal_strength: <td key="signal_strength"><SignalBars score={a.signal_strength} subScores={a.signal_sub_scores} sourceCount={a.signal_source_count} mentionCount={a.signal_mention_count} /></td>,
                 price_at_alert: <td key="price_at_alert" className="tbl-alert-price">${entry.toFixed(2)}</td>,
@@ -4260,7 +4262,7 @@ function LeaderboardTab({ alerts, prices, currentUserId }) {
 function planPill(u) {
   if (u.plan === 'paid') {
     const cancelled = u.subscription?.status === 'cancelled';
-    return <span className="admin-plan admin-plan-paid" title={cancelled ? 'Subscription cancelled — access until period ends' : 'Active paid subscriber'}>{cancelled ? '★ Cancelling' : '★ Paid'}</span>;
+    return <span className="admin-plan admin-plan-paid" title={cancelled ? 'Subscription cancelled — access until period ends' : 'Active paid subscriber'}><Ico name="star" size={11} /> {cancelled ? 'Cancelling' : 'Paid'}</span>;
   }
   if (u.plan === 'trial') {
     const d = u.trial_days_left;
@@ -5643,12 +5645,13 @@ export default function Dashboard() {
             boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
           }}
         >
-          <span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+            <Ico name={trialDaysLeft <= 1 ? 'warning' : 'gift'} size={14} />
             {trialDaysLeft === 0
-              ? '⏰ Your free trial ends today'
+              ? 'Your free trial ends today'
               : trialDaysLeft === 1
-              ? '⏰ 1 day left in your free trial'
-              : `🎁 ${trialDaysLeft} days left in your free trial`}
+              ? '1 day left in your free trial'
+              : `${trialDaysLeft} days left in your free trial`}
           </span>
           <a
             href={trialCheckoutUrl}
@@ -6480,7 +6483,7 @@ export default function Dashboard() {
                         </div>
 
                         <div className="monitor-banner">
-                          <span className="monitor-banner-icon">🤖</span>
+                          <span className="monitor-banner-icon"><Ico name="activity" size={16} /></span>
                           <span>
                             <strong>No active AI signal</strong> — we're monitoring {tk} and will flag it here if chatter emerges across our sources.
                           </span>
@@ -6495,7 +6498,7 @@ export default function Dashboard() {
                           const pnlPct = invested > 0 ? (pnl / invested) * 100 : 0;
                           return (
                             <div className={`monitor-position ${pnl >= 0 ? 'up' : 'down'}`}>
-                              <span>💼 {shares.toFixed(2)} sh @ ${parseFloat(openTrade.entry_price).toFixed(2)} · now ${cv.toFixed(2)}</span>
+                              <span><Ico name="briefcase" size={13} /> {shares.toFixed(2)} sh @ ${parseFloat(openTrade.entry_price).toFixed(2)} · now ${cv.toFixed(2)}</span>
                               <span className="monitor-position-pnl">
                                 {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
                               </span>
@@ -6594,10 +6597,10 @@ export default function Dashboard() {
       <div className="archive-section" id="archive-section">
         {showArchive && (
           <>
-            <p className="section-title" style={{ marginLeft: 0 }}>{"\u{1F4C5}"} Full Archive {"\u{2014}"} All Historical Picks ({alerts.length} total) <button className="section-close-btn" onClick={() => setShowArchive(false)}>{"\u{2715}"} Close</button></p>
+            <p className="section-title" style={{ marginLeft: 0 }}><Ico name="file" size={15} /> Full Archive {"\u{2014}"} All Historical Picks ({alerts.length} total) <button className="section-close-btn" onClick={() => setShowArchive(false)}><Ico name="x" size={13} /> Close</button></p>
             {alerts.some(a => a.dismissed_at) && (
               <div className="dismissed-banner">
-                🗑️ {alerts.filter(a => a.dismissed_at).length} dismissed pick{alerts.filter(a => a.dismissed_at).length === 1 ? '' : 's'} hidden from the main views — look for the <span className="dismissed-banner-tag">DISMISSED</span> tag below and click <b>↺ Bring back</b> to restore any of them.
+                <Ico name="trash" size={14} /> {alerts.filter(a => a.dismissed_at).length} dismissed pick{alerts.filter(a => a.dismissed_at).length === 1 ? '' : 's'} hidden from the main views — look for the <span className="dismissed-banner-tag">DISMISSED</span> tag below and click <b><Ico name="undo" size={12} /> Bring back</b> to restore any of them.
               </div>
             )}
           </>
@@ -6671,12 +6674,12 @@ export default function Dashboard() {
                         </td>
                         <td>
                           <span className={`pick-status-chip pick-${pickStatus}`}>{pickLabel}</span>
-                          {isDismissed && <span className="pick-status-chip pick-dismissed" style={{ marginLeft: 6 }}>🗑️ DISMISSED</span>}
+                          {isDismissed && <span className="pick-status-chip pick-dismissed" style={{ marginLeft: 6 }}><Ico name="trash" size={11} /> DISMISSED</span>}
                         </td>
                         <td className="tbl-alert-date">{alert.alert_date}</td>
                         <td className="tbl-ticker">{alert.ticker}</td>
                         <td style={{ color: '#a0b8d0' }}>{alert.company}</td>
-                        <td><span className={`source-badge-sm ${srcMeta.cls}`}>{srcMeta.emoji} {srcMeta.label}</span></td>
+                        <td><span className={`source-badge-sm ${srcMeta.cls}`}><Ico name={srcMeta.icon} /> {srcMeta.label}</span></td>
                         <td><span className="signal-chip">{alert.signal_type}</span></td>
                         <td className="tbl-alert-price">${parseFloat(alert.price_at_alert).toFixed(2)}</td>
                         <td>${latest?.price?.toFixed(2) || '\u{2014}'}</td>

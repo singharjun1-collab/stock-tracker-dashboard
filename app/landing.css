@@ -705,7 +705,8 @@
   position: relative;
   color: #7a9bc0;
 }
-.lp-bn-icon { font-size: 0.95rem; }
+.lp-bn-icon { display: flex; align-items: center; justify-content: center; line-height: 1; }
+.lp-bn-icon .ico { vertical-align: 0; }
 .lp-bn-label { font-size: 0.56rem; font-weight: 700; letter-spacing: 0.3px; }
 .lp-bn-active { color: #4fc3f7; }
 .lp-bn-active::before {
@@ -820,7 +821,8 @@
   border-radius: 6px;
 }
 .lp-lb-loss { border-left-color: #ef4444; }
-.lp-lb-rank { font-size: 0.92rem; min-width: 18px; text-align: center; }
+.lp-lb-rank { min-width: 32px; display: flex; align-items: center; justify-content: center; }
+.lp-lb-rank .rank-chip { min-width: 26px; height: 20px; font-size: 0.7rem; padding: 0 6px; }
 .lp-lb-mid { flex: 1; min-width: 0; }
 .lp-lb-tk { font-weight: 800; font-size: 0.76rem; letter-spacing: 0.5px; }
 .lp-lb-flow { font-size: 0.56rem; color: #9fb9d5; margin-top: 1px; }
@@ -861,7 +863,6 @@
 .lp-leading { border-left: 3px solid #4fc3f7; }
 .lp-lagging { border-left: 3px solid #7a9bc0; }
 .lp-source-icon {
-  font-size: 1.6rem;
   width: 44px;
   height: 44px;
   background: rgba(79, 195, 247, 0.08);
@@ -870,7 +871,9 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  color: #4fc3f7;        /* Lucide icons inherit currentColor */
 }
+.lp-source-icon .ico { vertical-align: 0; }
 .lp-source-name { font-weight: 700; font-size: 1rem; margin-bottom: 4px; }
 .lp-source-desc { color: #9fb9d5; font-size: 0.85rem; line-height: 1.45; margin-bottom: 8px; }
 .lp-source-tier {
@@ -990,7 +993,6 @@
 }
 .lp-feature:hover { transform: translateY(-3px); border-color: rgba(79, 195, 247, 0.45); }
 .lp-feature-icon {
-  font-size: 1.6rem;
   width: 48px;
   height: 48px;
   background: rgba(79, 195, 247, 0.12);
@@ -1000,7 +1002,9 @@
   align-items: center;
   justify-content: center;
   margin-bottom: 14px;
+  color: #4fc3f7;        /* Lucide icons inherit currentColor */
 }
+.lp-feature-icon .ico { vertical-align: 0; }
 .lp-feature h3 { font-size: 1.1rem; font-weight: 700; margin: 0 0 8px; }
 .lp-feature p { color: #b8cce0; font-size: 0.92rem; margin: 0; line-height: 1.55; }
 
@@ -1074,18 +1078,18 @@
 }
 .lp-pricing-list li:last-child { border-bottom: none; }
 .lp-check {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 18px;
   height: 18px;
   background: rgba(34, 197, 94, 0.15);
   color: #22c55e;
   border-radius: 50%;
-  text-align: center;
-  font-weight: 800;
   margin-right: 10px;
-  font-size: 0.78rem;
-  line-height: 18px;
+  flex-shrink: 0;
 }
+.lp-check .ico { vertical-align: 0; }
 .lp-pricing-card .lp-btn { width: 100%; display: block; margin-bottom: 14px; }
 .lp-pricing-fineprint { font-size: 0.78rem; color: #7a9bc0; line-height: 1.55; }
 

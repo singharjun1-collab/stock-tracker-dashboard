@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import './globals.css';
 import './landing.css';
+import { Ico, RankChip } from './components/Icon';
 
 /**
  * Stock Chatter — public marketing landing page.
@@ -104,7 +105,7 @@ export default function LandingPage() {
                 marginTop: 8,
                 marginBottom: 0,
               }}>
-                ✓ No credit card required &nbsp;·&nbsp; ✓ Cancel anytime &nbsp;·&nbsp; AUD $199/year after the trial
+                <Ico name="check" size={13} /> No credit card required &nbsp;·&nbsp; <Ico name="check" size={13} /> Cancel anytime &nbsp;·&nbsp; AUD $199/year after the trial
               </p>
             )}
 
@@ -256,7 +257,7 @@ export default function LandingPage() {
         <div className="lp-sources-grid">
           {SOURCES.map(s => (
             <div key={s.key} className={`lp-source-card lp-${s.tier}`}>
-              <div className="lp-source-icon">{s.icon}</div>
+              <div className="lp-source-icon"><Ico name={s.icon} size={22} strokeWidth={1.6} /></div>
               <div className="lp-source-body">
                 <div className="lp-source-name">{s.name}</div>
                 <div className="lp-source-desc">{s.desc}</div>
@@ -320,7 +321,7 @@ export default function LandingPage() {
         <div className="lp-features-grid">
           {FEATURES.map(f => (
             <div key={f.title} className="lp-feature">
-              <div className="lp-feature-icon">{f.icon}</div>
+              <div className="lp-feature-icon"><Ico name={f.icon} size={28} strokeWidth={1.5} /></div>
               <h3>{f.title}</h3>
               <p>{f.body}</p>
             </div>
@@ -351,12 +352,12 @@ export default function LandingPage() {
           </div>
 
           <ul className="lp-pricing-list">
-            <li><span className="lp-check">✓</span> Daily AI watchlist with BUY/HOLD/TRIM/EXIT/SELL</li>
-            <li><span className="lp-check">✓</span> Pre-market email digest + 10:30 AM market-open recap</li>
-            <li><span className="lp-check">✓</span> Mobile dashboard with full signal history</li>
-            <li><span className="lp-check">✓</span> Personal market-cap filter + watchlist notes</li>
-            <li><span className="lp-check">✓</span> Live source-health monitoring</li>
-            <li><span className="lp-check">✓</span> 14 signal sources updated every 30 min</li>
+            <li><span className="lp-check"><Ico name="check" size={11} strokeWidth={2.5} /></span> Daily AI watchlist with BUY/HOLD/TRIM/EXIT/SELL</li>
+            <li><span className="lp-check"><Ico name="check" size={11} strokeWidth={2.5} /></span> Pre-market email digest + 10:30 AM market-open recap</li>
+            <li><span className="lp-check"><Ico name="check" size={11} strokeWidth={2.5} /></span> Mobile dashboard with full signal history</li>
+            <li><span className="lp-check"><Ico name="check" size={11} strokeWidth={2.5} /></span> Personal market-cap filter + watchlist notes</li>
+            <li><span className="lp-check"><Ico name="check" size={11} strokeWidth={2.5} /></span> Live source-health monitoring</li>
+            <li><span className="lp-check"><Ico name="check" size={11} strokeWidth={2.5} /></span> 14 signal sources updated every 30 min</li>
           </ul>
 
           <a
@@ -407,7 +408,7 @@ export default function LandingPage() {
             fontSize: 13,
             marginTop: 12,
           }}>
-            ✓ Free for 7 days &nbsp;·&nbsp; ✓ Cancel anytime &nbsp;·&nbsp; AUD $199/year after
+            <Ico name="check" size={13} /> Free for 7 days &nbsp;·&nbsp; <Ico name="check" size={13} /> Cancel anytime &nbsp;·&nbsp; AUD $199/year after
           </p>
         )}
       </section>
@@ -521,7 +522,7 @@ function SignalCardMockup({ ticker, company, rec, price, todayPct, fromPrice, li
       </div>
 
       <div className="lp-mock-ai">
-        <span className="lp-mock-ai-label">🧠 AI read</span>
+        <span className="lp-mock-ai-label"><Ico name="sparkles" size={13} /> AI read</span>
         <span className="lp-mock-ai-text">{aiRead}</span>
       </div>
 
@@ -562,18 +563,20 @@ function PhoneHeader({ title, subtitle, badge }) {
 }
 
 function PhoneBottomNav({ active }) {
+  // Robinhood-style monochrome tab bar — thin-line Lucide icons. The active
+  // tab inherits green via .lp-bn-active in landing.css.
   const tabs = [
-    { id: 'new',         icon: '\u{1F195}', label: 'New', badge: 3 },
-    { id: 'active',      icon: '\u{1F525}', label: 'Active' },
-    { id: 'watchlist',   icon: '\u{2B50}',  label: 'Watch', badge: 5 },
-    { id: 'portfolio',   icon: '\u{1F4BC}', label: 'Portfolio' },
-    { id: 'leaderboard', icon: '\u{1F3C6}', label: 'Leaders' },
+    { id: 'new',         icon: 'plus',      label: 'New', badge: 3 },
+    { id: 'active',      icon: 'flame',     label: 'Active' },
+    { id: 'watchlist',   icon: 'eye',       label: 'Watch', badge: 5 },
+    { id: 'portfolio',   icon: 'briefcase', label: 'Portfolio' },
+    { id: 'leaderboard', icon: 'trophy',    label: 'Leaders' },
   ];
   return (
     <div className="lp-bottom-nav">
       {tabs.map(t => (
         <div key={t.id} className={`lp-bn-btn ${active === t.id ? 'lp-bn-active' : ''}`}>
-          <span className="lp-bn-icon">{t.icon}</span>
+          <span className="lp-bn-icon"><Ico name={t.icon} size={18} /></span>
           <span className="lp-bn-label">{t.label}</span>
           {t.badge && <span className="lp-bn-badge">{t.badge}</span>}
         </div>
@@ -605,7 +608,7 @@ function MiniSignalRow({ ticker, company, rec, price, todayPct, source, srcClass
 function MobileFeedMockup() {
   return (
     <div className="lp-screen lp-screen-feed">
-      <PhoneHeader title="🔥 Active picks" subtitle="12 signals · today" badge="BUY" />
+      <PhoneHeader title={<><Ico name="flame" size={14} /> Active picks</>} subtitle="12 signals · today" badge="BUY" />
       <div className="lp-filter-chips">
         <span className="lp-fc lp-fc-active">All</span>
         <span className="lp-fc">BUY</span>
@@ -668,7 +671,7 @@ function ChartDetailMockup() {
         <div><span>+ / −</span><strong className="lp-cd-up">+15.9%</strong></div>
       </div>
       <div className="lp-cd-ai">
-        <span className="lp-mock-ai-label">🧠 AI read</span>
+        <span className="lp-mock-ai-label"><Ico name="sparkles" size={13} /> AI read</span>
         <span>FDA catalyst in 11 days. Volume 2.1× avg. Trim half at $3.85.</span>
       </div>
     </div>
@@ -684,7 +687,7 @@ function PortfolioMockup() {
   ];
   return (
     <div className="lp-screen lp-screen-portfolio">
-      <PhoneHeader title="💼 My Portfolio" subtitle="Paper trading · 4 holdings" />
+      <PhoneHeader title={<><Ico name="briefcase" size={14} /> My Portfolio</>} subtitle="Paper trading · 4 holdings" />
       <div className="lp-pf-summary">
         <div className="lp-pf-stat">
           <span>Equity</span>
@@ -719,17 +722,18 @@ function PortfolioMockup() {
 }
 
 function ReportingMockup() {
+  // Numbered rank chips replace 🥇🥈🥉 medals — Robinhood-style leaderboard.
   const rows = [
-    { rank: '🥇', tk: 'CMND', pct: '+127%', flow: 'BUY → EXIT',  days: '11d' },
-    { rank: '🥈', tk: 'TOVX', pct: '+82%',  flow: 'BUY → TRIM',  days: '8d'  },
-    { rank: '🥉', tk: 'ENVB', pct: '+54%',  flow: 'BUY → EXIT',  days: '14d' },
-    { rank: '4',  tk: 'WLDS', pct: '+29%',  flow: 'BUY → HOLD',  days: '6d'  },
-    { rank: '5',  tk: 'CMPS', pct: '+18%',  flow: 'BUY → HOLD',  days: '4d'  },
-    { rank: '6',  tk: 'INSM', pct: '-7%',   flow: 'BUY → SELL',  days: '9d'  },
+    { rank: 1, tk: 'CMND', pct: '+127%', flow: 'BUY → EXIT',  days: '11d' },
+    { rank: 2, tk: 'TOVX', pct: '+82%',  flow: 'BUY → TRIM',  days: '8d'  },
+    { rank: 3, tk: 'ENVB', pct: '+54%',  flow: 'BUY → EXIT',  days: '14d' },
+    { rank: 4, tk: 'WLDS', pct: '+29%',  flow: 'BUY → HOLD',  days: '6d'  },
+    { rank: 5, tk: 'CMPS', pct: '+18%',  flow: 'BUY → HOLD',  days: '4d'  },
+    { rank: 6, tk: 'INSM', pct: '-7%',   flow: 'BUY → SELL',  days: '9d'  },
   ];
   return (
     <div className="lp-screen lp-screen-leaders">
-      <PhoneHeader title="🏆 What we held" subtitle="Last 30 days · 12 closed" />
+      <PhoneHeader title={<><Ico name="trophy" size={14} /> What we held</>} subtitle="Last 30 days · 12 closed" />
       <div className="lp-lb-summary">
         <div className="lp-lb-stat lp-lb-win">
           <span>Win rate</span>
@@ -747,7 +751,7 @@ function ReportingMockup() {
       <div className="lp-lb-list">
         {rows.map(r => (
           <div key={r.tk} className={`lp-lb-row ${r.pct.startsWith('-') ? 'lp-lb-loss' : ''}`}>
-            <div className="lp-lb-rank">{r.rank}</div>
+            <div className="lp-lb-rank"><RankChip n={r.rank} /></div>
             <div className="lp-lb-mid">
               <div className="lp-lb-tk">{r.tk}</div>
               <div className="lp-lb-flow">{r.flow} · {r.days}</div>
@@ -808,30 +812,32 @@ function PerformanceChart() {
    Static content
    ════════════════════════════════════════════════════════════════════ */
 
+// `icon` is the Lucide name passed to <Ico /> — see components/Icon.js for the
+// full registry. Replaced emoji icons 2026-05-13 for Robinhood-style consistency.
 const SOURCES = [
-  { key: 'sec',     name: 'SEC EDGAR 8-K',     desc: 'Material event filings, parsed in 6h windows.', tier: 'leading',  tierLabel: 'Leading', icon: '📜' },
-  { key: 'form4',   name: 'SEC Form 4 Insider Buys', desc: 'Directors & officers putting their own cash into the stock — mega buys & clusters.', tier: 'leading', tierLabel: 'Leading', icon: '💰' },
-  { key: 'fda',     name: 'FDA Catalyst Cal.', desc: 'PDUFA dates 3–14 days out, surfaced before the run.', tier: 'leading',  tierLabel: 'Leading', icon: '💊' },
-  { key: 'premkt',  name: 'Yahoo Pre-Market',  desc: 'Day gainers + small-cap movers, 4–9:30 AM ET.', tier: 'leading',  tierLabel: 'Leading', icon: '🌅' },
-  { key: 'ape',     name: 'ApeWisdom',         desc: 'Multi-sub Reddit + 4chan mention deltas.', tier: 'leading',  tierLabel: 'Leading', icon: '📈' },
-  { key: 'biotech', name: 'r/biotechplays',    desc: 'Niche biotech sub — pairs with FDA catalysts for gold-tier signals.', tier: 'leading', tierLabel: 'Leading', icon: '🧬' },
-  { key: 'squeeze', name: 'r/Shortsqueeze',    desc: 'Building short-interest narratives, often 1–3 days ahead of WSB.', tier: 'leading', tierLabel: 'Leading', icon: '🩳' },
-  { key: 'vitards', name: 'r/Vitards',         desc: 'Quiet cyclicals/steel/industrials sub the meme crowds ignore.', tier: 'leading', tierLabel: 'Leading', icon: '⚙️' },
-  { key: 'halt',    name: 'NASDAQ Halts',      desc: 'T1/T2/T12 halts surfaced via RSS in real time.', tier: 'leading',  tierLabel: 'Leading', icon: '⏸️' },
-  { key: 'wsb',     name: 'WallStreetBets',    desc: 'Hot + rising threads, mention velocity.', tier: 'lagging',  tierLabel: 'Confirming', icon: '💬' },
-  { key: 'yahoo',   name: 'Yahoo Trending',    desc: 'Live screener of unusual interest.', tier: 'lagging',  tierLabel: 'Confirming', icon: '📊' },
-  { key: 'poly',    name: 'Polymarket',        desc: 'Crypto-native event prediction signals.', tier: 'lagging',  tierLabel: 'Confirming', icon: '🎯' },
-  { key: 'kalshi',  name: 'Kalshi Macro Dial', desc: 'Risk-on / risk-off macro state from KXFED & friends.', tier: 'lagging',  tierLabel: 'Confirming', icon: '🌐' },
-  { key: 'stooq',   name: 'Stooq Quotes',      desc: 'Yahoo fallback for resilient pricing.', tier: 'lagging',  tierLabel: 'Confirming', icon: '🛡️' },
+  { key: 'sec',     name: 'SEC EDGAR 8-K',     desc: 'Material event filings, parsed in 6h windows.', tier: 'leading',  tierLabel: 'Leading', icon: 'file' },
+  { key: 'form4',   name: 'SEC Form 4 Insider Buys', desc: 'Directors & officers putting their own cash into the stock — mega buys & clusters.', tier: 'leading', tierLabel: 'Leading', icon: 'dollar' },
+  { key: 'fda',     name: 'FDA Catalyst Cal.', desc: 'PDUFA dates 3–14 days out, surfaced before the run.', tier: 'leading',  tierLabel: 'Leading', icon: 'pill' },
+  { key: 'premkt',  name: 'Yahoo Pre-Market',  desc: 'Day gainers + small-cap movers, 4–9:30 AM ET.', tier: 'leading',  tierLabel: 'Leading', icon: 'sunrise' },
+  { key: 'ape',     name: 'ApeWisdom',         desc: 'Multi-sub Reddit + 4chan mention deltas.', tier: 'leading',  tierLabel: 'Leading', icon: 'trend' },
+  { key: 'biotech', name: 'r/biotechplays',    desc: 'Niche biotech sub — pairs with FDA catalysts for gold-tier signals.', tier: 'leading', tierLabel: 'Leading', icon: 'dna' },
+  { key: 'squeeze', name: 'r/Shortsqueeze',    desc: 'Building short-interest narratives, often 1–3 days ahead of WSB.', tier: 'leading', tierLabel: 'Leading', icon: 'flame' },
+  { key: 'vitards', name: 'r/Vitards',         desc: 'Quiet cyclicals/steel/industrials sub the meme crowds ignore.', tier: 'leading', tierLabel: 'Leading', icon: 'cog' },
+  { key: 'halt',    name: 'NASDAQ Halts',      desc: 'T1/T2/T12 halts surfaced via RSS in real time.', tier: 'leading',  tierLabel: 'Leading', icon: 'warning' },
+  { key: 'wsb',     name: 'WallStreetBets',    desc: 'Hot + rising threads, mention velocity.', tier: 'lagging',  tierLabel: 'Confirming', icon: 'chat' },
+  { key: 'yahoo',   name: 'Yahoo Trending',    desc: 'Live screener of unusual interest.', tier: 'lagging',  tierLabel: 'Confirming', icon: 'bar' },
+  { key: 'poly',    name: 'Polymarket',        desc: 'Crypto-native event prediction signals.', tier: 'lagging',  tierLabel: 'Confirming', icon: 'target' },
+  { key: 'kalshi',  name: 'Kalshi Macro Dial', desc: 'Risk-on / risk-off macro state from KXFED & friends.', tier: 'lagging',  tierLabel: 'Confirming', icon: 'globe' },
+  { key: 'stooq',   name: 'Stooq Quotes',      desc: 'Yahoo fallback for resilient pricing.', tier: 'lagging',  tierLabel: 'Confirming', icon: 'shield' },
 ];
 
 const FEATURES = [
-  { icon: '🎯', title: '5-state AI engine',    body: 'Every pick gets BUY, HOLD, TRIM, EXIT, or SELL. We don&rsquo;t just tell you what to buy — we tell you when to ring the register.' },
-  { icon: '🚫', title: 'Anti-surge filter',     body: 'We never flag stocks already up +20% same day. The whole point is catching the move before it happens.' },
-  { icon: '📱', title: 'Mobile-first UI',       body: 'Robinhood-grade design. Works just as well from your couch as from your desk.' },
-  { icon: '✉️', title: 'Pre-market digest',     body: 'A clean email at 9:00 AM ET with everything new since the close. Plus a market-open recap at 10:30.' },
-  { icon: '🧠', title: 'Plain-English AI Read', body: 'Each pick comes with a one-sentence explanation of *why* it&rsquo;s on your watchlist. No jargon.' },
-  { icon: '🛠️', title: 'Personal filters',     body: 'Set your own market-cap range, take private notes per ticker, and dismiss anything that isn&rsquo;t for you.' },
+  { icon: 'target',    title: '5-state AI engine',    body: 'Every pick gets BUY, HOLD, TRIM, EXIT, or SELL. We don&rsquo;t just tell you what to buy — we tell you when to ring the register.' },
+  { icon: 'shieldoff', title: 'Anti-surge filter',    body: 'We never flag stocks already up +20% same day. The whole point is catching the move before it happens.' },
+  { icon: 'phone',     title: 'Mobile-first UI',      body: 'Robinhood-grade design. Works just as well from your couch as from your desk.' },
+  { icon: 'mail',      title: 'Pre-market digest',    body: 'A clean email at 9:00 AM ET with everything new since the close. Plus a market-open recap at 10:30.' },
+  { icon: 'sparkles',  title: 'Plain-English AI Read', body: 'Each pick comes with a one-sentence explanation of *why* it&rsquo;s on your watchlist. No jargon.' },
+  { icon: 'sliders',   title: 'Personal filters',     body: 'Set your own market-cap range, take private notes per ticker, and dismiss anything that isn&rsquo;t for you.' },
 ];
 
 const FAQ = [

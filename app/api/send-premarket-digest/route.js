@@ -230,7 +230,7 @@ function renderMarketMoodCard(brief) {
     .join('');
 
   const summaryBlock = brief.summary
-    ? `<div style="font-size:14px;line-height:1.55;color:#e2e8f0;margin-top:14px;">🌅 ${brief.summary}</div>`
+    ? `<div style="font-size:14px;line-height:1.55;color:#e2e8f0;margin-top:14px;">${brief.summary}</div>`
     : '';
 
   return `<tr><td style="padding:16px 24px 0 24px;">
@@ -406,7 +406,7 @@ function buildHtml({ data, recipientEmail }) {
               <div style="font-size:12px;font-weight:600;color:${recColor(p.recommendation)};">${p.recommendation || ''}</div>
             </div>
             <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''} · ${p.signal_type || ''}</div>
-            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5;">🧠 ${p.ai_read}</div>` : ''}
+            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5;"><strong style="color:#4fc3f7;">AI read:</strong> ${p.ai_read}</div>` : ''}
             <div style="font-size:12px;color:#94a3b8;margin-top:8px;">
               Entry ${fmtMoney(p.entry_low)}–${fmtMoney(p.entry_high)} ·
               Target ${fmtMoney(p.target_low)}–${fmtMoney(p.target_high)} ·
@@ -423,7 +423,7 @@ function buildHtml({ data, recipientEmail }) {
       ${
         freshSignalPicks.length > 0
           ? `<tr><td style="padding:16px 24px 8px 24px;">
-        <div style="font-size:14px;font-weight:600;color:#fac775;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">🔥 Fresh signals on existing picks</div>
+        <div style="font-size:14px;font-weight:600;color:#fac775;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">Fresh signals on existing picks</div>
         <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Active picks the scan re-detected overnight — the AI is doubling down. Already on your dashboard; signal history shows when previous flags fired.</div>
         ${freshSignalPicks
           .slice(0, 8)
@@ -438,7 +438,7 @@ function buildHtml({ data, recipientEmail }) {
               <div style="font-size:12px;font-weight:600;color:${recColor(p.recommendation)};">${p.recommendation || ''}</div>
             </div>
             <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''} · ${p.signal_type || ''}</div>
-            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5;">🧠 ${p.ai_read}</div>` : ''}
+            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5;"><strong style="color:#4fc3f7;">AI read:</strong> ${p.ai_read}</div>` : ''}
             <div style="font-size:12px;color:#94a3b8;margin-top:8px;">
               Entry ${fmtMoney(p.entry_low)}–${fmtMoney(p.entry_high)} ·
               Target ${fmtMoney(p.target_low)}–${fmtMoney(p.target_high)} ·
@@ -462,14 +462,14 @@ function buildHtml({ data, recipientEmail }) {
           ${
             biggestWinner
               ? `<div style="font-size:13px;color:#cbd5e1;margin-top:10px;">
-                   🏆 Biggest winner: <strong>${biggestWinner.ticker}</strong> ${fmtPct(biggestWinner.pct)}
+                   <span style="color:#22c55e;font-weight:700;">▲</span> Biggest winner: <strong>${biggestWinner.ticker}</strong> ${fmtPct(biggestWinner.pct)}
                  </div>`
               : ''
           }
           ${
             biggestLoser && biggestLoser.ticker !== biggestWinner?.ticker
               ? `<div style="font-size:13px;color:#cbd5e1;margin-top:4px;">
-                   🥶 Biggest loser: <strong>${biggestLoser.ticker}</strong> ${fmtPct(biggestLoser.pct)}
+                   <span style="color:#ef4444;font-weight:700;">▼</span> Biggest loser: <strong>${biggestLoser.ticker}</strong> ${fmtPct(biggestLoser.pct)}
                  </div>`
               : ''
           }

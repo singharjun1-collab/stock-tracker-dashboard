@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createSupabaseBrowserClient } from '../lib/supabase/browser';
 import '../globals.css';
+import { Ico } from '../components/Icon';
 
 /**
  * /upgrade — full-page paywall.
@@ -140,10 +141,10 @@ export default function UpgradePage() {
               lineHeight: 1.8,
             }}
           >
-            <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>Daily AI watchlist with BUY / HOLD / TRIM / EXIT / SELL</li>
-            <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>Pre-market email digest at 6:30 AM ET</li>
-            <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>Mobile dashboard with full signal history</li>
-            <li><span style={{ color: '#22c55e', marginRight: 8 }}>✓</span>All 14 leading-indicator signal sources (incl. insider buys & niche subs)</li>
+            <li><span style={{ color: '#22c55e', marginRight: 8, display: 'inline-flex', verticalAlign: 'middle' }}><Ico name="check" size={14} strokeWidth={2.5} /></span>Daily AI watchlist with BUY / HOLD / TRIM / EXIT / SELL</li>
+            <li><span style={{ color: '#22c55e', marginRight: 8, display: 'inline-flex', verticalAlign: 'middle' }}><Ico name="check" size={14} strokeWidth={2.5} /></span>Pre-market email digest at 6:30 AM ET</li>
+            <li><span style={{ color: '#22c55e', marginRight: 8, display: 'inline-flex', verticalAlign: 'middle' }}><Ico name="check" size={14} strokeWidth={2.5} /></span>Mobile dashboard with full signal history</li>
+            <li><span style={{ color: '#22c55e', marginRight: 8, display: 'inline-flex', verticalAlign: 'middle' }}><Ico name="check" size={14} strokeWidth={2.5} /></span>All 14 leading-indicator signal sources (incl. insider buys & niche subs)</li>
           </ul>
         </div>
 

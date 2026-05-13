@@ -23,6 +23,7 @@
 // self-contained — drop it in, render it, it just works.
 
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Ico } from './Icon';
 
 const TICKER_RE = /^[A-Z0-9.\-]{1,12}$/;
 
@@ -414,7 +415,7 @@ export default function AddStockSheet({
         <div className="as-body">
           {feedback && (
             <div className={`as-feedback as-feedback-${feedback.type}`}>
-              {feedback.type === 'success' ? '✓' : '!'} {feedback.message}
+              {feedback.type === 'success' ? <Ico name="check" size={13} strokeWidth={2.5} /> : '!'} {feedback.message}
             </div>
           )}
 
@@ -1366,7 +1367,7 @@ function SelectedStockPanel({
         </div>
       ) : (
         <div className="as-stock-strip-monitor">
-          🤖 No active AI signal — we'll monitor and flag if chatter emerges
+          <Ico name="activity" size={14} /> No active AI signal — we'll monitor and flag if chatter emerges
         </div>
       )}
     </div>
@@ -1405,7 +1406,7 @@ function SelectedStockPanel({
           </div>
           <div className="as-choice-body">
             <div className="as-choice-title">
-              {view.alreadyWatching ? '✓ Watching this stock' : 'Watch this stock'}
+              {view.alreadyWatching ? <><Ico name="check" size={13} strokeWidth={2.5} /> Watching this stock</> : 'Watch this stock'}
             </div>
             <div className="as-choice-sub">
               {view.alreadyWatching
