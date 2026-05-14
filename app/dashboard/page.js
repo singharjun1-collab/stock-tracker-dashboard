@@ -1121,6 +1121,18 @@ function AlertCard({
             {/* The × dismiss button was removed in Phase 5 — its action now
                 folds into the 👎 below: tapping 👎 both rates and dismisses. */}
           </div>
+          {/* "Updated" sits directly under the signal bar (2026-05-14) so
+              freshness is apparent at a glance — AJ asked for it here rather
+              than buried in the .ac-datemeta line. "Picked" stays down there. */}
+          {lastChatterMs != null && (
+            <span
+              className="ac-updated"
+              title="Most recent AI activity on this pick — a re-signal or a recommendation change"
+            >
+              <Ico name="clock" size={11} className="ac-updated-ico" />
+              Updated {relTimeLabel(lastChatterMs) || 'today'}
+            </span>
+          )}
           <div className="ac-actions">
             <RatingButtons alertId={alert.id} currentRating={alert.user_rating} onRate={onRate} />
             {/* The ⭐ watchlist star was removed in Phase 5. The new prominent
@@ -1165,11 +1177,9 @@ function AlertCard({
         )}
       </div>
 
-      {/* DATE META (2026-05-14) — first-picked + last-activity dates.
-          Lets AJ scan a big tab for freshness at a glance and pairs with
-          the new Sort-by control. "Picked" = alert_date (when the AI first
-          flagged it); "Updated" = lastChatterMs (most recent re-signal or
-          recommendation change). */}
+      {/* DATE META (2026-05-14) — "Picked" = alert_date (when the AI first
+          flagged it). The companion "Updated" indicator moved up under the
+          signal bar so freshness is more apparent (AJ's call 2026-05-14). */}
       <div className="ac-datemeta">
         <span
           className="ac-datemeta-item"
@@ -1178,15 +1188,6 @@ function AlertCard({
           <Ico name="calendar" size={11} className="ac-datemeta-ico" />
           Picked {alertDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
-        {lastChatterMs != null && (
-          <span
-            className="ac-datemeta-item"
-            title="Most recent AI activity on this pick — a re-signal or a recommendation change"
-          >
-            <Ico name="clock" size={11} className="ac-datemeta-ico" />
-            Updated {relTimeLabel(lastChatterMs) || 'today'}
-          </span>
-        )}
       </div>
 
       {/* TRADE PLAN — entry / take profit / stop loss */}
@@ -5935,7 +5936,7 @@ export default function Dashboard() {
               whiteSpace: 'nowrap',
             }}
           >
-            Subscribe — AUD&nbsp;$199/yr
+            Subscribe — AUD&nbsp;$16.58/mo
           </a>
         </div>
       )}

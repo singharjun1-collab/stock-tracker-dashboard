@@ -198,7 +198,7 @@ No credit card required — if Stock Chatter isn't for you, just walk away on da
 Open your dashboard:
 ${dashboardUrl}
 
-Loving it? Lock in your full year for AUD $199:
+Loving it? Subscribe — AUD $16.58/month, billed annually:
 ${checkoutUrl}
 
 — The Stock Chatter team`;
@@ -221,7 +221,7 @@ ${checkoutUrl}
     <a href="${dashboardUrl}" style="display:inline-block; background:linear-gradient(135deg,#1565c0,#4fc3f7); color:#fff; padding:14px 28px; border-radius:8px; text-decoration:none; font-weight:700; font-size:15px;">Open my dashboard →</a>
   </p>
   <p style="color:#7a9bc0; font-size:13px; margin-top:24px;">
-    If Stock Chatter isn't for you, just walk away on day 8 — you'll never be charged. Want to lock in the full year now? <a href="${checkoutUrl}" style="color:#1565c0;">Subscribe for AUD $199/year</a>.
+    If Stock Chatter isn't for you, just walk away on day 8 — you'll never be charged. Want to lock it in now? <a href="${checkoutUrl}" style="color:#1565c0;">Subscribe for AUD $16.58/month, billed annually</a>.
   </p>
   <p style="color:#9ca3af; font-size:11px; margin-top:24px; padding-top:16px; border-top:1px solid #e5e7eb; line-height:1.6;">
     Stock Chatter is an information service. Not financial advice &mdash; you can lose money.<br>
@@ -247,7 +247,7 @@ export async function sendTrialDay5Email({ userEmail, userName, trialEndsAt }) {
 
 Quick check-in — your free 7-day Stock Chatter trial ends in 2 days${endsLine ? ` (${endsLine})` : ''}.
 
-If the daily watchlist has been useful, lock in your full year for AUD $199 (≈ $16.58/month):
+If the daily watchlist has been useful, lock it in — AUD $16.58/month, billed annually at AUD $199:
 ${checkoutUrl}
 
 Or keep using it through the rest of the trial:
@@ -263,8 +263,8 @@ ${dashboardUrl}
   <p>Quick check-in — your free 7-day Stock Chatter trial ends in <strong>2 days</strong>${endsLine ? ` <span style="color:#7a9bc0;">(${escapeHtml(endsLine)})</span>` : ''}.</p>
   <p>If the daily watchlist has been useful, now is the moment to lock in your year. After day 7 the dashboard locks until you subscribe.</p>
   <div style="background:#f6f9fc; border:1px solid #e1e9f2; border-radius:10px; padding:16px 20px; margin:20px 0;">
-    <div style="font-size:24px; font-weight:800; color:#0b2540;">AUD $199 / year</div>
-    <div style="color:#7a9bc0; font-size:13px;">≈ AUD $16.58 / month &middot; cancel anytime</div>
+    <div style="font-size:24px; font-weight:800; color:#0b2540;">AUD $16.58 <span style="font-size:15px; font-weight:600; color:#7a9bc0;">/ month</span></div>
+    <div style="color:#7a9bc0; font-size:13px;">Billed annually at AUD $199 &middot; cancel anytime</div>
   </div>
   <p style="margin-top:24px;">
     <a href="${checkoutUrl}" style="display:inline-block; background:linear-gradient(135deg,#1565c0,#4fc3f7); color:#fff; padding:14px 28px; border-radius:8px; text-decoration:none; font-weight:700; font-size:15px;">Subscribe — keep my access</a>
@@ -297,7 +297,7 @@ Your free 7-day Stock Chatter trial ends today${endsLine ? ` (${endsLine})` : ''
 
 After today the dashboard locks until you subscribe. To keep getting the daily watchlist + pre-market digest, lock in your year now:
 
-AUD $199/year (≈ $16.58/month)
+AUD $16.58/month, billed annually at AUD $199
 ${checkoutUrl}
 
 If Stock Chatter isn't for you — no worries, no charge. Thanks for trying it.
@@ -312,8 +312,8 @@ If Stock Chatter isn't for you — no worries, no charge. Thanks for trying it.
   <p>Your free 7-day Stock Chatter trial ends <strong>today</strong>${endsLine ? ` <span style="color:#7a9bc0;">(${escapeHtml(endsLine)})</span>` : ''}.</p>
   <p>After today the dashboard locks until you subscribe. If the daily watchlist + pre-market digest have been useful, lock in your year now and keep your access uninterrupted.</p>
   <div style="background:#f6f9fc; border:1px solid #e1e9f2; border-radius:10px; padding:16px 20px; margin:20px 0;">
-    <div style="font-size:24px; font-weight:800; color:#0b2540;">AUD $199 / year</div>
-    <div style="color:#7a9bc0; font-size:13px;">≈ AUD $16.58 / month &middot; cancel anytime</div>
+    <div style="font-size:24px; font-weight:800; color:#0b2540;">AUD $16.58 <span style="font-size:15px; font-weight:600; color:#7a9bc0;">/ month</span></div>
+    <div style="color:#7a9bc0; font-size:13px;">Billed annually at AUD $199 &middot; cancel anytime</div>
   </div>
   <p style="margin-top:24px;">
     <a href="${checkoutUrl}" style="display:inline-block; background:linear-gradient(135deg,#1565c0,#4fc3f7); color:#fff; padding:14px 28px; border-radius:8px; text-decoration:none; font-weight:700; font-size:15px;">Subscribe — keep my access</a>

@@ -25,7 +25,7 @@ export const metadata = {
     template: '%s | Stock Chatter',
   },
   description:
-    'Stock Chatter is an AI-first stock scanner that fuses SEC 8-K filings, insider open-market buys, FDA catalysts, pre-market movers, niche Reddit chatter and prediction markets into a daily watchlist with entry, target and stop on every pick. AUD $199/yr — 7-day free trial, no credit card required.',
+    'Stock Chatter is an AI-first stock scanner that fuses SEC 8-K filings, insider open-market buys, FDA catalysts, pre-market movers, niche Reddit chatter and prediction markets into a daily watchlist with entry, target and stop on every pick. AUD $16.58/mo, billed annually — 7-day free trial, no credit card required.',
   applicationName: 'Stock Chatter',
   authors: [{ name: 'Stock Chatter', url: SITE_URL }],
   generator: 'Next.js',
@@ -69,7 +69,7 @@ export const metadata = {
     siteName: 'Stock Chatter',
     title: 'Stock Chatter — Catch the move before it happens',
     description:
-      'AI-first stock signals from 14 leading-indicator sources including SEC filings, insider buys, FDA catalysts and niche Reddit subs. Daily pre-market digest at 6:30 AM ET. Mobile-first dashboard. AUD $199/yr — 7-day free trial.',
+      'AI-first stock signals from 14 leading-indicator sources including SEC filings, insider buys, FDA catalysts and niche Reddit subs. Daily pre-market digest at 6:30 AM ET. Mobile-first dashboard. AUD $16.58/mo, billed annually — 7-day free trial.',
     images: [
       {
         url: '/logo.png',
@@ -85,7 +85,7 @@ export const metadata = {
     creator: '@StockChatter',
     title: 'Stock Chatter — AI-first stock signals',
     description:
-      'Catch the move before it happens. Daily AI watchlist with entry, target and stop on every pick. AUD $199/yr.',
+      'Catch the move before it happens. Daily AI watchlist with entry, target and stop on every pick. AUD $16.58/mo, billed annually.',
     images: ['/logo.png'],
   },
   robots: {
@@ -191,7 +191,7 @@ const JSON_LD = {
           name: 'How much does Stock Chatter cost?',
           acceptedAnswer: {
             '@type': 'Answer',
-            text: 'Stock Chatter is AUD $199 per year (about AUD $16.58 per month). New users get a 7-day free trial with no credit card required.',
+            text: 'Stock Chatter is AUD $16.58 per month, billed annually at AUD $199 per year. New users get a 7-day free trial with no credit card required.',
           },
         },
         {

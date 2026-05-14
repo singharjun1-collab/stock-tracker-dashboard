@@ -4735,6 +4735,18 @@ footer span { color: #4fc3f7; }
 
 .ac-right { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0; }
 .ac-right-top { display: flex; align-items: center; gap: 8px; }
+/* "Updated {rel}" — sits directly under the signal bar so freshness reads
+   at a glance (moved here from the .ac-datemeta line 2026-05-14). */
+.ac-updated {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #7a9bc0;
+  white-space: nowrap;
+}
+.ac-updated-ico { opacity: 0.7; flex: 0 0 auto; }
 .ac-dismiss {
   background: none; border: none; color: #4a6a85;
   font-size: 1.3rem; cursor: pointer; padding: 0 4px; line-height: 1;
@@ -5403,6 +5415,7 @@ footer span { color: #4fc3f7; }
 
 .ac.ac-compact .ac-badges,
 .ac.ac-compact .ac-datemeta,
+.ac.ac-compact .ac-updated,
 .ac.ac-compact .ac-plan,
 .ac.ac-compact .ac-ai-read,
 .ac.ac-compact .ac-range,

@@ -1043,6 +1043,7 @@
 }
 .lp-pricing-currency { font-size: 1.5rem; color: #b8cce0; font-weight: 600; }
 .lp-pricing-num { font-size: 4rem; font-weight: 800; color: #fff; letter-spacing: -2px; line-height: 1; }
+.lp-pricing-cents { font-size: 2.4rem; font-weight: 800; letter-spacing: -1px; }
 .lp-pricing-period { font-size: 1rem; color: #b8cce0; margin-left: 4px; }
 .lp-pricing-monthly { font-size: 0.85rem; color: #7a9bc0; margin-bottom: 14px; }
 .lp-pricing-fx {

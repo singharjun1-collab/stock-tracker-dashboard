@@ -105,7 +105,7 @@ export default function LandingPage() {
                 marginTop: 8,
                 marginBottom: 0,
               }}>
-                <Ico name="check" size={13} /> No credit card required &nbsp;·&nbsp; <Ico name="check" size={13} /> Cancel anytime &nbsp;·&nbsp; AUD $199/year after the trial
+                <Ico name="check" size={13} /> No credit card required &nbsp;·&nbsp; <Ico name="check" size={13} /> Cancel anytime &nbsp;·&nbsp; then AUD $16.58/month, billed annually
               </p>
             )}
 
@@ -341,10 +341,10 @@ export default function LandingPage() {
           }}>7-day free trial</div>
           <div className="lp-pricing-amount">
             <span className="lp-pricing-currency">AUD&nbsp;$</span>
-            <span className="lp-pricing-num">199</span>
-            <span className="lp-pricing-period">/ year</span>
+            <span className="lp-pricing-num">16<span className="lp-pricing-cents">.58</span></span>
+            <span className="lp-pricing-period">/ month</span>
           </div>
-          <div className="lp-pricing-monthly">≈ AUD $16.58 / month — only after your 7-day trial</div>
+          <div className="lp-pricing-monthly">Billed annually at AUD&nbsp;$199 — only after your 7-day trial</div>
           <div className="lp-pricing-fx">
             <span className="lp-fx-pill">≈ USD $130</span>
             <span className="lp-fx-pill">≈ GBP £105</span>
@@ -408,7 +408,7 @@ export default function LandingPage() {
             fontSize: 13,
             marginTop: 12,
           }}>
-            <Ico name="check" size={13} /> Free for 7 days &nbsp;·&nbsp; <Ico name="check" size={13} /> Cancel anytime &nbsp;·&nbsp; AUD $199/year after
+            <Ico name="check" size={13} /> Free for 7 days &nbsp;·&nbsp; <Ico name="check" size={13} /> Cancel anytime &nbsp;·&nbsp; then AUD $16.58/month, billed annually
           </p>
         )}
       </section>
@@ -851,7 +851,7 @@ const FAQ = [
   },
   {
     q: 'How does the 7-day free trial work?',
-    a: 'Sign in with Google and your 7-day trial starts immediately — no credit card required. You get full access to the daily AI watchlist, the pre-market email digest, and the mobile dashboard for the full 7 days. On day 8, the dashboard locks until you subscribe (AUD $199/year). If Stock Chatter isn’t for you, just walk away — you’ll never be charged.',
+    a: 'Sign in with Google and your 7-day trial starts immediately — no credit card required. You get full access to the daily AI watchlist, the pre-market email digest, and the mobile dashboard for the full 7 days. On day 8, the dashboard locks until you subscribe (AUD $16.58/month, billed annually at AUD $199). If Stock Chatter isn’t for you, just walk away — you’ll never be charged.',
   },
   {
     q: 'How fast do I get access after subscribing?',

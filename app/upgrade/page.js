@@ -125,11 +125,11 @@ export default function UpgradePage() {
         >
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, color: '#fff', marginBottom: 4 }}>
             <span style={{ fontSize: 14, color: '#7a9bc0' }}>AUD&nbsp;$</span>
-            <span style={{ fontSize: 36, fontWeight: 800, lineHeight: 1 }}>199</span>
-            <span style={{ fontSize: 14, color: '#7a9bc0' }}>/ year</span>
+            <span style={{ fontSize: 36, fontWeight: 800, lineHeight: 1 }}>16<span style={{ fontSize: 22 }}>.58</span></span>
+            <span style={{ fontSize: 14, color: '#7a9bc0' }}>/ month</span>
           </div>
           <div style={{ color: '#7a9bc0', fontSize: 12, marginBottom: 14 }}>
-            ≈ AUD $16.58 / month &middot; cancel anytime
+            Billed annually at AUD $199 &middot; cancel anytime
           </div>
           <ul
             style={{
@@ -166,7 +166,7 @@ export default function UpgradePage() {
               marginBottom: 12,
             }}
           >
-            <span>Subscribe &mdash; AUD $199 / year</span>
+            <span>Subscribe &mdash; AUD $16.58 / mo</span>
           </a>
         ) : (
           <p style={{ color: '#ef4444', fontSize: 13 }}>
