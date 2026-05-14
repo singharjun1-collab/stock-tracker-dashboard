@@ -1653,6 +1653,8 @@ footer span { color: #4fc3f7; }
 .sort-by-row {
   display: flex;
   justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 0 40px;
   margin: -4px 0 10px;
 }
@@ -1697,6 +1699,15 @@ footer span { color: #4fc3f7; }
 .sort-by:hover .sort-by-current,
 .sort-by:focus-within .sort-by-current { color: #4fc3f7; }
 .sort-by-caret { flex: 0 0 auto; opacity: 0.7; }
+/* Sector pill — when a sector is actively selected, keep the accent
+   border + text lit so it's obvious at a glance that the grid is being
+   filtered (Robinhood-style: the control tells you its own state). */
+.sector-by.is-active {
+  border-color: #4fc3f7;
+  color: #4fc3f7;
+}
+.sector-by.is-active .sort-by-current { color: #4fc3f7; }
+.sector-by.is-active .sort-by-ico { opacity: 1; }
 /* Invisible native <select> overlay — keeps the OS picker on mobile
    while letting us fully style the visible chip above. */
 .sort-by-select {

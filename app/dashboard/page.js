@@ -239,6 +239,23 @@ function setSortModeCookie(mode) {
   document.cookie = `stock_sort_mode=${encodeURIComponent(mode)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
+// ── Cookie helpers for the inline Sector dropdown (2026-05-14) ──
+// Remembers the user's chosen sector across sessions, the same way the
+// sort control does. Stores the raw industry string; 'ALL' (default) means
+// no sector filter. Industry names are arbitrary strings so there's no
+// allow-list to validate against — an empty/missing cookie falls back to
+// 'ALL', and a stale sector simply shows a (0) count until cleared.
+function getSectorFilter() {
+  if (typeof document === 'undefined') return 'ALL';
+  const match = document.cookie.match(/(?:^|; )stock_sector_filter=([^;]*)/);
+  if (!match) return 'ALL';
+  const val = decodeURIComponent(match[1]);
+  return val || 'ALL';
+}
+function setSectorFilterCookie(sector) {
+  document.cookie = `stock_sector_filter=${encodeURIComponent(sector || 'ALL')}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
+
 // lastActivityMs — the "last updated" timestamp for a pick. Mirrors the
 // AlertCard's own lastChatterMs logic so the sort order and the on-card
 // "Updated" badge always agree: MAX of last_updated, last_resignal_at, the
@@ -1770,6 +1787,45 @@ function SortByDropdown({ value, onChange }) {
       >
         {options.map(o => (
           <option key={o.key} value={o.key}>{o.label}</option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+// ── Sector Dropdown (2026-05-14) ──
+// Sits right next to the Sort control. This is a FILTER, not a sort — it
+// narrows the card grid to one industry so AJ can do things like "show me
+// the newest picks in Computer Hardware" (pick the sector here, pick the
+// order in Sort — the two stack). Same invisible-native-<select> trick as
+// SortByDropdown so it pops the OS picker wheel on mobile. The options +
+// live counts come from the `sectorOptions` memo (current tab's picks with
+// every filter except sector applied). 'ALL' means no sector filter.
+function SectorByDropdown({ value, onChange, options }) {
+  const isAll = !value || value === 'ALL';
+  const current = isAll ? 'All sectors' : value;
+  return (
+    <label
+      className={`sort-by sector-by${isAll ? '' : ' is-active'}`}
+      title="Filter picks by sector"
+    >
+      <Ico name="building" size={13} className="sort-by-ico" />
+      <span className="sort-by-text">
+        <span className="sort-by-kicker">Sector</span>
+        <span className="sort-by-current">{current}</span>
+      </span>
+      <Ico name="chevrondown" size={13} className="sort-by-caret" />
+      <select
+        className="sort-by-select"
+        value={isAll ? 'ALL' : value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Filter picks by sector"
+      >
+        <option value="ALL">All sectors</option>
+        {(options || []).map(o => (
+          <option key={o.industry} value={o.industry}>
+            {o.industry} ({o.count})
+          </option>
         ))}
       </select>
     </label>
@@ -4896,6 +4952,18 @@ export default function Dashboard() {
   //   filter behaviour is unchanged when sectorFilter === 'ALL'.
   const [tickerMetaMap, setTickerMetaMap] = useState({});
   const [sectorFilter, setSectorFilter] = useState('ALL');
+  // Restore the saved sector after mount (cookie read is client-only, so
+  // we start at 'ALL' on the server to avoid a hydration mismatch — same
+  // pattern as sortMode above). handleSetSectorFilter is the single entry
+  // point that BOTH the inline Sector dropdown and the kebab-menu Sector
+  // Pulse bar call, so the choice is always persisted no matter where the
+  // user changes it.
+  useEffect(() => { setSectorFilter(getSectorFilter()); }, []);
+  const handleSetSectorFilter = useCallback((s) => {
+    const next = s || 'ALL';
+    setSectorFilter(next);
+    setSectorFilterCookie(next);
+  }, []);
   // Sector Pulse inline accordion was retired 2026-05-12 v2 — see the
   // "Filters & Sectors" panel below. localStorage key `sectorPulseOpen`
   // is now ignored; left orphaned for users who had it set, no harm.
@@ -5514,10 +5582,15 @@ export default function Dashboard() {
     return arr;
   }, [sortMode, getLatestPct]);
 
-  // Apply all filters: search + recommendation + market cap
+  // Apply all filters: search + recommendation + market cap + sector.
   // (Old signal-type filter was removed 2026-04-21 — replaced by the
   // quick Buy/Hold/Trim/Exit/Sell chip row under the tabs.)
-  const applyAllFilters = useCallback((list) => {
+  //
+  // `opts.skipSector` (2026-05-14) — when true, every filter EXCEPT the
+  // sector filter is applied. The inline Sector dropdown uses this to
+  // derive its option list + counts, so the user only ever sees sectors
+  // that actually have cards under the current search / rec / mcap filters.
+  const applyAllFilters = useCallback((list, opts = {}) => {
     let filtered = list;
 
     // Search filter
@@ -5541,9 +5614,10 @@ export default function Dashboard() {
     }
 
     // Sector filter (added 2026-05-08). Only narrows when the user has picked
-    // a specific sector in the new Sector Pulse bar. ALL is the default and
-    // is a no-op so all existing card flows behave identically.
-    if (sectorFilter !== 'ALL') {
+    // a specific sector — via the inline Sector dropdown OR the kebab-menu
+    // Sector Pulse bar (both drive the same `sectorFilter` state). ALL is the
+    // default and is a no-op so all existing card flows behave identically.
+    if (!opts.skipSector && sectorFilter !== 'ALL') {
       filtered = filtered.filter(a => {
         const meta = tickerMetaMap[String(a.ticker).toUpperCase()];
         return meta && meta.industry === sectorFilter;
@@ -5797,6 +5871,33 @@ export default function Dashboard() {
     }
     return c;
   }, [currentTabPicks]);
+
+  // ─── Inline Sector dropdown options (2026-05-14) ───────────────────
+  // The Sector dropdown next to Sort lets AJ narrow the grid to one
+  // industry (e.g. "Computer Hardware") and then sort within it. Its
+  // options are derived from the current tab's picks with EVERY filter
+  // except sector applied — so the list (and counts) only ever show
+  // industries that actually have cards right now. The currently-selected
+  // sector is always kept in the list even if its live count is 0, so the
+  // native <select> never renders blank after a tab switch.
+  const sectorOptions = useMemo(() => {
+    const base = applyAllFilters(currentTabPicks, { skipSector: true });
+    const counts = new Map();
+    for (const a of base) {
+      const meta = tickerMetaMap[String(a.ticker).toUpperCase()];
+      const ind = meta?.industry;
+      if (ind) counts.set(ind, (counts.get(ind) || 0) + 1);
+    }
+    if (sectorFilter !== 'ALL' && !counts.has(sectorFilter)) counts.set(sectorFilter, 0);
+    return [...counts.entries()]
+      .map(([industry, count]) => ({ industry, count }))
+      .sort((a, b) => b.count - a.count || a.industry.localeCompare(b.industry));
+  }, [currentTabPicks, applyAllFilters, tickerMetaMap, sectorFilter]);
+
+  // Clearing the sector filter when switching to a tab that has no cards
+  // in that sector would be surprising, so we DON'T auto-reset — the
+  // dropdown just shows "Computer Hardware (0)" and the empty-state copy
+  // explains it. AJ can pick "All sectors" to clear.
 
   // Hide the rec-filter row on tabs that don't show pick cards.
   const showRecFilter = ['new', 'chatter', 'active', 'riding', 'watchlist', 'dropped'].includes(activeTab);
@@ -6443,11 +6544,21 @@ export default function Dashboard() {
           </p>
 
           {/* SORT-BY ROW (2026-05-14) — lets AJ re-order a big card list by
-              signal strength, recency or performance. Only on card tabs in
-              card view; the Table view has its own column-header sorting. */}
+              signal strength, recency or performance, and narrow it to one
+              sector. Only on card tabs in card view; the Table view has its
+              own column-header sorting. The Sector pill only appears once
+              there's more than one sector to choose between (or a sector
+              filter is already active) — no point showing it otherwise. */}
           {showRecFilter && viewMode === 'cards' && getTabData().length > 1 && (
             <div className="sort-by-row">
               <SortByDropdown value={sortMode} onChange={handleSetSortMode} />
+              {(sectorOptions.length > 1 || sectorFilter !== 'ALL') && (
+                <SectorByDropdown
+                  value={sectorFilter}
+                  onChange={handleSetSectorFilter}
+                  options={sectorOptions}
+                />
+              )}
             </div>
           )}
 
@@ -7032,7 +7143,7 @@ export default function Dashboard() {
                   <SectorPulseBar
                     enabled={!!profile}
                     selected={sectorFilter}
-                    onSelect={setSectorFilter}
+                    onSelect={handleSetSectorFilter}
                     tickerMeta={tickerMetaMap}
                     preloadedSectors={preloadedSectorPulse}
                   />
