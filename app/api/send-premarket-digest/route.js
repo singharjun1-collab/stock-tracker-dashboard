@@ -261,14 +261,58 @@ function recColor(rec) {
   }
 }
 
+// Trim long AI-read strings to keep card height predictable on mobile.
+// Cuts on a word boundary so we never end mid-token like "the comp…".
+function truncate(s, n = 120) {
+  if (!s) return '';
+  const str = String(s).trim();
+  if (str.length <= n) return str;
+  const cut = str.slice(0, n).replace(/\s+\S*$/, '');
+  return `${cut}…`;
+}
+
+// signal_changes can record the same flip multiple times (intra-day scan
+// re-evaluations, idempotency drift, whatever) — without dedupe the email
+// would show GME → SELL six times in a row. Keep only the most recent flip
+// per ticker. recChanges is already ordered created_at DESC at query time.
+function dedupeFlipsByTicker(recChanges) {
+  const seen = new Set();
+  const out = [];
+  for (const c of recChanges || []) {
+    if (!c?.ticker || seen.has(c.ticker)) continue;
+    seen.add(c.ticker);
+    out.push(c);
+  }
+  return out;
+}
+
+// Compact "Entry $X.XX – $Y.YY · Target … · Stop …" line. Skips fields that
+// are null so a pick with no stop loss doesn't render "Stop —".
+function renderPriceBands(p) {
+  const bits = [];
+  if (p.entry_low != null || p.entry_high != null) {
+    const lo = fmtMoney(p.entry_low);
+    const hi = fmtMoney(p.entry_high);
+    bits.push(`<span style="color:#94a3b8;">Entry</span> <span style="color:#e2e8f0;font-weight:600;">${lo}${p.entry_high != null && p.entry_high !== p.entry_low ? `–${hi}` : ''}</span>`);
+  }
+  if (p.target_low != null || p.target_high != null) {
+    const lo = fmtMoney(p.target_low);
+    const hi = fmtMoney(p.target_high);
+    bits.push(`<span style="color:#94a3b8;">Target</span> <span style="color:#22c55e;font-weight:600;">${lo}${p.target_high != null && p.target_high !== p.target_low ? `–${hi}` : ''}</span>`);
+  }
+  if (p.stop_loss != null) {
+    bits.push(`<span style="color:#94a3b8;">Stop</span> <span style="color:#ef4444;font-weight:600;">${fmtMoney(p.stop_loss)}</span>`);
+  }
+  if (bits.length === 0) return '';
+  return `<div style="font-size:12px;line-height:1.5;margin-top:10px;letter-spacing:.01em;">${bits.join(' &nbsp;·&nbsp; ')}</div>`;
+}
+
 function buildHtml({ data, recipientEmail }) {
   const {
     recChanges,
     newPicks: allNewPicks,
     freshSignalPicks: allFreshSignalPicks,
     activePicks: allActivePicks,
-    openTrades: allOpenTrades,
-    prices,
     emailToUserId,
   } = data;
 
@@ -282,58 +326,42 @@ function buildHtml({ data, recipientEmail }) {
   const newPicks = (allNewPicks || []).filter(ownedBy);
   const freshSignalPicks = (allFreshSignalPicks || []).filter(ownedBy);
   const activePicks = (allActivePicks || []).filter(ownedBy);
-  const openTrades = (allOpenTrades || []).filter(ownedBy);
 
-  // Portfolio P/L
-  let portfolioPL = 0;
-  let portfolioCost = 0;
-  const positions = (openTrades || []).map((t) => {
-    const p = prices[t.ticker];
-    const live = p?.price;
-    const pl = live != null ? (Number(live) - Number(t.entry_price)) * Number(t.qty) : null;
-    const pct =
-      live != null
-        ? ((Number(live) - Number(t.entry_price)) / Number(t.entry_price)) * 100
-        : null;
-    if (pl != null) portfolioPL += pl;
-    portfolioCost += Number(t.entry_price) * Number(t.qty);
-    return { ...t, live, pl, pct };
-  });
-  const portfolioPct = portfolioCost > 0 ? (portfolioPL / portfolioCost) * 100 : null;
+  // Lookup table: ticker -> active pick. Used to enrich each rec flip with
+  // the current AI read for that ticker (so the Chatter section can show a
+  // 1-line "why" under each flip).
+  const activeByTicker = Object.fromEntries(
+    (activePicks || []).map((a) => [a.ticker, a]),
+  );
 
-  // Biggest mover (winner + loser among open trades)
-  const sortedByPct = positions
-    .filter((p) => p.pct != null)
-    .sort((a, b) => b.pct - a.pct);
-  const biggestWinner = sortedByPct[0];
-  const biggestLoser = sortedByPct[sortedByPct.length - 1];
+  // Dedupe rec flips by ticker so the same stock can't appear N times in a
+  // row (fixes the GME×6 bug seen in the May 13 digest). After dedupe we
+  // cap the rendered list — anything beyond surfaces as a "+N more" pill.
+  const dedupedFlips = dedupeFlipsByTicker(recChanges);
 
-  // Active count by recommendation
-  const recCounts = activePicks.reduce((acc, a) => {
-    acc[a.recommendation] = (acc[a.recommendation] || 0) + 1;
-    return acc;
-  }, {});
+  // Cap-and-spillover counts for each section. These also drive the hero
+  // line at the top.
+  const NEW_CAP = 5;
+  const CHATTER_CAP = 8;
+  const newPicksToShow = newPicks.slice(0, NEW_CAP);
+  const newPicksSpill = Math.max(0, newPicks.length - newPicksToShow.length);
+  const chatterToShow = dedupedFlips.slice(0, CHATTER_CAP);
+  const chatterSpill = Math.max(0, dedupedFlips.length - chatterToShow.length);
 
-  // Top-of-mind blurb — counts now span both brand-new and fresh-signal picks.
-  // To the reader, both are "things to look at this morning."
-  let topOfMind;
-  const flipsToday = recChanges.length;
-  const totalAttentionPicks = newPicks.length + freshSignalPicks.length;
-  const picksWord = totalAttentionPicks === 1 ? 'pick' : 'picks';
-  if (flipsToday === 0 && totalAttentionPicks === 0) {
-    topOfMind = `<strong>Quiet morning.</strong> No recommendation flips overnight, no new or re-signaled picks. Your portfolio is sitting at <strong>${fmtPct(portfolioPct)}</strong> overall — review the dashboard if you want to fine-tune any positions.`;
-  } else if (flipsToday > 0 && totalAttentionPicks === 0) {
-    topOfMind = `<strong>${flipsToday} recommendation ${flipsToday === 1 ? 'change' : 'changes'} since yesterday's close.</strong> Scroll down for the flip list — you may want to act on these before the bell.`;
-  } else if (totalAttentionPicks > 0 && flipsToday === 0) {
-    const breakdown =
-      newPicks.length > 0 && freshSignalPicks.length > 0
-        ? `${newPicks.length} new + ${freshSignalPicks.length} re-signaled`
-        : newPicks.length > 0
-          ? `${newPicks.length} new`
-          : `${freshSignalPicks.length} re-signaled`;
-    topOfMind = `<strong>${totalAttentionPicks} ${picksWord} need attention this morning</strong> (${breakdown}). Entry/target/stop bands below — line up your orders before 9:30 AM ET.`;
+  // Hero line — keep it to one short sentence. Robinhood/Stake style: don't
+  // narrate every state, just call out what's actionable.
+  const heroBits = [];
+  if (newPicks.length > 0) {
+    heroBits.push(`<strong style="color:#fff;">${newPicks.length}</strong> fresh ${newPicks.length === 1 ? 'pick' : 'picks'}`);
+  }
+  if (dedupedFlips.length > 0) {
+    heroBits.push(`<strong style="color:#fff;">${dedupedFlips.length}</strong> ${dedupedFlips.length === 1 ? 'flip' : 'flips'}`);
+  }
+  let heroLine;
+  if (heroBits.length === 0) {
+    heroLine = `<strong style="color:#fff;">Quiet open.</strong> No new picks or rec changes overnight — sit tight, sip the coffee.`;
   } else {
-    topOfMind = `<strong>${flipsToday} ${flipsToday === 1 ? 'flip' : 'flips'} + ${totalAttentionPicks} ${picksWord} overnight.</strong> Both lists below — act before the bell.`;
+    heroLine = `${heroBits.join(' · ')} overnight. Lined up below — act before the bell.`;
   }
 
   const unsubUrl = makeUnsubscribeUrl(APP_URL, recipientEmail);
@@ -366,131 +394,106 @@ function buildHtml({ data, recipientEmail }) {
 
       ${renderMarketMoodCard(data.morningBrief)}
 
-      <tr><td style="padding:16px 24px 8px 24px;">
-        <p style="margin:0;font-size:16px;line-height:1.55;color:#cbd5e1;">${topOfMind}</p>
+      <tr><td style="padding:14px 24px 4px 24px;">
+        <p style="margin:0;font-size:15px;line-height:1.55;color:#cbd5e1;">${heroLine}</p>
       </td></tr>
 
       ${
-        recChanges.length > 0
-          ? `<tr><td style="padding:24px 24px 8px 24px;">
-        <div style="font-size:14px;font-weight:600;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;">Recommendation flips</div>
-        ${recChanges
+        newPicksToShow.length > 0
+          ? `<tr><td style="padding:22px 24px 4px 24px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:12px;">
+          <tr>
+            <td style="vertical-align:middle;">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.10em;color:#4fc3f7;text-transform:uppercase;">Fresh picks</div>
+              <div style="font-size:12px;color:#64748b;margin-top:3px;">First-time detections from overnight</div>
+            </td>
+            <td align="right" style="vertical-align:middle;">
+              <span style="display:inline-block;font-size:11px;font-weight:700;background:rgba(79,195,247,0.12);color:#4fc3f7;padding:4px 9px;border-radius:999px;">${newPicks.length}</span>
+            </td>
+          </tr>
+        </table>
+        ${newPicksToShow
           .map(
-            (c) => `
-          <div style="background:#0f172a;border-radius:10px;padding:12px 14px;margin-bottom:8px;border:1px solid #1e293b;">
-            <div style="font-size:15px;font-weight:600;color:#fff;">${c.ticker}</div>
-            <div style="font-size:13px;color:#94a3b8;margin-top:2px;">
-              <span style="color:${recColor(c.old_recommendation)};font-weight:600;">${c.old_recommendation || '—'}</span>
-              &nbsp;→&nbsp;
-              <span style="color:${recColor(c.new_recommendation)};font-weight:600;">${c.new_recommendation || '—'}</span>
-            </div>
+            (p) => `
+          <div style="background:#0f172a;border-radius:12px;padding:14px 16px;margin-bottom:10px;border:1px solid #1e293b;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-.01em;">${p.ticker}</div>
+                  <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''}${p.signal_type ? ` <span style="color:#475569;">·</span> ${p.signal_type}` : ''}</div>
+                </td>
+                <td align="right" style="vertical-align:middle;white-space:nowrap;">
+                  <span style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;color:${recColor(p.recommendation)};background:${recColor(p.recommendation)}22;padding:5px 10px;border-radius:6px;">${p.recommendation || '—'}</span>
+                </td>
+              </tr>
+            </table>
+            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:10px;line-height:1.5;">${truncate(p.ai_read, 140)}</div>` : ''}
+            ${renderPriceBands(p)}
           </div>`,
           )
           .join('')}
+        ${newPicksSpill > 0 ? `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:2px;">+${newPicksSpill} more on the dashboard</div>` : ''}
       </td></tr>`
           : ''
       }
 
       ${
-        newPicks.length > 0
-          ? `<tr><td style="padding:16px 24px 8px 24px;">
-        <div style="font-size:14px;font-weight:600;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">Brand-new picks</div>
-        <div style="font-size:12px;color:#64748b;margin-bottom:12px;">First-time detections from the overnight scan.</div>
-        ${newPicks
-          .slice(0, 8)
-          .map(
-            (p) => `
-          <div style="background:#0f172a;border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid #1e293b;border-left:3px solid #4fc3f7;">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <div style="font-size:16px;font-weight:700;color:#fff;">${p.ticker} <span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;background:rgba(79,195,247,0.2);color:#4fc3f7;padding:2px 6px;border-radius:4px;margin-left:4px;vertical-align:middle;">NEW</span></div>
-              <div style="font-size:12px;font-weight:600;color:${recColor(p.recommendation)};">${p.recommendation || ''}</div>
-            </div>
-            <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''} · ${p.signal_type || ''}</div>
-            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5;"><strong style="color:#4fc3f7;">AI read:</strong> ${p.ai_read}</div>` : ''}
-            <div style="font-size:12px;color:#94a3b8;margin-top:8px;">
-              Entry ${fmtMoney(p.entry_low)}–${fmtMoney(p.entry_high)} ·
-              Target ${fmtMoney(p.target_low)}–${fmtMoney(p.target_high)} ·
-              Stop ${fmtMoney(p.stop_loss)}
-            </div>
-          </div>`,
-          )
+        chatterToShow.length > 0
+          ? `<tr><td style="padding:22px 24px 4px 24px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:12px;">
+          <tr>
+            <td style="vertical-align:middle;">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.10em;color:#fbbf24;text-transform:uppercase;">Chatter</div>
+              <div style="font-size:12px;color:#64748b;margin-top:3px;">Recommendation flips in the last 24 hours</div>
+            </td>
+            <td align="right" style="vertical-align:middle;">
+              <span style="display:inline-block;font-size:11px;font-weight:700;background:rgba(251,191,36,0.12);color:#fbbf24;padding:4px 9px;border-radius:999px;">${dedupedFlips.length}</span>
+            </td>
+          </tr>
+        </table>
+        ${chatterToShow
+          .map((c) => {
+            const active = activeByTicker[c.ticker];
+            const why = active?.ai_read ? truncate(active.ai_read, 130) : '';
+            return `
+          <div style="background:#0f172a;border-radius:12px;padding:12px 16px;margin-bottom:8px;border:1px solid #1e293b;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.01em;">${c.ticker}</div>
+                </td>
+                <td align="right" style="vertical-align:middle;white-space:nowrap;font-size:12px;font-weight:700;letter-spacing:.04em;">
+                  <span style="color:${recColor(c.old_recommendation)};">${c.old_recommendation || '—'}</span>
+                  <span style="color:#475569;font-weight:500;margin:0 6px;">→</span>
+                  <span style="color:${recColor(c.new_recommendation)};">${c.new_recommendation || '—'}</span>
+                </td>
+              </tr>
+            </table>
+            ${why ? `<div style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.5;">${why}</div>` : ''}
+          </div>`;
+          })
           .join('')}
-        ${newPicks.length > 8 ? `<div style="font-size:12px;color:#94a3b8;text-align:center;margin-top:6px;">+${newPicks.length - 8} more on the dashboard</div>` : ''}
+        ${chatterSpill > 0 ? `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:2px;">+${chatterSpill} more on the dashboard</div>` : ''}
       </td></tr>`
           : ''
       }
 
       ${
         freshSignalPicks.length > 0
-          ? `<tr><td style="padding:16px 24px 8px 24px;">
-        <div style="font-size:14px;font-weight:600;color:#fac775;letter-spacing:.04em;text-transform:uppercase;margin-bottom:4px;">Fresh signals on existing picks</div>
-        <div style="font-size:12px;color:#64748b;margin-bottom:12px;">Active picks the scan re-detected overnight — the AI is doubling down. Already on your dashboard; signal history shows when previous flags fired.</div>
-        ${freshSignalPicks
-          .slice(0, 8)
-          .map((p) => {
-            const hist = Array.isArray(p.signal_history) ? p.signal_history : [];
-            const flagCount = hist.length;
-            const countNote = flagCount > 1 ? `${flagCount}× total flags` : 'fresh signal';
-            return `
-          <div style="background:#0f172a;border-radius:10px;padding:14px;margin-bottom:10px;border:1px solid #1e293b;border-left:3px solid #ef9f27;">
-            <div style="display:flex;justify-content:space-between;align-items:baseline;">
-              <div style="font-size:16px;font-weight:700;color:#fff;">${p.ticker} <span style="display:inline-block;font-size:10px;font-weight:700;letter-spacing:.04em;background:rgba(239,159,39,0.18);color:#fac775;padding:2px 6px;border-radius:999px;margin-left:4px;vertical-align:middle;">FRESH · ${countNote}</span></div>
-              <div style="font-size:12px;font-weight:600;color:${recColor(p.recommendation)};">${p.recommendation || ''}</div>
-            </div>
-            <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''} · ${p.signal_type || ''}</div>
-            ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:8px;line-height:1.5;"><strong style="color:#4fc3f7;">AI read:</strong> ${p.ai_read}</div>` : ''}
-            <div style="font-size:12px;color:#94a3b8;margin-top:8px;">
-              Entry ${fmtMoney(p.entry_low)}–${fmtMoney(p.entry_high)} ·
-              Target ${fmtMoney(p.target_low)}–${fmtMoney(p.target_high)} ·
-              Stop ${fmtMoney(p.stop_loss)}
-            </div>
-          </div>`;
-          })
-          .join('')}
-        ${freshSignalPicks.length > 8 ? `<div style="font-size:12px;color:#94a3b8;text-align:center;margin-top:6px;">+${freshSignalPicks.length - 8} more on the dashboard</div>` : ''}
+          ? `<tr><td style="padding:14px 24px 0 24px;">
+        <div style="font-size:12px;color:#64748b;line-height:1.6;">
+          <span style="color:#fac775;font-weight:700;letter-spacing:.04em;">Also re-signaled:</span>
+          ${freshSignalPicks
+            .slice(0, 6)
+            .map((p) => `<span style="display:inline-block;font-weight:700;color:#cbd5e1;margin-right:8px;">${p.ticker}</span>`)
+            .join('')}
+          ${freshSignalPicks.length > 6 ? `<span style="color:#475569;">+${freshSignalPicks.length - 6}</span>` : ''}
+        </div>
       </td></tr>`
           : ''
       }
 
-      <tr><td style="padding:24px 24px 8px 24px;">
-        <div style="font-size:14px;font-weight:600;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;">Open positions snapshot</div>
-        <div style="background:#0f172a;border-radius:10px;padding:14px;border:1px solid #1e293b;">
-          <div style="font-size:13px;color:#94a3b8;">Total P/L</div>
-          <div style="font-size:24px;font-weight:700;color:${portfolioPL >= 0 ? '#22c55e' : '#ef4444'};margin-top:2px;">
-            ${portfolioPL >= 0 ? '+' : ''}${fmtMoney(portfolioPL)} <span style="font-size:14px;font-weight:600;">(${fmtPct(portfolioPct)})</span>
-          </div>
-          ${
-            biggestWinner
-              ? `<div style="font-size:13px;color:#cbd5e1;margin-top:10px;">
-                   <span style="color:#22c55e;font-weight:700;">▲</span> Biggest winner: <strong>${biggestWinner.ticker}</strong> ${fmtPct(biggestWinner.pct)}
-                 </div>`
-              : ''
-          }
-          ${
-            biggestLoser && biggestLoser.ticker !== biggestWinner?.ticker
-              ? `<div style="font-size:13px;color:#cbd5e1;margin-top:4px;">
-                   <span style="color:#ef4444;font-weight:700;">▼</span> Biggest loser: <strong>${biggestLoser.ticker}</strong> ${fmtPct(biggestLoser.pct)}
-                 </div>`
-              : ''
-          }
-        </div>
-      </td></tr>
-
-      <tr><td style="padding:16px 24px 8px 24px;">
-        <div style="font-size:14px;font-weight:600;color:#94a3b8;letter-spacing:.04em;text-transform:uppercase;margin-bottom:12px;">Active picks by rec</div>
-        <div style="font-size:13px;color:#cbd5e1;line-height:1.7;">
-          ${['BUY', 'HOLD', 'TRIM', 'EXIT', 'SELL']
-            .map(
-              (r) => `<span style="display:inline-block;margin-right:14px;">
-                <span style="color:${recColor(r)};font-weight:600;">${r}</span>
-                <span style="color:#94a3b8;">${recCounts[r] || 0}</span>
-              </span>`,
-            )
-            .join('')}
-        </div>
-      </td></tr>
-
-      <tr><td style="padding:24px 24px 28px 24px;text-align:center;">
+      <tr><td style="padding:26px 24px 28px 24px;text-align:center;">
         <a href="${APP_URL}" style="display:inline-block;background:#4fc3f7;color:#0a0e1a;padding:14px 28px;border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;">Open the dashboard →</a>
         <div style="font-size:12px;color:#94a3b8;margin-top:12px;">Place your orders before 9:30 AM ET (≈ 11:30 PM Sydney AEDT / 1:30 AM Sydney AEST).</div>
       </td></tr>
@@ -546,27 +549,32 @@ function buildText({ data, recipientEmail }) {
     }
   }
 
-  if (recChanges.length > 0) {
-    lines.push(`${recChanges.length} recommendation flips since yesterday:`);
-    for (const c of recChanges) {
-      lines.push(`  - ${c.ticker}: ${c.old_recommendation || '—'} → ${c.new_recommendation || '—'}`);
+  // Dedupe flips by ticker for the plain-text version too (same fix as HTML).
+  const dedupedFlips = dedupeFlipsByTicker(recChanges);
+
+  if (newPicks.length > 0) {
+    lines.push(`FRESH PICKS (${newPicks.length})`);
+    for (const p of newPicks.slice(0, 5)) {
+      lines.push(`  · ${p.ticker} [${p.recommendation || '—'}] — ${truncate(p.ai_read || p.signal_type || '', 120)}`);
     }
+    if (newPicks.length > 5) lines.push(`  +${newPicks.length - 5} more on the dashboard`);
     lines.push('');
   }
-  if (newPicks.length > 0) {
-    lines.push(`${newPicks.length} brand-new ${newPicks.length === 1 ? 'pick' : 'picks'} overnight:`);
-    for (const p of newPicks.slice(0, 8)) {
-      lines.push(`  - ${p.ticker} (${p.recommendation || '—'}) — ${p.ai_read || p.signal_type || ''}`);
+  if (dedupedFlips.length > 0) {
+    lines.push(`CHATTER — rec flips (${dedupedFlips.length})`);
+    for (const c of dedupedFlips.slice(0, 8)) {
+      lines.push(`  · ${c.ticker}: ${c.old_recommendation || '—'} → ${c.new_recommendation || '—'}`);
     }
+    if (dedupedFlips.length > 8) lines.push(`  +${dedupedFlips.length - 8} more on the dashboard`);
     lines.push('');
   }
   if (freshSignalPicks.length > 0) {
-    lines.push(`${freshSignalPicks.length} fresh ${freshSignalPicks.length === 1 ? 'signal' : 'signals'} on existing picks:`);
-    for (const p of freshSignalPicks.slice(0, 8)) {
-      const hist = Array.isArray(p.signal_history) ? p.signal_history : [];
-      const cnt = hist.length;
-      lines.push(`  - ${p.ticker} (${p.recommendation || '—'}) — ${p.ai_read || p.signal_type || ''}${cnt > 1 ? ` [${cnt}× total flags]` : ''}`);
-    }
+    const list = freshSignalPicks
+      .slice(0, 6)
+      .map((p) => p.ticker)
+      .join(', ');
+    const tail = freshSignalPicks.length > 6 ? ` (+${freshSignalPicks.length - 6})` : '';
+    lines.push(`Also re-signaled: ${list}${tail}`);
     lines.push('');
   }
   lines.push(`Open dashboard: ${APP_URL}`);
