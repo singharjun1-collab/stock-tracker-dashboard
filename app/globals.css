@@ -382,6 +382,20 @@ body {
   border-color: rgba(34, 211, 238, 0.40);
 }
 
+/* RIDING filter pill — green like BUY (it IS a winner) but slightly
+   brighter so it visually separates in the rec-chip filter row. */
+.rec-pill--riding.rec-pill--active {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  box-shadow: 0 0 12px rgba(74, 222, 128, 0.30);
+}
+.rec-pill--riding.rec-pill--active .rec-pill-count {
+  background: rgba(74, 222, 128, 0.22);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.40);
+}
+
 .rec-pill--sell.rec-pill--active {
   border-color: #ef4444;
   background: rgba(239, 68, 68, 0.15);
@@ -1164,6 +1178,7 @@ td { padding: 9px 12px; vertical-align: middle; color: #c0d4e8; }
 .rec-chip.rec-hold { background: rgba(245,158,11,0.08); color: #f59e0b; border: 1px solid #f59e0b; }
 .rec-chip.rec-trim { background: rgba(245,158,11,0.14); color: #fbbf24; border: 1px solid #f59e0b; }
 .rec-chip.rec-exit { background: rgba(6,182,212,0.14); color: #22d3ee; border: 1px solid #22d3ee; }
+.rec-chip.rec-riding { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid #22c55e; }
 
 /* Stop-loss hit badge — shown next to ticker when current price <= stop */
 .pt-stop-badge {
@@ -4404,6 +4419,10 @@ footer span { color: #4fc3f7; }
 .ac-trim  { border-left-color: #f59e0b; }
 .ac-exit  { border-left-color: #22d3ee; }
 .ac-sell  { border-left-color: #ef4444; }
+/* RIDING (2026-05-14) — cyan accent same family as EXIT but the card
+   itself reads as a winner: green dot + green hero tone. The strip
+   below the plan and the trail-stop tile carry the cyan accent. */
+.ac-riding { border-left-color: #22d3ee; }
 
 .ac-new::after {
   content: 'NEW';
@@ -4685,6 +4704,7 @@ footer span { color: #4fc3f7; }
 .ac-rec-sell { background: #ef4444; color: #4a0a0a; }
 .ac-rec-trim { background: #f59e0b; color: #3a1d00; }
 .ac-rec-exit { background: linear-gradient(135deg,#06b6d4,#22d3ee); color: #062a33; }
+.ac-rec-riding { background: linear-gradient(135deg,#16a34a,#4ade80); color: #052e13; }
 
 /* Since-alert hero line: "From $142.15 → +3.0%"
    Wraps cleanly on narrow screens by letting the arrow + % drop under From. */
@@ -4781,6 +4801,37 @@ footer span { color: #4fc3f7; }
   border-color: #ef4444;
   background: rgba(239,68,68,0.08);
 }
+/* RIDING trail stop tile (2026-05-14) — replaces the hard stop in the
+   trade-plan row for cards in the RIDING state. Green border + green
+   value reinforce that this is a profit-protection floor, not a risk
+   line. */
+.ac-plan-trail {
+  border-color: rgba(34,197,94,0.45) !important;
+  background: rgba(34,197,94,0.08);
+}
+.ac-plan-trail .ac-plan-lbl { color: #4ade80; }
+.ac-plan-trail .ac-plan-val { color: #4ade80; }
+
+/* RIDING momentum strip (2026-05-14) — the row that sits between the
+   trade-plan and the AI read, only for RIDING cards. Three chips:
+   the riding pill, locked-in profit, and recent high. */
+.ac-riding-strip {
+  display: flex; flex-wrap: wrap; align-items: center;
+  gap: 8px; margin: 4px 0 10px;
+}
+.ac-riding-pill {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 0.74rem; font-weight: 600; letter-spacing: 0.02em;
+  color: #22d3ee;
+  background: rgba(34,211,238,0.10);
+  border: 1px solid rgba(34,211,238,0.30);
+  padding: 4px 10px; border-radius: 999px;
+}
+.ac-riding-locked, .ac-riding-high {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 0.72rem; color: #9fc3e6;
+}
+.ac-riding-locked b { color: #4ade80; font-weight: 700; }
 
 /* ─── AI READ LINE ─── */
 .ac-ai-read {
@@ -4803,10 +4854,18 @@ footer span { color: #4fc3f7; }
   border-color: rgba(239,68,68,0.25);
   border-left-color: #ef4444;
 }
+/* RIDING-tone AI read — green for "we're riding a winner". The flame
+   icon picks up green too, signaling momentum rather than warning. */
+.ac-ai-read.riding {
+  background: rgba(34,197,94,0.06);
+  border-color: rgba(34,197,94,0.25);
+  border-left-color: #4ade80;
+}
 .ac-ai-read b { color: #e0e6f0; font-weight: 600; }
 .ac-ai-icon { flex-shrink: 0; color: #22d3ee; }
 .ac-ai-read.warn .ac-ai-icon { color: #f59e0b; }
 .ac-ai-read.danger .ac-ai-icon { color: #ef4444; }
+.ac-ai-read.riding .ac-ai-icon { color: #4ade80; }
 
 /* ─── ROBINHOOD-STYLE ICONS (Lucide) ─────────────────────────
    Global helpers for the <Ico/> component. We use thin-stroke,
@@ -5445,6 +5504,12 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   .mobile-bottom-nav-4 .mb-nav-label { font-size: 0.66rem; }
   .mobile-bottom-nav-4 .mb-nav-icon  { font-size: 1.15rem; }
   .mobile-bottom-nav-4 .mb-nav-btn   { padding: 6px 4px; }
+  /* 5-tab variant (added 2026-05-14 with the Riding tab). Tighter than
+     the 4-tab so the labels still fit on a narrow phone. Matches
+     Robinhood's mobile bottom nav rhythm. */
+  .mobile-bottom-nav-5 .mb-nav-label { font-size: 0.60rem; letter-spacing: 0.01em; }
+  .mobile-bottom-nav-5 .mb-nav-icon  { font-size: 1.05rem; }
+  .mobile-bottom-nav-5 .mb-nav-btn   { padding: 6px 2px; }
 }
 
 /* ── QUICK-WATCH PILL on New/Active cards (Phase 8, 2026-05-12) ──

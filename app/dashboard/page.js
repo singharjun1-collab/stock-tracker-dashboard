@@ -133,6 +133,7 @@ function fmtPct(pct) {
 function recLabel(rec) {
   if (rec === 'TRIM') return <><Ico name="scissors" size={11} /> TRIM</>;
   if (rec === 'EXIT') return <><Ico name="flag" size={11} /> EXIT</>;
+  if (rec === 'RIDING') return <><Ico name="flame" size={11} /> RIDING</>;
   return rec; // BUY / SELL / HOLD — color says it all
 }
 function recClass(rec) {
@@ -140,6 +141,7 @@ function recClass(rec) {
   if (rec === 'SELL') return 'rec-sell';
   if (rec === 'TRIM') return 'rec-trim';
   if (rec === 'EXIT') return 'rec-exit';
+  if (rec === 'RIDING') return 'rec-riding';
   return 'rec-hold';
 }
 
@@ -870,10 +872,11 @@ function AlertCard({
   const dotClass = pct >= 5 ? 'win' : pct <= -5 ? 'loss' : 'neutral';
 
   // Rec chip variant + hero tone
-  const recVariant = ['BUY', 'HOLD', 'SELL', 'TRIM', 'EXIT'].includes(rec)
+  const recVariant = ['BUY', 'HOLD', 'SELL', 'TRIM', 'EXIT', 'RIDING'].includes(rec)
     ? rec.toLowerCase() : 'hold';
   const heroTone = rec === 'SELL' ? 'loss'
-    : (rec === 'TRIM' || rec === 'EXIT') ? 'neutral' : '';
+    : (rec === 'TRIM' || rec === 'EXIT') ? 'neutral'
+    : rec === 'RIDING' ? 'win' : '';
 
   // Days since alert
   const alertDateObj = new Date(alert.alert_date + 'T00:00:00');
@@ -953,7 +956,20 @@ function AlertCard({
 
   // AI read tone
   const aiReadTone = rec === 'SELL' ? 'danger'
-    : rec === 'TRIM' || rec === 'EXIT' ? 'warn' : '';
+    : rec === 'TRIM' || rec === 'EXIT' ? 'warn'
+    : rec === 'RIDING' ? 'riding' : '';
+
+  // ── RIDING trail-stop metadata ──────────────────────────────────
+  // For RIDING cards we surface the trail stop + locked-in gain.
+  // Falls back gracefully when trail_stop hasn't been written yet
+  // (e.g. the scan just flipped to RIDING but refresh-prices hasn't
+  //  ratcheted yet — the card still renders, just without the badge).
+  const trailStop = alert.trail_stop != null ? parseFloat(alert.trail_stop) : null;
+  const recentHigh = alert.recent_high != null ? parseFloat(alert.recent_high) : null;
+  const entryRef = alert.entry_low != null ? parseFloat(alert.entry_low) : null;
+  const lockedInPct = (entryRef && trailStop && entryRef > 0)
+    ? ((trailStop - entryRef) / entryRef) * 100
+    : null;
 
   const handleDismiss = () => {
     if (!onDismiss) return;
@@ -971,6 +987,8 @@ function AlertCard({
     ? <><Ico name="flag" size={12} /> EXIT</>
     : rec === 'TRIM'
     ? <><Ico name="scissors" size={12} /> TRIM</>
+    : rec === 'RIDING'
+    ? <><Ico name="flame" size={12} /> RIDING</>
     : rec;
 
   return (
@@ -1118,11 +1136,53 @@ function AlertCard({
                 <span className="ac-plan-val">{fmtRange(alert.target_low, alert.target_high)}</span>
               </div>
             )}
-            {alert.stop_loss != null && (
-              <div className={`ac-plan-item ac-plan-stop${stopHit ? ' hit' : ''}`}>
-                <span className="ac-plan-lbl">{stopHit ? <>Stop hit <Ico name="check" size={11} /></> : 'Stop'}</span>
-                <span className="ac-plan-val">{fmtP(alert.stop_loss)}</span>
+            {/* RIDING swaps the hard stop for the live trail stop. The
+                trail stop ratchets up in /api/refresh-prices every 30 min,
+                so the value here is always the latest. Falls back to the
+                original stop if trail_stop hasn't been written yet. */}
+            {rec === 'RIDING' && trailStop != null ? (
+              <div className="ac-plan-item ac-plan-trail">
+                <span className="ac-plan-lbl"><Ico name="shield" size={11} /> Trail stop</span>
+                <span className="ac-plan-val">{fmtP(trailStop)}</span>
               </div>
+            ) : (
+              alert.stop_loss != null && (
+                <div className={`ac-plan-item ac-plan-stop${stopHit ? ' hit' : ''}`}>
+                  <span className="ac-plan-lbl">{stopHit ? <>Stop hit <Ico name="check" size={11} /></> : 'Stop'}</span>
+                  <span className="ac-plan-val">{fmtP(alert.stop_loss)}</span>
+                </div>
+              )
+            )}
+          </div>
+        );
+      })()}
+
+      {/* RIDING momentum strip — appears between the plan row and the AI
+          read, only on cards in the RIDING state. Tells the user at a
+          glance that this is a winner we're still riding + how much
+          profit is locked in by the trail stop. Inline price format
+          here (not the inner fmtP helper) because that helper is scoped
+          to the IIFE above. */}
+      {rec === 'RIDING' && (() => {
+        const fmtP2 = (n) => {
+          const v = parseFloat(n);
+          if (!Number.isFinite(v)) return '';
+          return v >= 100 ? `$${Math.round(v)}` : `$${v.toFixed(2)}`;
+        };
+        return (
+          <div className="ac-riding-strip">
+            <span className="ac-riding-pill">
+              <Ico name="flame" size={12} /> Riding momentum
+            </span>
+            {lockedInPct != null && lockedInPct > 0 && (
+              <span className="ac-riding-locked">
+                <Ico name="shield" size={11} /> Locks in <b>+{lockedInPct.toFixed(1)}%</b> if hit
+              </span>
+            )}
+            {recentHigh != null && (
+              <span className="ac-riding-high">
+                <Ico name="trend" size={11} /> High {fmtP2(recentHigh)}
+              </span>
             )}
           </div>
         );
@@ -1560,12 +1620,13 @@ function RecommendationFilter({ value, onChange, counts }) {
   // color-codes the recommendation. Robinhood-style: let the color carry the
   // meaning, no redundant glyph.
   const options = [
-    { key: 'ALL',  label: 'All',  cls: 'rec-pill--all'  },
-    { key: 'BUY',  label: 'Buy',  cls: 'rec-pill--buy'  },
-    { key: 'HOLD', label: 'Hold', cls: 'rec-pill--hold' },
-    { key: 'TRIM', label: 'Trim', cls: 'rec-pill--trim' },
-    { key: 'EXIT', label: 'Exit', cls: 'rec-pill--exit' },
-    { key: 'SELL', label: 'Sell', cls: 'rec-pill--sell' },
+    { key: 'ALL',    label: 'All',    cls: 'rec-pill--all'    },
+    { key: 'BUY',    label: 'Buy',    cls: 'rec-pill--buy'    },
+    { key: 'HOLD',   label: 'Hold',   cls: 'rec-pill--hold'   },
+    { key: 'TRIM',   label: 'Trim',   cls: 'rec-pill--trim'   },
+    { key: 'RIDING', label: 'Riding', cls: 'rec-pill--riding' },
+    { key: 'EXIT',   label: 'Exit',   cls: 'rec-pill--exit'   },
+    { key: 'SELL',   label: 'Sell',   cls: 'rec-pill--sell'   },
   ];
   return (
     <div
@@ -4615,7 +4676,7 @@ function fmtHoursCountdown(totalMins) {
 export default function Dashboard() {
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [recFilter, setRecFilter] = useState('ALL');   // 'ALL' | 'BUY' | 'HOLD' | 'TRIM' | 'EXIT' | 'SELL'
+  const [recFilter, setRecFilter] = useState('ALL');   // 'ALL' | 'BUY' | 'HOLD' | 'TRIM' | 'RIDING' | 'EXIT' | 'SELL'
   const [activeTab, setActiveTab] = useState('active');
   const [searchQuery, setSearchQuery] = useState('');
   // Drives the unified-search results dropdown (2026-05-12). Mirrors the
@@ -5422,14 +5483,23 @@ export default function Dashboard() {
     return out;
   }, [alerts]);
 
+  // RIDING tab carve-out (added 2026-05-14). A RIDING alert is status=active,
+  // but it deserves its own spotlight: target's been hit, signals still firing,
+  // trail stop locked in. We carve these out of BOTH Active and Chatter so
+  // each card lives in exactly one tab (preserves the 2026-05-13 routing rule).
+  const isRiding = (a) => (a.recommendation || '').toUpperCase() === 'RIDING';
+
   const newPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
     a.status === 'new' && notDismissed(a)
   )), [dedupedAlerts]);
   const chatterPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
-    a.status === 'active' && notDismissed(a) && hasRecentFlip(a)
+    a.status === 'active' && notDismissed(a) && hasRecentFlip(a) && !isRiding(a)
   )), [dedupedAlerts]);
   const activePicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
-    a.status === 'active' && notDismissed(a) && !hasRecentFlip(a)
+    a.status === 'active' && notDismissed(a) && !hasRecentFlip(a) && !isRiding(a)
+  )), [dedupedAlerts]);
+  const ridingPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a =>
+    a.status === 'active' && notDismissed(a) && isRiding(a)
   )), [dedupedAlerts]);
   const droppedPicks = useMemo(() => sortByPerf(dedupedAlerts.filter(a => a.status === 'dropped' && notDismissed(a))), [dedupedAlerts]);
   // My Stocks tab data (was: watchlist tab). Includes any ticker that is
@@ -5462,6 +5532,7 @@ export default function Dashboard() {
   const filteredNew = useMemo(() => applyAllFilters(newPicks), [newPicks, applyAllFilters]);
   const filteredChatter = useMemo(() => applyAllFilters(chatterPicks), [chatterPicks, applyAllFilters]);
   const filteredActive = useMemo(() => applyAllFilters(activePicks), [activePicks, applyAllFilters]);
+  const filteredRiding = useMemo(() => applyAllFilters(ridingPicks), [ridingPicks, applyAllFilters]);
   const filteredDropped = useMemo(() => applyAllFilters(droppedPicks), [droppedPicks, applyAllFilters]);
   const filteredWatchlist = useMemo(() => applyAllFilters(watchlistPicks), [watchlistPicks, applyAllFilters]);
 
@@ -5546,12 +5617,13 @@ export default function Dashboard() {
       case 'watchlist': return watchlistPicks;
       case 'dropped':   return droppedPicks;
       case 'active':    return activePicks;
+      case 'riding':    return ridingPicks;
       default:          return [];
     }
-  }, [activeTab, newPicks, chatterPicks, activePicks, watchlistPicks, droppedPicks]);
+  }, [activeTab, newPicks, chatterPicks, activePicks, ridingPicks, watchlistPicks, droppedPicks]);
 
   const recCounts = useMemo(() => {
-    const c = { ALL: 0, BUY: 0, HOLD: 0, TRIM: 0, EXIT: 0, SELL: 0 };
+    const c = { ALL: 0, BUY: 0, HOLD: 0, TRIM: 0, RIDING: 0, EXIT: 0, SELL: 0 };
     for (const a of currentTabPicks) {
       c.ALL++;
       const r = a.recommendation;
@@ -5561,7 +5633,7 @@ export default function Dashboard() {
   }, [currentTabPicks]);
 
   // Hide the rec-filter row on tabs that don't show pick cards.
-  const showRecFilter = ['new', 'chatter', 'active', 'watchlist', 'dropped'].includes(activeTab);
+  const showRecFilter = ['new', 'chatter', 'active', 'riding', 'watchlist', 'dropped'].includes(activeTab);
 
   // Global stats (totalCurrent / buys / sells / avgPct) — fold in chatter
   // picks since they're carved out of activePicks but still represent
@@ -5592,6 +5664,10 @@ export default function Dashboard() {
     { id: 'new',         label: <><Ico name="belldot" size={14} /> New</>,     count: newPicks.length },
     { id: 'chatter',     label: <><Ico name="chat" size={14} /> Chatter</>,    count: chatterPicks.length },
     { id: 'active',      label: <><Ico name="flame" size={14} /> Active</>,    count: activePicks.length },
+    // Riding tab (2026-05-14) — winners past their target, still firing,
+    // protected by a trail stop. Lucide trending-up icon reads as "still
+    // going up". Sits between Active and Portfolio per AJ's choice.
+    { id: 'riding',      label: <><Ico name="trend" size={14} /> Riding</>,    count: ridingPicks.length },
     { id: 'watchlist',   label: <><Ico name="briefcase" size={14} /> Portfolio</>, count: watchlistPicks.length },
     { id: 'leaderboard', label: <><Ico name="trophy" size={14} /> Leaderboard</>, count: null },
   ];
@@ -5602,6 +5678,7 @@ export default function Dashboard() {
       case 'new': return filteredNew;
       case 'chatter': return filteredChatter;
       case 'active': return filteredActive;
+      case 'riding': return filteredRiding;
       case 'dropped': return filteredDropped;
       case 'watchlist': return filteredWatchlist;
       default: return filteredActive;
@@ -6192,6 +6269,7 @@ export default function Dashboard() {
             {activeTab === 'new' && 'Brand-new picks from the last overnight scan. Look here first each morning.'}
             {activeTab === 'chatter' && 'Active picks where the AI changed its call in the last 24h. Worth a fresh look.'}
             {activeTab === 'active' && 'Current picks being tracked. Sorted by performance.'}
+            {activeTab === 'riding' && 'Winners past their target with signals still firing — protected by a trailing stop, riding the momentum.'}
             {activeTab === 'dropped' && 'Previously tracked stocks where the signal has faded.'}
             {activeTab === 'watchlist' && 'Everything personal — your watchlist, open positions, and closed trades. Filter with the chips below.'}
           </p>
@@ -6834,7 +6912,7 @@ export default function Dashboard() {
           Leaderboard moved out of the bottom nav 2026-05-13 — it's a "check
           weekly" view, whereas Chatter is daily; Leaderboard stays accessible
           via the top tab row + the ⋯ kebab menu. */}
-      <nav className="mobile-bottom-nav mobile-bottom-nav-4" aria-label="Primary">
+      <nav className="mobile-bottom-nav mobile-bottom-nav-5" aria-label="Primary">
         <button
           className={`mb-nav-btn${activeTab === 'new' ? ' active' : ''}`}
           onClick={() => { setActiveTab('new'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
@@ -6860,6 +6938,19 @@ export default function Dashboard() {
         >
           <span className="mb-nav-icon"><Ico name="flame" size={22} strokeWidth={1.75} /></span>
           <span className="mb-nav-label">Active</span>
+        </button>
+        {/* Riding tab (2026-05-14) — winners past target with signals still
+            firing. Trending-up icon. Only renders a badge when there's a
+            riding pick; otherwise the slot stays quiet so the nav doesn't
+            shout "5 things to look at" by default. */}
+        <button
+          className={`mb-nav-btn${activeTab === 'riding' ? ' active' : ''}`}
+          onClick={() => { setActiveTab('riding'); setRecFilter('ALL'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+          aria-label="Riding"
+        >
+          <span className="mb-nav-icon"><Ico name="trend" size={22} strokeWidth={1.75} /></span>
+          <span className="mb-nav-label">Riding</span>
+          {ridingPicks.length > 0 && <span className="mb-nav-badge">{ridingPicks.length}</span>}
         </button>
         <button
           className={`mb-nav-btn${activeTab === 'watchlist' ? ' active' : ''}`}

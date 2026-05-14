@@ -142,7 +142,7 @@ async function loadDigestData() {
     admin
       .from('stock_alerts')
       .select(
-        'user_id, ticker, company, recommendation, ai_read, price_at_alert, target_high, stop_loss',
+        'user_id, ticker, company, recommendation, ai_read, price_at_alert, target_high, stop_loss, trail_stop, recent_high, riding_entered_at, entry_low',
       )
       .eq('status', 'active')
       .limit(500),
@@ -252,6 +252,8 @@ function recColor(rec) {
       return '#fbbf24';
     case 'TRIM':
       return '#fb923c';
+    case 'RIDING':
+      return '#4ade80';
     case 'EXIT':
       return '#a78bfa';
     case 'SELL':
@@ -337,16 +339,33 @@ function buildHtml({ data, recipientEmail }) {
   // Dedupe rec flips by ticker so the same stock can't appear N times in a
   // row (fixes the GME×6 bug seen in the May 13 digest). After dedupe we
   // cap the rendered list — anything beyond surfaces as a "+N more" pill.
-  const dedupedFlips = dedupeFlipsByTicker(recChanges);
+  const dedupedFlipsAll = dedupeFlipsByTicker(recChanges);
+
+  // RIDING flips (added 2026-05-14) — anything that flipped to RIDING in
+  // the last 24h gets its own "Still riding" section above Chatter, so the
+  // celebratory tone isn't buried in the generic flip list. We also pull
+  // these OUT of the Chatter list to avoid double-rendering.
+  //
+  // Note: flips are global (recChanges has no user_id column today, matching
+  // the existing Chatter section's behavior). The activeByTicker lookup is
+  // only for enriching with trail_stop/ai_read; if the recipient doesn't own
+  // the alert, those enrichment fields are simply omitted.
+  const ridingFlips = dedupedFlipsAll
+    .filter((c) => (c.new_recommendation || '').toUpperCase() === 'RIDING');
+  const ridingTickers = new Set(ridingFlips.map((c) => c.ticker));
+  const dedupedFlips = dedupedFlipsAll.filter((c) => !ridingTickers.has(c.ticker));
 
   // Cap-and-spillover counts for each section. These also drive the hero
   // line at the top.
   const NEW_CAP = 5;
   const CHATTER_CAP = 8;
+  const RIDING_CAP = 6;
   const newPicksToShow = newPicks.slice(0, NEW_CAP);
   const newPicksSpill = Math.max(0, newPicks.length - newPicksToShow.length);
   const chatterToShow = dedupedFlips.slice(0, CHATTER_CAP);
   const chatterSpill = Math.max(0, dedupedFlips.length - chatterToShow.length);
+  const ridingToShow = ridingFlips.slice(0, RIDING_CAP);
+  const ridingSpill = Math.max(0, ridingFlips.length - ridingToShow.length);
 
   // Hero line — keep it to one short sentence. Robinhood/Stake style: don't
   // narrate every state, just call out what's actionable.
@@ -356,6 +375,9 @@ function buildHtml({ data, recipientEmail }) {
   }
   if (dedupedFlips.length > 0) {
     heroBits.push(`<strong style="color:#fff;">${dedupedFlips.length}</strong> ${dedupedFlips.length === 1 ? 'flip' : 'flips'}`);
+  }
+  if (ridingFlips.length > 0) {
+    heroBits.push(`<strong style="color:#4ade80;">${ridingFlips.length}</strong> still riding`);
   }
   let heroLine;
   if (heroBits.length === 0) {
@@ -433,6 +455,57 @@ function buildHtml({ data, recipientEmail }) {
           )
           .join('')}
         ${newPicksSpill > 0 ? `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:2px;">+${newPicksSpill} more on the dashboard</div>` : ''}
+      </td></tr>`
+          : ''
+      }
+
+      ${
+        ridingToShow.length > 0
+          ? `<tr><td style="padding:22px 24px 4px 24px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:12px;">
+          <tr>
+            <td style="vertical-align:middle;">
+              <div style="font-size:12px;font-weight:700;letter-spacing:.10em;color:#4ade80;text-transform:uppercase;">Still riding</div>
+              <div style="font-size:12px;color:#64748b;margin-top:3px;">Past target, signals still firing — trailing stops protecting the gain</div>
+            </td>
+            <td align="right" style="vertical-align:middle;">
+              <span style="display:inline-block;font-size:11px;font-weight:700;background:rgba(74,222,128,0.12);color:#4ade80;padding:4px 9px;border-radius:999px;">${ridingFlips.length}</span>
+            </td>
+          </tr>
+        </table>
+        ${ridingToShow
+          .map((c) => {
+            const active = activeByTicker[c.ticker];
+            const why = active?.ai_read ? truncate(active.ai_read, 130) : '';
+            const trail = active?.trail_stop != null ? fmtMoney(active.trail_stop) : null;
+            const high  = active?.recent_high != null ? fmtMoney(active.recent_high) : null;
+            const entry = active?.entry_low != null ? Number(active.entry_low) : null;
+            const trailNum = active?.trail_stop != null ? Number(active.trail_stop) : null;
+            const lockedPct = (entry && trailNum && entry > 0)
+              ? ((trailNum - entry) / entry) * 100
+              : null;
+            return `
+          <div style="background:#0f172a;border-radius:12px;padding:12px 16px;margin-bottom:8px;border:1px solid rgba(74,222,128,0.25);border-left:3px solid #4ade80;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;">
+              <tr>
+                <td style="vertical-align:middle;">
+                  <div style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.01em;">${c.ticker}</div>
+                </td>
+                <td align="right" style="vertical-align:middle;white-space:nowrap;font-size:11px;font-weight:700;letter-spacing:.04em;color:#4ade80;background:rgba(74,222,128,0.12);padding:4px 9px;border-radius:6px;">
+                  RIDING
+                </td>
+              </tr>
+            </table>
+            ${trail ? `<div style="font-size:12px;color:#cbd5e1;margin-top:8px;line-height:1.5;">
+              <span style="color:#94a3b8;">Trail stop</span> <span style="color:#4ade80;font-weight:700;">${trail}</span>
+              ${lockedPct != null && lockedPct > 0 ? ` <span style="color:#475569;">·</span> <span style="color:#94a3b8;">locks in</span> <span style="color:#4ade80;font-weight:700;">+${lockedPct.toFixed(1)}%</span>` : ''}
+              ${high ? ` <span style="color:#475569;">·</span> <span style="color:#94a3b8;">high</span> <span style="color:#e2e8f0;font-weight:600;">${high}</span>` : ''}
+            </div>` : ''}
+            ${why ? `<div style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.5;">${why}</div>` : ''}
+          </div>`;
+          })
+          .join('')}
+        ${ridingSpill > 0 ? `<div style="font-size:12px;color:#64748b;text-align:center;margin-top:2px;">+${ridingSpill} more on the dashboard</div>` : ''}
       </td></tr>`
           : ''
       }
@@ -550,7 +623,18 @@ function buildText({ data, recipientEmail }) {
   }
 
   // Dedupe flips by ticker for the plain-text version too (same fix as HTML).
-  const dedupedFlips = dedupeFlipsByTicker(recChanges);
+  const dedupedFlipsAll = dedupeFlipsByTicker(recChanges);
+  // RIDING flips get their own section, mirroring the HTML build.
+  const ridingFlips = dedupedFlipsAll.filter(
+    (c) => (c.new_recommendation || '').toUpperCase() === 'RIDING'
+  );
+  const ridingTickers = new Set(ridingFlips.map((c) => c.ticker));
+  const dedupedFlips = dedupedFlipsAll.filter((c) => !ridingTickers.has(c.ticker));
+
+  // Active-pick lookup so we can read trail_stop / recent_high per riding ticker.
+  const activeByTicker = Object.fromEntries(
+    (data.activePicks || []).map((a) => [a.ticker, a])
+  );
 
   if (newPicks.length > 0) {
     lines.push(`FRESH PICKS (${newPicks.length})`);
@@ -558,6 +642,16 @@ function buildText({ data, recipientEmail }) {
       lines.push(`  · ${p.ticker} [${p.recommendation || '—'}] — ${truncate(p.ai_read || p.signal_type || '', 120)}`);
     }
     if (newPicks.length > 5) lines.push(`  +${newPicks.length - 5} more on the dashboard`);
+    lines.push('');
+  }
+  if (ridingFlips.length > 0) {
+    lines.push(`STILL RIDING (${ridingFlips.length})`);
+    for (const c of ridingFlips.slice(0, 6)) {
+      const active = activeByTicker[c.ticker] || {};
+      const trail = active.trail_stop != null ? `$${Number(active.trail_stop).toFixed(2)}` : null;
+      lines.push(`  · ${c.ticker}${trail ? ` — trail stop ${trail}` : ''}${active.ai_read ? ` — ${truncate(active.ai_read, 110)}` : ''}`);
+    }
+    if (ridingFlips.length > 6) lines.push(`  +${ridingFlips.length - 6} more on the dashboard`);
     lines.push('');
   }
   if (dedupedFlips.length > 0) {
