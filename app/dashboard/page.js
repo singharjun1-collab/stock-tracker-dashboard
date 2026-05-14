@@ -224,6 +224,63 @@ function setMarketCapFilter(range) {
   document.cookie = `stock_mcap_filter=${val}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
 }
 
+// ── Cookie helpers for the card sort-by control ──
+// Lets the dashboard remember how the user wants cards ordered across
+// sessions. Default 'strength' preserves the original strongest-first sort.
+const SORT_MODES = ['strength', 'updated', 'newest', 'oldest', 'best', 'worst'];
+function getSortMode() {
+  if (typeof document === 'undefined') return 'strength';
+  const match = document.cookie.match(/(?:^|; )stock_sort_mode=([^;]*)/);
+  if (!match) return 'strength';
+  const val = decodeURIComponent(match[1]);
+  return SORT_MODES.includes(val) ? val : 'strength';
+}
+function setSortModeCookie(mode) {
+  document.cookie = `stock_sort_mode=${encodeURIComponent(mode)}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
+}
+
+// lastActivityMs — the "last updated" timestamp for a pick. Mirrors the
+// AlertCard's own lastChatterMs logic so the sort order and the on-card
+// "Updated" badge always agree: MAX of last_updated, last_resignal_at, the
+// newest signal_change entry, and alert_date as a floor fallback.
+function lastActivityMs(alert) {
+  const cands = [];
+  if (alert.last_updated) {
+    const t = new Date(alert.last_updated).getTime();
+    if (!Number.isNaN(t)) cands.push(t);
+  }
+  if (alert.last_resignal_at) {
+    const t = new Date(alert.last_resignal_at).getTime();
+    if (!Number.isNaN(t)) cands.push(t);
+  }
+  if (Array.isArray(alert.signal_change_history)) {
+    for (const sc of alert.signal_change_history) {
+      const ts = new Date(sc?.change_date || sc?.created_at || 0).getTime();
+      if (!Number.isNaN(ts) && ts > 0) cands.push(ts);
+    }
+  }
+  if (alert.latest_signal_change) {
+    const ts = new Date(alert.latest_signal_change.change_date || alert.latest_signal_change.created_at || 0).getTime();
+    if (!Number.isNaN(ts) && ts > 0) cands.push(ts);
+  }
+  if (alert.alert_date) {
+    const ts = new Date(alert.alert_date + 'T00:00:00').getTime();
+    if (!Number.isNaN(ts) && ts > 0) cands.push(ts);
+  }
+  return cands.length ? Math.max(...cands) : 0;
+}
+
+// Short "2d ago" / "today" style relative-time label for the card date badge.
+function relTimeLabel(ms) {
+  if (!ms) return null;
+  const diffDays = Math.floor((Date.now() - ms) / 86400000);
+  if (diffDays <= 0) return 'today';
+  if (diffDays === 1) return '1d ago';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+  return `${Math.floor(diffDays / 30)}mo ago`;
+}
+
 // ── Reddit link builder ──
 function getRedditLinks(ticker) {
   return [
@@ -1108,6 +1165,30 @@ function AlertCard({
         )}
       </div>
 
+      {/* DATE META (2026-05-14) — first-picked + last-activity dates.
+          Lets AJ scan a big tab for freshness at a glance and pairs with
+          the new Sort-by control. "Picked" = alert_date (when the AI first
+          flagged it); "Updated" = lastChatterMs (most recent re-signal or
+          recommendation change). */}
+      <div className="ac-datemeta">
+        <span
+          className="ac-datemeta-item"
+          title={`First flagged by the AI on ${alertDateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'long', day: 'numeric', year: 'numeric' })}`}
+        >
+          <Ico name="calendar" size={11} className="ac-datemeta-ico" />
+          Picked {alertDateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+        {lastChatterMs != null && (
+          <span
+            className="ac-datemeta-item"
+            title="Most recent AI activity on this pick — a re-signal or a recommendation change"
+          >
+            <Ico name="clock" size={11} className="ac-datemeta-ico" />
+            Updated {relTimeLabel(lastChatterMs) || 'today'}
+          </span>
+        )}
+      </div>
+
       {/* TRADE PLAN — entry / take profit / stop loss */}
       {hasPlan && (() => {
         // Smart decimal formatting — stocks ≥$100 drop the cents so the chip
@@ -1653,6 +1734,44 @@ function RecommendationFilter({ value, onChange, counts }) {
         );
       })}
     </div>
+  );
+}
+
+// ── Sort-By Dropdown (2026-05-14) ──
+// A compact, Robinhood-quiet control that re-orders the card grid. Uses a
+// native <select> on purpose: on mobile it pops the OS picker wheel (fast,
+// familiar, accessible) and on desktop it's a normal dropdown. The visible
+// chip (icon + current label) is styled; the <select> sits invisibly on top
+// so the whole thing is one big tap target.
+function SortByDropdown({ value, onChange }) {
+  const options = [
+    { key: 'strength', label: 'Strongest signal' },
+    { key: 'updated',  label: 'Recently updated' },
+    { key: 'newest',   label: 'Newest pick' },
+    { key: 'oldest',   label: 'Oldest pick' },
+    { key: 'best',     label: 'Best performer' },
+    { key: 'worst',    label: 'Worst performer' },
+  ];
+  const current = options.find(o => o.key === value) || options[0];
+  return (
+    <label className="sort-by" title="Change how picks are ordered">
+      <Ico name="sort" size={13} className="sort-by-ico" />
+      <span className="sort-by-text">
+        <span className="sort-by-kicker">Sort</span>
+        <span className="sort-by-current">{current.label}</span>
+      </span>
+      <Ico name="chevrondown" size={13} className="sort-by-caret" />
+      <select
+        className="sort-by-select"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        aria-label="Sort picks by"
+      >
+        {options.map(o => (
+          <option key={o.key} value={o.key}>{o.label}</option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -4744,6 +4863,18 @@ export default function Dashboard() {
       document.cookie = `sc_view_mode=${m}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`;
     }
   }, []);
+  // ─── Card sort-by control (2026-05-14) ─────────────────────────────
+  // The Active tab can hold 100+ cards, so AJ asked for a way to re-order
+  // them. 'strength' (default) keeps the original strongest-signal-first
+  // sort; the other modes sort by date or performance. Persists in the
+  // `stock_sort_mode` cookie. Initialised to 'strength' on the server and
+  // synced from the cookie after mount to avoid a hydration mismatch.
+  const [sortMode, setSortMode] = useState('strength');
+  useEffect(() => { setSortMode(getSortMode()); }, []);
+  const handleSetSortMode = useCallback((m) => {
+    setSortMode(m);
+    setSortModeCookie(m);
+  }, []);
   // Close the ⋯ kebab dropdown when the user clicks anywhere outside it.
   useEffect(() => {
     if (!kebabOpen) return;
@@ -5348,6 +5479,40 @@ export default function Dashboard() {
     return pb - pa;
   });
 
+  // sortPicks — re-orders a (already filtered) pick list per the user's
+  // chosen sortMode. 'strength' is the original sortByPerf behaviour; the
+  // other modes let AJ scan a big Active tab by recency or performance.
+  // Always returns a new array so we never mutate the memoised lists.
+  const sortPicks = useCallback((list) => {
+    if (!Array.isArray(list)) return [];
+    if (sortMode === 'strength') return sortByPerf(list);
+    const arr = [...list];
+    const alertMs = (a) => {
+      const t = a.alert_date ? new Date(a.alert_date + 'T00:00:00').getTime() : 0;
+      return Number.isNaN(t) ? 0 : t;
+    };
+    switch (sortMode) {
+      case 'updated':
+        arr.sort((a, b) => lastActivityMs(b) - lastActivityMs(a));
+        break;
+      case 'newest':
+        arr.sort((a, b) => alertMs(b) - alertMs(a) || lastActivityMs(b) - lastActivityMs(a));
+        break;
+      case 'oldest':
+        arr.sort((a, b) => alertMs(a) - alertMs(b) || lastActivityMs(a) - lastActivityMs(b));
+        break;
+      case 'best':
+        arr.sort((a, b) => getLatestPct(b) - getLatestPct(a));
+        break;
+      case 'worst':
+        arr.sort((a, b) => getLatestPct(a) - getLatestPct(b));
+        break;
+      default:
+        return sortByPerf(list);
+    }
+    return arr;
+  }, [sortMode, getLatestPct]);
+
   // Apply all filters: search + recommendation + market cap
   // (Old signal-type filter was removed 2026-04-21 — replaced by the
   // quick Buy/Hold/Trim/Exit/Sell chip row under the tabs.)
@@ -5674,15 +5839,17 @@ export default function Dashboard() {
 
   // Current tab data
   const getTabData = () => {
+    let data;
     switch (activeTab) {
-      case 'new': return filteredNew;
-      case 'chatter': return filteredChatter;
-      case 'active': return filteredActive;
-      case 'riding': return filteredRiding;
-      case 'dropped': return filteredDropped;
-      case 'watchlist': return filteredWatchlist;
-      default: return filteredActive;
+      case 'new': data = filteredNew; break;
+      case 'chatter': data = filteredChatter; break;
+      case 'active': data = filteredActive; break;
+      case 'riding': data = filteredRiding; break;
+      case 'dropped': data = filteredDropped; break;
+      case 'watchlist': data = filteredWatchlist; break;
+      default: data = filteredActive; break;
     }
+    return sortPicks(data);
   };
 
   // Union of every ticker that might render a card on this page. Used by
@@ -6266,13 +6433,22 @@ export default function Dashboard() {
         <>
           {/* Tab description */}
           <p className="section-hint" style={{ marginLeft: '40px', marginTop: '8px' }}>
-            {activeTab === 'new' && 'Brand-new picks from the last overnight scan. Look here first each morning.'}
+            {activeTab === 'new' && 'Brand-new picks from the last 2 days of scans. Look here first each morning.'}
             {activeTab === 'chatter' && 'Active picks where the AI changed its call in the last 24h. Worth a fresh look.'}
-            {activeTab === 'active' && 'Current picks being tracked. Sorted by performance.'}
+            {activeTab === 'active' && 'Current picks being tracked. Use Sort to scan by signal, date or performance.'}
             {activeTab === 'riding' && 'Winners past their target with signals still firing — protected by a trailing stop, riding the momentum.'}
             {activeTab === 'dropped' && 'Previously tracked stocks where the signal has faded.'}
             {activeTab === 'watchlist' && 'Everything personal — your watchlist, open positions, and closed trades. Filter with the chips below.'}
           </p>
+
+          {/* SORT-BY ROW (2026-05-14) — lets AJ re-order a big card list by
+              signal strength, recency or performance. Only on card tabs in
+              card view; the Table view has its own column-header sorting. */}
+          {showRecFilter && viewMode === 'cards' && getTabData().length > 1 && (
+            <div className="sort-by-row">
+              <SortByDropdown value={sortMode} onChange={handleSetSortMode} />
+            </div>
+          )}
 
           {/* MY STOCKS FILTER CHIPS (Phase 7) ─────────────────────────────
               Lifecycle filter for the unified My Stocks view. Replaces the

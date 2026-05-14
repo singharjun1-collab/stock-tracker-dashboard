@@ -1645,6 +1645,79 @@ footer span { color: #4fc3f7; }
 }
 
 /* ─────────────────────────────────────────────────────────────────
+   SORT-BY CONTROL (2026-05-14)
+   Compact, right-aligned dropdown above the card grid. A styled chip
+   sits under an invisible native <select> so mobile gets the OS
+   picker wheel and the whole chip is one tap target.
+   ───────────────────────────────────────────────────────────────── */
+.sort-by-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 40px;
+  margin: -4px 0 10px;
+}
+.sort-by {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px;
+  border-radius: 20px;
+  background: #0f1d30;
+  border: 1px solid #1e3a5f;
+  color: #7a9bc0;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+.sort-by:hover,
+.sort-by:focus-within {
+  border-color: #4fc3f7;
+  color: #4fc3f7;
+}
+.sort-by-ico { flex: 0 0 auto; opacity: 0.85; }
+.sort-by-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  font-size: 0.78rem;
+  line-height: 1;
+}
+.sort-by-kicker {
+  font-weight: 600;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+}
+.sort-by-current {
+  font-weight: 700;
+  color: #cfe3f7;
+}
+.sort-by:hover .sort-by-current,
+.sort-by:focus-within .sort-by-current { color: #4fc3f7; }
+.sort-by-caret { flex: 0 0 auto; opacity: 0.7; }
+/* Invisible native <select> overlay — keeps the OS picker on mobile
+   while letting us fully style the visible chip above. */
+.sort-by-select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  border: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+@media (max-width: 768px) {
+  .sort-by-row {
+    padding: 0 16px;
+    margin: 0 0 10px;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
    SECTOR PULSE ACCORDION (2026-05-12)
    Collapsed by default — keeps the top of the dashboard clean. The
    toggle chip shows the currently-selected sector when one is active
@@ -4769,6 +4842,26 @@ footer span { color: #4fc3f7; }
 }
 @keyframes ac-flicker { 0%,100%{opacity:1} 50%{opacity:.75} }
 
+/* ── Date meta line (2026-05-14) — first-picked + last-activity ──
+   A quiet, muted row under the badges. Robinhood-style: low-contrast,
+   informational, never competes with the price or recommendation. */
+.ac-datemeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+  margin: -3px 0 10px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: #5a7a98;
+}
+.ac-datemeta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ac-datemeta-ico { opacity: 0.7; flex: 0 0 auto; }
+
 /* ─── TRADE PLAN (3 chips) ─── */
 .ac-plan {
   display: flex; gap: 6px; margin-bottom: 10px;
@@ -5309,6 +5402,7 @@ footer span { color: #4fc3f7; }
 }
 
 .ac.ac-compact .ac-badges,
+.ac.ac-compact .ac-datemeta,
 .ac.ac-compact .ac-plan,
 .ac.ac-compact .ac-ai-read,
 .ac.ac-compact .ac-range,

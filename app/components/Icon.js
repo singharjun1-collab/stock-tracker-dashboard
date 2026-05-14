@@ -68,6 +68,9 @@ import {
   ArrowLeft,
   Plus,
   Eye,
+  Calendar,
+  Clock,
+  ArrowUpDown,
 } from 'lucide-react';
 
 const REGISTRY = {
@@ -113,6 +116,9 @@ const REGISTRY = {
   arrowleft: ArrowLeft,
   plus: Plus,
   eye: Eye,
+  calendar: Calendar,   // "first picked" date badge on cards
+  clock: Clock,         // "last updated" date badge on cards
+  sort: ArrowUpDown,    // Sort-by dropdown control
 };
 
 /**
