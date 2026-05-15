@@ -1404,8 +1404,8 @@ function AlertCard({
                     </span>
                   </div>
                   <div className="pth-bot">
-                    <span>{shares.toFixed(4)} sh @ ${parseFloat(openPosition.entry_price).toFixed(2)} = ${invested.toFixed(2)}</span>
-                    <span>Now: ${currentValue.toFixed(2)}</span>
+                    <span>{fmtShares(shares)} sh @ ${parseFloat(openPosition.entry_price).toFixed(2)} {"·"} ${invested.toFixed(2)} cost</span>
+                    <span>Now ${currentValue.toFixed(2)}</span>
                   </div>
                 </div>
                 <button className="paper-trade-btn paper-trade-sell" onClick={() => onOpenSellModal(openPosition, currentPrice)}>
@@ -2580,23 +2580,27 @@ function AnalyticsTab({ alerts }) {
 // ══════════════════════════════════════
 // ── Paper Trade Buy Modal ──
 function BuyTradeModal({ alert, currentPrice, onClose, onConfirm }) {
-  const [amount, setAmount] = useState('500');
+  // Buy ticket: you type the number of shares and the price you paid per
+  // share. Total cost is calculated for you — no more "dollar amount in,
+  // fractional shares out" guessing.
+  const [shares, setShares] = useState('');
+  const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(2) : '');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const amountNum = parseFloat(amount) || 0;
-  const shares = currentPrice > 0 ? amountNum / currentPrice : 0;
+  const sharesNum = parseFloat(shares) || 0;
+  const priceNum = parseFloat(price) || 0;
+  const totalCost = sharesNum * priceNum;
+  const canConfirm = sharesNum > 0 && priceNum > 0;
 
   const handleConfirm = async () => {
-    if (amountNum <= 0) {
-      setError('Enter a dollar amount greater than 0');
-      return;
-    }
+    if (sharesNum <= 0) { setError('Enter how many shares you bought'); return; }
+    if (priceNum <= 0) { setError('Enter the price you paid per share'); return; }
     setSaving(true);
     setError('');
     try {
-      await onConfirm({ amount: amountNum, notes });
+      await onConfirm({ shares: sharesNum, price: priceNum, notes });
     } catch (e) {
       setError(e.message || 'Failed to save trade');
       setSaving(false);
@@ -2607,60 +2611,75 @@ function BuyTradeModal({ alert, currentPrice, onClose, onConfirm }) {
     <div className="pt-modal-backdrop" onClick={onClose}>
       <div className="pt-modal" onClick={(e) => e.stopPropagation()}>
         <div className="pt-modal-header">
-          <h3>{"\u{1F4B0}"} Paper Buy <span className="pt-modal-ticker">{alert.ticker}</span></h3>
-          <button className="pt-modal-close" onClick={onClose}>{"\u{2715}"}</button>
+          <h3><Ico name="trend" size={18} /> Buy <span className="pt-modal-ticker">{alert.ticker}</span></h3>
+          <button className="pt-modal-close" onClick={onClose} aria-label="Close"><Ico name="x" size={16} /></button>
         </div>
         <div className="pt-modal-body">
-          <div className="pt-modal-row">
-            <span className="pt-modal-label">Company</span>
-            <span className="pt-modal-value">{alert.company}</span>
-          </div>
-          <div className="pt-modal-row">
-            <span className="pt-modal-label">Current price</span>
-            <span className="pt-modal-value pt-price">${currentPrice.toFixed(2)}</span>
-          </div>
-          <div className="pt-modal-row">
-            <span className="pt-modal-label">AI rec</span>
-            <span className={`rec-chip ${recClass(alert.recommendation || 'HOLD')}`}>{recLabel(alert.recommendation || 'HOLD')}</span>
+          {/* Compact context strip — company, live price, AI call, all in one line */}
+          <div className="pt-context-strip">
+            <span className="pt-context-co">{alert.company || alert.ticker}</span>
+            <span className="pt-context-meta">
+              <span className="pt-price">${currentPrice.toFixed(2)}</span>
+              <span className="pt-context-dot">{"·"}</span>
+              <span className={`rec-chip ${recClass(alert.recommendation || 'HOLD')}`}>{recLabel(alert.recommendation || 'HOLD')}</span>
+            </span>
           </div>
 
-          <div className="pt-modal-input-group">
-            <label>Amount to invest ($)</label>
-            <div className="pt-amount-input-wrap">
-              <span className="pt-amount-prefix">$</span>
-              <input
-                type="number"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min="1"
-                step="any"
-                autoFocus
-              />
+          <div className="pt-input-duo">
+            <div className="pt-modal-input-group">
+              <label>Shares</label>
+              <div className="pt-amount-input-wrap">
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={shares}
+                  onChange={(e) => setShares(e.target.value)}
+                  min="0"
+                  step="any"
+                  placeholder="0"
+                  autoFocus
+                />
+              </div>
             </div>
-            <div className="pt-amount-presets">
-              {[100, 500, 1000, 5000].map(v => (
-                <button key={v} type="button" onClick={() => setAmount(String(v))}>${v}</button>
-              ))}
+            <div className="pt-modal-input-group">
+              <label>Price per share</label>
+              <div className="pt-amount-input-wrap">
+                <span className="pt-amount-prefix">$</span>
+                <input
+                  type="number"
+                  inputMode="decimal"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                />
+              </div>
             </div>
           </div>
+          {currentPrice > 0 && (
+            <button
+              type="button"
+              className="pt-use-market"
+              onClick={() => setPrice(currentPrice.toFixed(2))}
+            >
+              Use current price (${currentPrice.toFixed(2)})
+            </button>
+          )}
 
           <div className="pt-modal-summary">
-            <div className="pt-summary-row">
-              <span>Shares (fractional)</span>
-              <span>{shares.toFixed(4)}</span>
-            </div>
-            <div className="pt-summary-row">
-              <span>Position cost</span>
-              <span className="pt-price">${amountNum.toFixed(2)}</span>
+            <div className="pt-summary-row pt-summary-total">
+              <span>Total cost</span>
+              <span className="pt-price">${totalCost.toFixed(2)}</span>
             </div>
           </div>
 
           <div className="pt-modal-input-group">
-            <label>Notes (optional)</label>
+            <label>Note <span className="pt-label-optional">optional</span></label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder="Why are you buying? e.g. 'Strong signal + momentum setup'"
+              placeholder="Why are you buying?"
               rows={2}
             />
           </div>
@@ -2669,8 +2688,8 @@ function BuyTradeModal({ alert, currentPrice, onClose, onConfirm }) {
         </div>
         <div className="pt-modal-footer">
           <button className="pt-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="pt-btn-primary" onClick={handleConfirm} disabled={saving || amountNum <= 0}>
-            {saving ? 'Saving...' : `\u{1F4C8} Buy $${amountNum.toFixed(2)}`}
+          <button className="pt-btn-primary" onClick={handleConfirm} disabled={saving || !canConfirm}>
+            {saving ? 'Saving…' : `Buy ${sharesNum > 0 ? sharesNum + ' ' : ''}${sharesNum === 1 ? 'share' : 'shares'}`}
           </button>
         </div>
       </div>
@@ -2679,100 +2698,172 @@ function BuyTradeModal({ alert, currentPrice, onClose, onConfirm }) {
 }
 
 // ── Paper Trade Sell Modal ──
+// Supports a FULL close or a PARTIAL sell. For a partial sell the position
+// stays open with the remaining shares; the sold slice becomes its own
+// closed trade (the split happens server-side in /api/paper-trades PATCH).
+function fmtShares(n) {
+  if (n == null || Number.isNaN(n)) return '0';
+  if (Number.isInteger(n)) return String(n);
+  return parseFloat(n.toFixed(4)).toString();
+}
 function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
+  const totalShares = parseFloat(trade.shares);
+  const entryPrice = parseFloat(trade.entry_price);
+
   const [price, setPrice] = useState(currentPrice > 0 ? currentPrice.toFixed(2) : '');
+  const [sellShares, setSellShares] = useState(fmtShares(totalShares));
   const [verdict, setVerdict] = useState('');
   const [reviewNotes, setReviewNotes] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const priceNum = parseFloat(price) || 0;
-  const exitAmount = priceNum * parseFloat(trade.shares);
-  const pnl = exitAmount - parseFloat(trade.entry_amount);
-  const pnlPct = trade.entry_amount > 0 ? (pnl / parseFloat(trade.entry_amount)) * 100 : 0;
+  const sellSharesNum = parseFloat(sellShares) || 0;
+  const clampedSell = Math.min(Math.max(sellSharesNum, 0), totalShares);
+  const isPartial = clampedSell > 0 && clampedSell < totalShares - 1e-9;
+  const remaining = Math.max(0, totalShares - clampedSell);
+
+  const costOfPortion = clampedSell * entryPrice;
+  const proceeds = clampedSell * priceNum;
+  const pnl = proceeds - costOfPortion;
+  const pnlPct = costOfPortion > 0 ? (pnl / costOfPortion) * 100 : 0;
+  const canConfirm = priceNum > 0 && clampedSell > 0;
+
+  // Quick-pick chips. A whole-share position keeps tidy whole-number results;
+  // fractional legacy positions stay fractional.
+  const setPct = (pct) => {
+    const raw = totalShares * pct;
+    if (Number.isInteger(totalShares)) {
+      setSellShares(String(pct === 1 ? totalShares : Math.max(1, Math.round(raw))));
+    } else {
+      setSellShares(fmtShares(pct === 1 ? totalShares : raw));
+    }
+  };
 
   const handleConfirm = async () => {
-    if (priceNum <= 0) {
-      setError('Enter a sell price greater than 0');
-      return;
-    }
+    if (priceNum <= 0) { setError('Enter a sell price greater than 0'); return; }
+    if (clampedSell <= 0) { setError('Choose how many shares to sell'); return; }
     setSaving(true);
     setError('');
     try {
       await onConfirm({
         price: priceNum,
+        sell_shares: clampedSell,
         ai_review_verdict: verdict || null,
         ai_review_notes: reviewNotes.trim() || null,
       });
     } catch (e) {
-      setError(e.message || 'Failed to close trade');
+      setError(e.message || 'Failed to sell');
       setSaving(false);
     }
   };
 
   const verdictOptions = [
-    { value: 'right', label: '\u2705 Right', hint: 'AI nailed the call' },
-    { value: 'partial', label: '\u{1F7E1} Partial', hint: 'Partly right' },
-    { value: 'wrong', label: '\u274C Wrong', hint: 'AI was off' },
-    { value: 'unclear', label: '\u2754 Unclear', hint: 'Hard to say' },
+    { value: 'right', label: 'Right', hint: 'AI nailed the call' },
+    { value: 'partial', label: 'Partial', hint: 'Partly right' },
+    { value: 'wrong', label: 'Wrong', hint: 'AI was off' },
+    { value: 'unclear', label: 'Unclear', hint: 'Hard to say' },
   ];
 
   return (
     <div className="pt-modal-backdrop" onClick={onClose}>
       <div className="pt-modal" onClick={(e) => e.stopPropagation()}>
         <div className="pt-modal-header">
-          <h3>{"\u{1F4B8}"} Paper Sell <span className="pt-modal-ticker">{trade.ticker}</span></h3>
-          <button className="pt-modal-close" onClick={onClose}>{"\u{2715}"}</button>
+          <h3><Ico name="dollar" size={18} /> Sell <span className="pt-modal-ticker">{trade.ticker}</span></h3>
+          <button className="pt-modal-close" onClick={onClose} aria-label="Close"><Ico name="x" size={16} /></button>
         </div>
         <div className="pt-modal-body">
-          <div className="pt-modal-row">
-            <span className="pt-modal-label">Bought</span>
-            <span className="pt-modal-value">{parseFloat(trade.shares).toFixed(4)} sh @ ${parseFloat(trade.entry_price).toFixed(2)}</span>
-          </div>
-          <div className="pt-modal-row">
-            <span className="pt-modal-label">Invested</span>
-            <span className="pt-modal-value pt-price">${parseFloat(trade.entry_amount).toFixed(2)}</span>
-          </div>
-          <div className="pt-modal-row">
-            <span className="pt-modal-label">Current market price</span>
-            <span className="pt-modal-value pt-price">${currentPrice.toFixed(2)}</span>
+          {/* Compact context strip */}
+          <div className="pt-context-strip">
+            <span className="pt-context-co">Holding {fmtShares(totalShares)} sh @ ${entryPrice.toFixed(2)}</span>
+            <span className="pt-context-meta">
+              <span className="pt-price">${currentPrice.toFixed(2)}</span>
+            </span>
           </div>
 
+          {/* Shares to sell — quick chips + exact input */}
           <div className="pt-modal-input-group">
-            <label>Sell price ($)</label>
+            <label>Shares to sell</label>
+            <div className="pt-sell-chips">
+              {[['25%', 0.25], ['50%', 0.5], ['75%', 0.75], ['All', 1]].map(([lbl, pct]) => {
+                const target = pct === 1
+                  ? totalShares
+                  : (Number.isInteger(totalShares) ? Math.max(1, Math.round(totalShares * pct)) : totalShares * pct);
+                const active = Math.abs(clampedSell - target) < 1e-6;
+                return (
+                  <button
+                    key={lbl}
+                    type="button"
+                    className={`pt-sell-chip ${active ? 'active' : ''}`}
+                    onClick={() => setPct(pct)}
+                  >
+                    {lbl}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="pt-amount-input-wrap">
+              <input
+                type="number"
+                inputMode="decimal"
+                value={sellShares}
+                onChange={(e) => setSellShares(e.target.value)}
+                min="0"
+                max={totalShares}
+                step="any"
+              />
+              <span className="pt-amount-suffix">of {fmtShares(totalShares)}</span>
+            </div>
+          </div>
+
+          {/* Sell price */}
+          <div className="pt-modal-input-group">
+            <label>Sell price per share</label>
             <div className="pt-amount-input-wrap">
               <span className="pt-amount-prefix">$</span>
               <input
                 type="number"
+                inputMode="decimal"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                min="0.01"
+                min="0"
                 step="0.01"
-                autoFocus
+                placeholder="0.00"
               />
             </div>
-            <button type="button" className="pt-use-market" onClick={() => setPrice(currentPrice.toFixed(2))}>
-              Use current market price
-            </button>
+            {currentPrice > 0 && (
+              <button type="button" className="pt-use-market" onClick={() => setPrice(currentPrice.toFixed(2))}>
+                Use current price (${currentPrice.toFixed(2)})
+              </button>
+            )}
           </div>
 
           <div className="pt-modal-summary">
             <div className="pt-summary-row">
-              <span>Proceeds</span>
-              <span className="pt-price">${exitAmount.toFixed(2)}</span>
+              <span>Selling</span>
+              <span>{fmtShares(clampedSell)} {clampedSell === 1 ? 'share' : 'shares'}</span>
             </div>
             <div className="pt-summary-row">
+              <span>Proceeds</span>
+              <span className="pt-price">${proceeds.toFixed(2)}</span>
+            </div>
+            <div className="pt-summary-row pt-summary-total">
               <span>Profit / Loss</span>
               <span className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
                 {pnl >= 0 ? '+' : ''}${pnl.toFixed(2)} ({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)
               </span>
             </div>
+            {isPartial && (
+              <div className="pt-summary-note">
+                {fmtShares(remaining)} {remaining === 1 ? 'share' : 'shares'} stay open after this sale.
+              </div>
+            )}
           </div>
 
           {/* Post-trade AI review — feedback loop */}
           <div className="pt-review-block">
             <div className="pt-review-title">
-              {"\u{1F3AF}"} Post-trade review
+              Post-trade review
               <span className="pt-review-optional">optional</span>
             </div>
             <div className="pt-review-sub">
@@ -2813,8 +2904,10 @@ function SellTradeModal({ trade, currentPrice, onClose, onConfirm }) {
         </div>
         <div className="pt-modal-footer">
           <button className="pt-btn-secondary" onClick={onClose} disabled={saving}>Cancel</button>
-          <button className="pt-btn-primary" onClick={handleConfirm} disabled={saving || priceNum <= 0}>
-            {saving ? 'Closing...' : `\u{1F4B0} Sell @ $${priceNum.toFixed(2)}`}
+          <button className="pt-btn-primary" onClick={handleConfirm} disabled={saving || !canConfirm}>
+            {saving ? 'Selling…' : (isPartial
+              ? `Sell ${fmtShares(clampedSell)} ${clampedSell === 1 ? 'share' : 'shares'}`
+              : 'Sell all & close')}
           </button>
         </div>
       </div>
@@ -3263,6 +3356,180 @@ function TradeDetailDrawer({ trade, onUpdateReview, currentPrice, currentPriceDa
   );
 }
 
+// ── Portfolio P/L over time ───────────────────────────────────
+// Reconstructs the account's cumulative profit/loss for every day from
+// the first buy to today. Open positions are marked to that day's close
+// price using the price history already loaded on the client
+// (alerts[].prices); closed lots lock in their realized P/L from the
+// exit date onward. Pure SVG — no chart library, no extra tables.
+function PortfolioValueChart({ trades, alerts }) {
+  const [hoverIdx, setHoverIdx] = useState(null);
+
+  const series = useMemo(() => {
+    if (!trades || trades.length === 0) return null;
+    const DAY = 86400000;
+    const floorDay = (ms) => { const d = new Date(ms); d.setHours(0, 0, 0, 0); return d.getTime(); };
+
+    // Price history per ticker, floored to day and sorted ascending.
+    const hist = {};
+    (alerts || []).forEach((a) => {
+      if (!a || !a.ticker || !Array.isArray(a.prices)) return;
+      const pts = a.prices
+        .filter((p) => p && p.date && typeof p.price === 'number')
+        .map((p) => ({ t: floorDay(new Date(p.date + 'T00:00:00').getTime()), price: p.price }))
+        .sort((x, y) => x.t - y.t);
+      if (pts.length) hist[a.ticker] = pts;
+    });
+    const priceOnOrBefore = (ticker, ms, fallback) => {
+      const pts = hist[ticker];
+      if (!pts || !pts.length) return fallback;
+      let val = null;
+      for (let i = 0; i < pts.length; i++) {
+        if (pts[i].t <= ms) val = pts[i].price;
+        else break;
+      }
+      return val != null ? val : pts[0].price;
+    };
+
+    const startDay = floorDay(Math.min(...trades.map((t) => new Date(t.entry_date).getTime())));
+    const endDay = floorDay(Date.now());
+    const out = [];
+    for (let d = startDay; d <= endDay; d += DAY) {
+      let pnl = 0;
+      for (const t of trades) {
+        const entryDay = floorDay(new Date(t.entry_date).getTime());
+        if (d < entryDay) continue;
+        const entryPrice = parseFloat(t.entry_price);
+        const shares = parseFloat(t.shares);
+        const closed = t.status === 'closed' && t.exit_date;
+        const exitDay = closed ? floorDay(new Date(t.exit_date).getTime()) : null;
+        if (closed && d >= exitDay) {
+          pnl += parseFloat(t.exit_amount) - parseFloat(t.entry_amount);
+        } else {
+          const px = priceOnOrBefore(t.ticker, d, entryPrice);
+          pnl += shares * (px - entryPrice);
+        }
+      }
+      out.push({ t: d, pnl });
+    }
+    return out;
+  }, [trades, alerts]);
+
+  if (!series || series.length < 2) return null;
+
+  const W = 640, H = 150, PAD = 8;
+  const vals = series.map((s) => s.pnl);
+  const min = Math.min(...vals, 0);
+  const max = Math.max(...vals, 0);
+  const range = (max - min) || 1;
+  const stepX = (W - PAD * 2) / (series.length - 1);
+  const yOf = (v) => PAD + (H - PAD * 2) * (1 - (v - min) / range);
+  const xOf = (i) => PAD + i * stepX;
+  const coords = series.map((s, i) => ({ x: xOf(i), y: yOf(s.pnl) }));
+  const linePts = coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  const last = series[series.length - 1];
+  const up = last.pnl >= 0;
+  const stroke = up ? '#22c55e' : '#ef4444';
+  const fill = up ? 'rgba(34,197,94,0.13)' : 'rgba(239,68,68,0.13)';
+  const zeroY = yOf(0);
+  const areaPath = `M${coords[0].x},${zeroY} L${linePts.replace(/ /g, ' L')} L${coords[coords.length - 1].x},${zeroY} Z`;
+  const fmtD = (ms) => new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const hover = hoverIdx != null ? { c: coords[hoverIdx], s: series[hoverIdx] } : null;
+  const shown = hover ? hover.s : last;
+
+  const handleMove = (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const frac = (e.clientX - rect.left) / rect.width;
+    const idx = Math.round(frac * (series.length - 1));
+    setHoverIdx(Math.max(0, Math.min(series.length - 1, idx)));
+  };
+
+  return (
+    <div className="pt-chart-card">
+      <div className="pt-chart-head">
+        <span className="pt-chart-title">Portfolio P/L over time</span>
+        <span className={`pt-chart-now ${shown.pnl >= 0 ? 'pct-pos' : 'pct-neg'}`}>
+          {shown.pnl >= 0 ? '+' : ''}${shown.pnl.toFixed(2)}
+          <span className="pt-chart-now-date">{fmtD(shown.t)}</span>
+        </span>
+      </div>
+      <svg
+        className="pt-chart-svg"
+        viewBox={`0 0 ${W} ${H}`}
+        preserveAspectRatio="none"
+        onMouseMove={handleMove}
+        onMouseLeave={() => setHoverIdx(null)}
+      >
+        <line x1={PAD} y1={zeroY} x2={W - PAD} y2={zeroY} stroke="#2a3b52" strokeWidth="1" strokeDasharray="3,3" vectorEffect="non-scaling-stroke" />
+        <path d={areaPath} fill={fill} stroke="none" />
+        <polyline points={linePts} fill="none" stroke={stroke} strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+        {hover && (
+          <>
+            <line x1={hover.c.x} y1={PAD} x2={hover.c.x} y2={H - PAD} stroke="#7a9bc0" strokeWidth="1" strokeDasharray="2,2" vectorEffect="non-scaling-stroke" />
+            <circle cx={hover.c.x} cy={hover.c.y} r="3.5" fill={stroke} stroke="#0a1728" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
+      </svg>
+      <div className="pt-chart-foot">
+        <span>{fmtD(series[0].t)}</span>
+        <span>{fmtD(last.t)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── Winners & losers ──────────────────────────────────────────
+// One horizontal bar per ticker, ranked by total P/L. Open positions are
+// marked to live price; closed lots use realized P/L. Multiple lots in
+// the same ticker are summed so you see the whole position at a glance.
+function WinnersLosersChart({ trades, getLatest }) {
+  const rows = useMemo(() => {
+    const byTicker = {};
+    for (const t of trades) {
+      const entryAmount = parseFloat(t.entry_amount);
+      let pnl;
+      if (t.status === 'closed') {
+        pnl = parseFloat(t.exit_amount) - entryAmount;
+      } else {
+        const latest = getLatest(t.ticker);
+        pnl = latest == null ? 0 : latest * parseFloat(t.shares) - entryAmount;
+      }
+      if (!byTicker[t.ticker]) byTicker[t.ticker] = { ticker: t.ticker, pnl: 0 };
+      byTicker[t.ticker].pnl += pnl;
+    }
+    return Object.values(byTicker).sort((a, b) => b.pnl - a.pnl);
+  }, [trades, getLatest]);
+
+  if (rows.length === 0) return null;
+  const maxAbs = Math.max(...rows.map((r) => Math.abs(r.pnl)), 1);
+
+  return (
+    <div className="pt-chart-card">
+      <div className="pt-chart-head">
+        <span className="pt-chart-title">Winners &amp; losers</span>
+        <span className="pt-chart-sub">{rows.length} stock{rows.length === 1 ? '' : 's'}</span>
+      </div>
+      <div className="pt-wl-list">
+        {rows.map((r) => {
+          const pos = r.pnl >= 0;
+          const widthPct = Math.max(2, (Math.abs(r.pnl) / maxAbs) * 100);
+          return (
+            <div key={r.ticker} className="pt-wl-row">
+              <span className="pt-wl-ticker">{r.ticker}</span>
+              <div className="pt-wl-track">
+                <div className={`pt-wl-bar ${pos ? 'pos' : 'neg'}`} style={{ width: `${widthPct}%` }} />
+              </div>
+              <span className={`pt-wl-val ${pos ? 'pct-pos' : 'pct-neg'}`}>
+                {pos ? '+' : ''}${r.pnl.toFixed(0)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Portfolio Tab ──
 function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, onRefreshPrices, onSell, onDelete, onBuyFromWatchlist, onUpdateReview, onOpenCard }) {
   const [expandedId, setExpandedId] = useState(null);
@@ -3535,6 +3802,9 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
         </div>
       </div>
 
+      {/* Portfolio P/L over time — reconstructed from price history */}
+      <PortfolioValueChart trades={trades} alerts={alerts} />
+
       {/* ROI breakdown — Open (unrealized) vs Closed (realized) */}
       <div className="pt-roi-grid">
         <div className="pt-roi-card pt-roi-open">
@@ -3575,6 +3845,9 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
           </div>
         </div>
       </div>
+
+      {/* Winners & losers — total P/L per ticker */}
+      <WinnersLosersChart trades={trades} getLatest={getLatest} />
 
       {/* AI Accuracy */}
       <div className="pt-ai-accuracy">
@@ -3620,6 +3893,7 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                   <th>Invested</th>
                   <th>Current Value</th>
                   <th>P/L</th>
+                  <th>Trend</th>
                   <th title="What the AI would recommend RIGHT NOW based on the latest scan. Click a row to see the original recommendation at entry.">AI Rec (Live)</th>
                   <th></th>
                 </tr>
@@ -3680,12 +3954,15 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                         <td>{daysHeld(t)}d</td>
                         <td>${parseFloat(t.entry_price).toFixed(2)}</td>
                         <td>{latest != null ? '$' + latest.toFixed(2) : '\u{2014}'}</td>
-                        <td>{parseFloat(t.shares).toFixed(4)}</td>
+                        <td>{fmtShares(parseFloat(t.shares))}</td>
                         <td>${invested.toFixed(2)}</td>
                         <td>${current.toFixed(2)}</td>
                         <td className={pnl >= 0 ? 'pct-pos' : 'pct-neg'}>
                           {fmt$(pnl)} <br />
                           <span className="pt-sub">({pnl >= 0 ? '+' : ''}{pnlPct.toFixed(2)}%)</span>
+                        </td>
+                        <td className="pt-trend-cell">
+                          <MiniSparkline prices={getAlert(t.ticker)?.prices} width={88} height={26} />
                         </td>
                         <td>
                           <span className={`rec-chip ${recClass(liveRec)}`} title={recTitle}>
@@ -3703,13 +3980,13 @@ function PortfolioTab({ trades, alerts, prices, pricesAsOf, pricesRefreshing, on
                         </td>
                         <td>
                           <button className="pt-sell-btn" onClick={() => onSell(t, latest != null ? latest : parseFloat(t.entry_price))}>
-                            {"\u{1F4B0}"} Sell
+                            <Ico name="dollar" size={13} /> Sell
                           </button>
                         </td>
                       </tr>
                       {isOpen && (
                         <tr className="pt-drawer-row">
-                          <td colSpan={11}>
+                          <td colSpan={12}>
                             <TradeDetailDrawer
                               trade={t}
                               onUpdateReview={onUpdateReview}
@@ -5421,8 +5698,9 @@ export default function Dashboard() {
     setSellModalState({ trade, currentPrice });
   }, []);
 
-  const handleConfirmBuy = useCallback(async ({ amount, notes }) => {
-    const { alert, currentPrice } = buyModalState;
+  // Buy: the modal now hands us an explicit share count + price per share.
+  const handleConfirmBuy = useCallback(async ({ shares, price, notes }) => {
+    const { alert } = buyModalState;
     const res = await fetch('/api/paper-trades', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -5430,8 +5708,9 @@ export default function Dashboard() {
         ticker: alert.ticker,
         company: alert.company,
         alert_id: alert.id,
-        entry_price: currentPrice,
-        entry_amount: amount,
+        entry_price: price,
+        shares,
+        entry_amount: shares * price,
         ai_recommendation_at_entry: alert.recommendation || 'HOLD',
         signal_strength_at_entry: alert.signal_strength ?? null,
         signal_type_at_entry: alert.signal_type || null,
@@ -5451,7 +5730,10 @@ export default function Dashboard() {
     setBuyModalState(null);
   }, [buyModalState]);
 
-  const handleConfirmSell = useCallback(async ({ price, ai_review_verdict, ai_review_notes }) => {
+  // Sell: supports a full close OR a partial sell. On a partial sell the
+  // server splits the lot — it returns the shrunk open row as `trade` plus
+  // a brand-new `closed` row for the sold slice.
+  const handleConfirmSell = useCallback(async ({ price, sell_shares, ai_review_verdict, ai_review_notes }) => {
     const { trade } = sellModalState;
     const res = await fetch('/api/paper-trades', {
       method: 'PATCH',
@@ -5459,14 +5741,22 @@ export default function Dashboard() {
       body: JSON.stringify({
         id: trade.id,
         exit_price: price,
+        sell_shares,
         ai_review_verdict: ai_review_verdict ?? null,
         ai_review_notes: ai_review_notes ?? null,
       }),
     });
     if (!res.ok) throw new Error('Server rejected the sell');
     const data = await res.json();
-    if (data?.trade) {
-      setPaperTrades(prev => prev.map(t => t.id === data.trade.id ? data.trade : t));
+    if (data?.partial && data?.closed) {
+      // Partial sell: update the shrunk open row + prepend the new closed lot.
+      setPaperTrades(prev => [
+        data.closed,
+        ...prev.map(t => (t.id === data.trade.id ? data.trade : t)),
+      ]);
+    } else if (data?.trade) {
+      // Full close: just swap the row in place.
+      setPaperTrades(prev => prev.map(t => (t.id === data.trade.id ? data.trade : t)));
     }
     setSellModalState(null);
   }, [sellModalState]);

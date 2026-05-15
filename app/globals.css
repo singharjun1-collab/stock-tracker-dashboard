@@ -2994,6 +2994,163 @@ footer span { color: #4fc3f7; }
 .pt-btn-primary:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(34, 197, 94, 0.35); }
 .pt-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
 
+/* Buy / Sell modal — decluttered layout (2026-05-15) */
+.pt-context-strip {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 8px;
+}
+.pt-context-co {
+  color: #e6f3ff;
+  font-weight: 600;
+  font-size: 0.9rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pt-context-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.pt-context-dot { color: #4a5f7a; }
+.pt-input-duo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.pt-amount-suffix {
+  color: #7a9bc0;
+  font-size: 0.82rem;
+  padding-right: 4px;
+  white-space: nowrap;
+}
+.pt-label-optional {
+  color: #5e7a99;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 0.72rem;
+  margin-left: 6px;
+}
+.pt-summary-total {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #e6f3ff;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+}
+.pt-summary-note {
+  font-size: 0.78rem;
+  color: #7a9bc0;
+  padding-top: 4px;
+}
+.pt-sell-chips {
+  display: flex;
+  gap: 6px;
+}
+.pt-sell-chip {
+  flex: 1;
+  background: rgba(0, 229, 255, 0.06);
+  border: 1px solid rgba(0, 229, 255, 0.2);
+  color: #7a9bc0;
+  padding: 7px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: inherit;
+  transition: all 0.12s;
+}
+.pt-sell-chip:hover { background: rgba(0, 229, 255, 0.14); color: #e6f3ff; }
+.pt-sell-chip.active {
+  background: rgba(0, 229, 255, 0.22);
+  border-color: rgba(0, 229, 255, 0.55);
+  color: #e6f3ff;
+}
+
+/* Portfolio charts — value-over-time line + winners/losers bars (2026-05-15) */
+.pt-chart-card {
+  background: linear-gradient(180deg, rgba(15, 28, 45, 0.85), rgba(10, 20, 35, 0.85));
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.pt-chart-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 10px;
+}
+.pt-chart-title {
+  color: #a0c0dc;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.pt-chart-now {
+  font-size: 1.1rem;
+  font-weight: 700;
+  font-family: 'SF Mono', Consolas, monospace;
+}
+.pt-chart-now-date {
+  color: #7a9bc0;
+  font-size: 0.72rem;
+  font-weight: 400;
+  font-family: inherit;
+  margin-left: 8px;
+}
+.pt-chart-sub { color: #7a9bc0; font-size: 0.78rem; }
+.pt-chart-svg {
+  width: 100%;
+  height: 150px;
+  display: block;
+  cursor: crosshair;
+}
+.pt-chart-foot {
+  display: flex;
+  justify-content: space-between;
+  color: #5e7a99;
+  font-size: 0.72rem;
+  margin-top: 4px;
+}
+.pt-wl-list { display: flex; flex-direction: column; gap: 7px; }
+.pt-wl-row {
+  display: grid;
+  grid-template-columns: 54px 1fr 68px;
+  align-items: center;
+  gap: 10px;
+}
+.pt-wl-ticker {
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #e6f3ff;
+}
+.pt-wl-track {
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  height: 16px;
+  overflow: hidden;
+}
+.pt-wl-bar { height: 100%; border-radius: 4px; transition: width 0.3s ease; }
+.pt-wl-bar.pos { background: linear-gradient(90deg, rgba(34,197,94,0.5), #22c55e); }
+.pt-wl-bar.neg { background: linear-gradient(90deg, rgba(239,68,68,0.5), #ef4444); }
+.pt-wl-val {
+  font-family: 'SF Mono', Consolas, monospace;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-align: right;
+}
+.pt-trend-cell { min-width: 96px; }
+
 /* Portfolio Tab */
 .portfolio-tab { padding: 20px 40px; }
 .pt-summary-grid {
