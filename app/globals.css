@@ -5787,37 +5787,6 @@ tr.row-dismissed .tbl-ticker { text-decoration: line-through; }
   .mobile-bottom-nav-5 .mb-nav-btn   { padding: 6px 2px; }
 }
 
-/* ── QUICK-WATCH PILL on New/Active cards (Phase 8, 2026-05-12) ──
-   Small secondary action that lives ABOVE the main "+ Add to Portfolio"
-   gradient CTA. One tap adds the ticker to the watchlist (Portfolio >
-   Watching) without opening the heavier AddStockSheet. Hides itself
-   automatically once the ticker is watched (the parent component
-   stops rendering it). Robinhood-style minimalist pill: subtle by
-   default, blue-tinted on hover so the affordance is discoverable. */
-.ac-quick-watch-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 8px;
-  padding: 7px 14px;
-  background: rgba(10,132,255,0.10);
-  color: #4fa3ff;
-  border: 1px solid rgba(10,132,255,0.30);
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.2px;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
-  align-self: center;
-}
-.ac-quick-watch-btn:hover {
-  background: rgba(10,132,255,0.18);
-  border-color: rgba(10,132,255,0.55);
-}
-.ac-quick-watch-btn:active { transform: scale(0.97); }
-
-
 /* ── INLINE COLLAPSE-ALL BUTTON (now lives in the search row) ──
    Keeps the same look as the old filter-bar version but without the
    flex: auto-right-push it had before. */

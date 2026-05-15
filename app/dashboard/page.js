@@ -843,7 +843,7 @@ function SearchResultRow({ alert, sharedPrices, tracked, onTap }) {
 function AlertCard({
   alert, index, sectionPrefix, watchlist, sharedPrices,
   forceCompact, forceCompactNonce,
-  onToggleWatchlist, onRate, onDismiss, onSaveNote,
+  onRate, onDismiss, onSaveNote,
   userNote, openPosition, onOpenBuyModal, onOpenSellModal,
   // Optional ticker meta for the new Sector Pulse feature. Always falls back
   // to null so legacy callers that don't pass it keep working unchanged.
@@ -1461,24 +1461,12 @@ function AlertCard({
             - Holding a position \u2192 green "\u25CF Holding X shares" pill
             - Already on watchlist \u2192 subtle gray "\u2713 Watching \u00B7 tap to log position"
             - Not tracked \u2192 bright blue "+ Add to Portfolio" gradient
-
-          Phase 8 (2026-05-12) addition: on the New + Active tabs, also show
-          a small one-tap "+ Watch" pill ABOVE the gradient CTA when the
-          ticker isn't already tracked. This routes straight to the
-          watchlist (no sheet) so users can park a pick in their Portfolio
-          > Watching list with a single tap, Robinhood-style. The gradient
-          CTA is preserved for the heavier "log a position" path.
       */}
       {onOpenAddSheet && (() => {
         const isServerWatched = !!(serverWatchlist || []).find(
           (w) => (w.ticker || '').toUpperCase() === alert.ticker.toUpperCase()
         );
         const hasPosition = !!openPosition;
-        const showQuickWatch =
-          (sectionPrefix === 'new' || sectionPrefix === 'active') &&
-          !hasPosition &&
-          !isServerWatched &&
-          typeof onToggleWatchlist === 'function';
         let label, classMod;
         if (hasPosition) {
           const shares = parseFloat(openPosition.shares || 0);
@@ -1492,30 +1480,18 @@ function AlertCard({
           classMod = '';
         }
         return (
-          <>
-            {showQuickWatch && (
-              <button
-                type="button"
-                className="ac-quick-watch-btn"
-                onClick={(e) => { e.stopPropagation(); onToggleWatchlist(alert.ticker); }}
-                aria-label={`Watch ${alert.ticker} \u2014 add to Portfolio`}
-              >
-                + Watch
-              </button>
-            )}
-            <button
-              type="button"
-              className={`ac-track-cta ${classMod}`}
-              onClick={() => onOpenAddSheet({
-                ticker: alert.ticker,
-                company: alert.company,
-                alert: alert,
-              })}
-              aria-label={`Add ${alert.ticker} to Portfolio`}
-            >
-              {label}
-            </button>
-          </>
+          <button
+            type="button"
+            className={`ac-track-cta ${classMod}`}
+            onClick={() => onOpenAddSheet({
+              ticker: alert.ticker,
+              company: alert.company,
+              alert: alert,
+            })}
+            aria-label={`Add ${alert.ticker} to Portfolio`}
+          >
+            {label}
+          </button>
         );
       })()}
 
