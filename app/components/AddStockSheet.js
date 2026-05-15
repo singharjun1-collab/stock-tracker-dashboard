@@ -215,12 +215,8 @@ export default function AddStockSheet({
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || 'Failed');
-      setFeedback({
-        type: 'success',
-        message: data.already_watching ? `${selectedView.ticker} is already in your watchlist` : `Added ${selectedView.ticker} to your watchlist`,
-      });
       onAdded?.(data.watchlist);
-      setTimeout(() => onClose?.(), 900);
+      setScreen('done-watch');
     } catch (e) {
       console.error(e);
       setFeedback({ type: 'error', message: 'Could not add to watchlist. Try again?' });
@@ -312,10 +308,9 @@ export default function AddStockSheet({
           }),
         });
       } catch { /* non-fatal */ }
-      setFeedback({ type: 'success', message: `Logged ${shareCount} ${shareCount === 1 ? 'share' : 'shares'} of ${selectedView.ticker}` });
       onPositionLogged?.(data.trade);
       onAdded?.();
-      setTimeout(() => onClose?.(), 1100);
+      setScreen('done-buy');
     } catch (e) {
       console.error(e);
       setFeedback({ type: 'error', message: 'Could not log position. Try again?' });
@@ -364,13 +359,17 @@ export default function AddStockSheet({
 
         <div className="as-header">
           <div className="as-title">
-            {selectedTicker
-              ? <>Add <span className="as-title-ticker">{selectedTicker}</span> to Portfolio</>
-              : 'Add to Portfolio'}
+            {selectedTicker && screen === 'log-position'
+              ? <>Buy <span className="as-title-ticker">{selectedTicker}</span></>
+              : selectedTicker
+                ? <>Add <span className="as-title-ticker">{selectedTicker}</span> to Portfolio</>
+                : 'Add to Portfolio'}
             <span className="as-subtitle">
-              {selectedTicker
-                ? 'Watch the AI signals or log a position you own'
-                : 'Pick a stock to watch or log a position you own'}
+              {screen === 'log-position'
+                ? 'Paper portfolio — no real money'
+                : selectedTicker
+                  ? 'Watch the AI signal or log a buy'
+                  : 'Pick a stock to watch or log a buy'}
             </span>
           </div>
           <button className="as-close" onClick={onClose}>Cancel</button>
@@ -423,6 +422,7 @@ export default function AddStockSheet({
             <SelectedStockPanel
               view={selectedView}
               screen={screen}
+              onClose={onClose}
               onGoToLogPosition={() => { setScreen('log-position'); setFeedback(null); }}
               onBackToChoice={() => { setScreen('choice'); setFeedback(null); }}
               shares={shares} setShares={setShares}
@@ -1184,6 +1184,125 @@ export default function AddStockSheet({
         .as-preview-scenario-row span:first-child { color: #b8c4d6; }
         .as-preview-scenario-row .up { color: #00c853; font-weight: 600; }
         .as-preview-scenario-row .down { color: #ff3b30; font-weight: 600; }
+
+        /* ── Add-to-Portfolio redesign v2 (2026-05-15) ──────────────────
+           Robinhood-style action buttons + success screens. Replaces the
+           two equal-weight .as-choice-card rows with one green "Buy shares"
+           hero button + a secondary "Add to watchlist" pill, each with a
+           one-line helper. Adds done-buy / done-watch confirmation screens.
+           ─────────────────────────────────────────────────────────────── */
+
+        .as-btn-buy {
+          width: 100%;
+          padding: 16px;
+          background: #00c853;
+          color: #042611;
+          border: none;
+          border-radius: 16px;
+          font-size: 16px; font-weight: 700;
+          cursor: pointer; font-family: inherit;
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+          margin-top: 4px;
+        }
+        .as-btn-buy:active:not(:disabled) { background: #00b14a; }
+        .as-btn-buy:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .as-btn-watch {
+          width: 100%;
+          padding: 15px;
+          background: transparent;
+          color: #e8ecf3;
+          border: 1px solid #3a4760;
+          border-radius: 16px;
+          font-size: 15px; font-weight: 700;
+          cursor: pointer; font-family: inherit;
+          display: flex; align-items: center; justify-content: center; gap: 8px;
+        }
+        .as-btn-watch:active:not(:disabled) { background: #1a2230; }
+        .as-btn-watch:disabled { opacity: 0.5; cursor: not-allowed; }
+        .as-btn-watch.is-watching {
+          background: rgba(0,200,83,0.08);
+          border-color: rgba(0,200,83,0.3);
+          color: #00c853;
+        }
+        .as-btn-watch.is-watching:active:not(:disabled) {
+          background: rgba(255,59,48,0.1);
+          border-color: rgba(255,59,48,0.35);
+          color: #ff3b30;
+        }
+
+        .as-action-helper {
+          font-size: 12px;
+          color: #8b95a8;
+          line-height: 1.4;
+          margin: 7px 4px 16px;
+        }
+
+        /* Buy-ticket summary card — total cost + AI target/stop scenarios */
+        .as-summary {
+          background: rgba(10,132,255,0.07);
+          border: 1px solid rgba(10,132,255,0.22);
+          border-radius: 14px;
+          padding: 13px 14px;
+          margin: 16px 0;
+        }
+        .as-summary-row {
+          display: flex; align-items: center; justify-content: space-between;
+          font-size: 13px; color: #8b95a8;
+          margin: 7px 0;
+        }
+        .as-summary-total {
+          font-size: 14px; color: #e8ecf3; font-weight: 700;
+          margin-top: 0;
+        }
+        .as-summary-total span:last-child { font-size: 16px; }
+        .as-summary-div {
+          height: 1px; background: rgba(255,255,255,0.08);
+          margin: 10px 0;
+        }
+        .as-summary-sclabel {
+          font-size: 11px; color: #5a6478;
+          letter-spacing: 0.5px; text-transform: uppercase;
+          font-weight: 700; margin-bottom: 2px;
+        }
+        .as-sum-up { color: #00c853; font-weight: 700; }
+        .as-sum-down { color: #ff3b30; font-weight: 700; }
+
+        /* Success screens — done-buy / done-watch */
+        .as-done { text-align: center; padding: 14px 6px 4px; }
+        .as-done-circle {
+          width: 64px; height: 64px; border-radius: 50%;
+          display: grid; place-items: center;
+          margin: 6px auto 14px;
+        }
+        .as-done-circle-buy { background: rgba(0,200,83,0.15); color: #00c853; }
+        .as-done-circle-watch { background: rgba(10,132,255,0.15); color: #4fa3ff; }
+        .as-done-title { font-size: 19px; font-weight: 700; color: #e8ecf3; }
+        .as-done-line {
+          font-size: 13px; color: #8b95a8;
+          margin: 6px auto 16px; line-height: 1.5;
+          max-width: 280px;
+        }
+        .as-done-card {
+          display: flex; align-items: flex-start; gap: 10px;
+          text-align: left;
+          background: #1a2230;
+          border: 1px solid #2a3447;
+          border-radius: 12px;
+          padding: 12px 13px;
+          margin-bottom: 16px;
+          font-size: 12px; color: #b8c4d6; line-height: 1.45;
+        }
+        .as-done-card svg { color: #00c853; flex-shrink: 0; }
+        .as-done-card-watch svg { color: #4fa3ff; }
+        .as-done-card strong { color: #e8ecf3; font-weight: 700; }
+        .as-done-dismiss {
+          background: none; border: none;
+          color: #8b95a8; font-size: 14px; font-weight: 600;
+          cursor: pointer; font-family: inherit;
+          padding: 12px; width: 100%; margin-top: 4px;
+        }
+        .as-done-dismiss:active { color: #e8ecf3; }
       `}</style>
     </>
   );
@@ -1316,16 +1435,17 @@ function SearchResults({ results, alertByTicker, onPickWatched, onPickAlert, onP
 }
 
 // ----------------------------------------------------------------------------
-// SelectedStockPanel — two-screen flow shown once a ticker is selected.
-//   screen='choice'        → compact stock header + two choice cards
-//                              (Watch  /  I own shares)
-//   screen='log-position'  → Robinhood-style shares stepper + avg cost +
-//                              live P&L preview against AI target/stop
-// Replaces the old "single panel with two stacked buttons + inline form"
-// pattern. See PR feat/add-to-portfolio-redesign (2026-05-12).
+// SelectedStockPanel — multi-screen flow shown once a ticker is selected.
+//   screen='choice'        → compact stock header + green "Buy shares" hero
+//                              button + secondary "Add to watchlist" pill
+//   screen='log-position'  → Robinhood-style buy ticket: shares stepper +
+//                              buy price + total cost & AI target/stop preview
+//   screen='done-buy'      → confirmation: position logged to Holdings
+//   screen='done-watch'    → confirmation: added to Watchlist
+// Redesign 2026-05-15 — see PR feat/add-to-portfolio-redesign-v2.
 // ----------------------------------------------------------------------------
 function SelectedStockPanel({
-  view, screen,
+  view, screen, onClose,
   onGoToLogPosition, onBackToChoice,
   shares, setShares, entryPrice, setEntryPrice, notes, setNotes,
   busy, onAddToWatchlist, onRemoveFromWatchlist, onLogPosition,
@@ -1374,6 +1494,10 @@ function SelectedStockPanel({
   );
 
   // ─── Screen 1: choice ─────────────────────────────────────────────────
+  // Robinhood-style hierarchy: one green "Buy shares" hero button + a
+  // secondary "Add to watchlist" pill, each with a one-line helper. The
+  // watchlist pill toggles to a remove affordance when already watching.
+  // Redesign 2026-05-15 — see PR feat/add-to-portfolio-redesign-v2.
   if (screen === 'choice') {
     return (
       <>
@@ -1391,57 +1515,48 @@ function SelectedStockPanel({
 
         <div className="as-choose-label">Choose how to track it</div>
 
-        {/* Watch card — toggles between Add and Remove based on current state */}
+        {/* Primary action — Buy shares. Green hero button; opens the buy ticket. */}
         <button
           type="button"
-          className={`as-choice-card as-choice-watch ${view.alreadyWatching ? 'is-active' : ''}`}
-          onClick={view.alreadyWatching ? onRemoveFromWatchlist : onAddToWatchlist}
-          disabled={busy}
-        >
-          <div className="as-choice-icon as-choice-icon-watch">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </div>
-          <div className="as-choice-body">
-            <div className="as-choice-title">
-              {view.alreadyWatching ? <><Ico name="check" size={13} strokeWidth={2.5} /> Watching this stock</> : 'Watch this stock'}
-            </div>
-            <div className="as-choice-sub">
-              {view.alreadyWatching
-                ? 'Tap to stop watching'
-                : a?.entry_low != null
-                  ? `Alert me when it enters the buy zone`
-                  : `Alert me on AI signal updates`}
-            </div>
-          </div>
-          <span className={`as-choice-action ${view.alreadyWatching ? 'is-remove' : ''}`}>
-            {busy ? '…' : view.alreadyWatching ? 'Remove' : 'Add'}
-          </span>
-        </button>
-
-        {/* Own card — opens the log-position screen */}
-        <button
-          type="button"
-          className="as-choice-card as-choice-own"
+          className="as-btn-buy"
           onClick={onGoToLogPosition}
           disabled={busy}
         >
-          <div className="as-choice-icon as-choice-icon-own">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="7" width="18" height="13" rx="2" />
-              <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-            </svg>
-          </div>
-          <div className="as-choice-body">
-            <div className="as-choice-title">I own shares</div>
-            <div className="as-choice-sub">
-              {a?.target_low != null ? `Track P&L vs AI target` : `Track P&L over time`}
-            </div>
-          </div>
-          <span className="as-choice-action as-choice-action-secondary">Log →</span>
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="7" width="18" height="13" rx="2" />
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          Buy shares
         </button>
+        <div className="as-action-helper">
+          Logs shares into your paper portfolio — shows under the Holdings tab so you can track gains and losses.
+        </div>
+
+        {/* Secondary action — Add to watchlist. Toggles to a remove
+            affordance when the stock is already on the watchlist. */}
+        <button
+          type="button"
+          className={`as-btn-watch ${view.alreadyWatching ? 'is-watching' : ''}`}
+          onClick={view.alreadyWatching ? onRemoveFromWatchlist : onAddToWatchlist}
+          disabled={busy}
+        >
+          {view.alreadyWatching ? (
+            <><Ico name="check" size={14} strokeWidth={2.5} /> On your watchlist · tap to remove</>
+          ) : (
+            <>
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              Add to watchlist
+            </>
+          )}
+        </button>
+        <div className="as-action-helper">
+          {view.alreadyWatching
+            ? `We'll alert you when ${view.ticker} enters the AI buy zone.`
+            : `No shares logged — just get an alert when ${view.ticker} enters the AI buy zone.`}
+        </div>
 
         <div className="as-choice-footer">
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
@@ -1450,6 +1565,59 @@ function SelectedStockPanel({
           You can switch between these anytime
         </div>
       </>
+    );
+  }
+
+  // ─── Success: position logged (done-buy) ──────────────────────────────
+  if (screen === 'done-buy') {
+    const doneShares = parseInt(shares, 10) || 0;
+    return (
+      <div className="as-done">
+        <div className="as-done-circle as-done-circle-buy">
+          <Ico name="check" size={30} strokeWidth={2.5} />
+        </div>
+        <div className="as-done-title">Buy logged</div>
+        <div className="as-done-line">
+          {doneShares} {doneShares === 1 ? 'share' : 'shares'} of {view.ticker} added to your Holdings
+        </div>
+        <div className="as-done-card">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="7" width="18" height="13" rx="2" />
+            <path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+          </svg>
+          <span>Find it under the <strong>Holdings</strong> tab — we&apos;ll track its live value against the AI target and stop for you.</span>
+        </div>
+        <button type="button" className="as-btn-buy" onClick={onClose}>View my portfolio</button>
+        <button type="button" className="as-done-dismiss" onClick={onClose}>Done</button>
+      </div>
+    );
+  }
+
+  // ─── Success: added to watchlist (done-watch) ─────────────────────────
+  if (screen === 'done-watch') {
+    return (
+      <div className="as-done">
+        <div className="as-done-circle as-done-circle-watch">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </div>
+        <div className="as-done-title">Added to watchlist</div>
+        <div className="as-done-line">
+          {a?.entry_low != null
+            ? `We'll alert you the moment ${view.ticker} enters the AI buy zone of $${a.entry_low}${a.entry_high && a.entry_high !== a.entry_low ? `–${a.entry_high}` : ''}.`
+            : `We'll alert you when the AI signal updates for ${view.ticker}.`}
+        </div>
+        <div className="as-done-card as-done-card-watch">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          <span>Find it under the <strong>Watchlist</strong> tab — no shares logged yet. Tap it anytime to buy.</span>
+        </div>
+        <button type="button" className="as-btn-watch" onClick={onClose}>Done</button>
+      </div>
     );
   }
 
@@ -1488,14 +1656,14 @@ function LogPositionScreen({
   const cost = parseFloat(entryPrice);
   const validCost = Number.isFinite(cost) && cost > 0;
   const basis = validCost ? shareCount * cost : 0;
-  const curVal = validCost && currentPrice != null ? shareCount * currentPrice : null;
-  const pnl = curVal != null ? curVal - basis : null;
-  const pnlPct = pnl != null && basis > 0 ? (pnl / basis) * 100 : null;
   const targetGain = validCost && targetMid != null ? shareCount * (targetMid - cost) : null;
   const stopLoss = validCost && stopPrice != null ? shareCount * (stopPrice - cost) : null;
 
   const fmt$ = (n) =>
     (n < 0 ? '−$' : '$') +
+    Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtSigned = (n) =>
+    (n >= 0 ? '+$' : '−$') +
     Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
@@ -1551,7 +1719,7 @@ function LogPositionScreen({
       {/* Avg cost input */}
       <div className="as-field-block">
         <div className="as-field-label-row">
-          <span className="as-field-eyebrow">Avg cost per share</span>
+          <span className="as-field-eyebrow">Buy price per share</span>
           {currentPrice != null && (
             <button
               type="button"
@@ -1588,60 +1756,46 @@ function LogPositionScreen({
         />
       </div>
 
-      {/* Live preview */}
+      {/* Buy summary — total cost + AI target/stop scenarios */}
       {validCost && shareCount > 0 && (
-        <div className={`as-preview ${pnl != null && pnl < 0 ? 'is-down' : 'is-up'}`}>
-          <div className="as-preview-eyebrow">Your position so far</div>
-          {pnl != null && pnlPct != null ? (
-            <div className="as-preview-hero">
-              <span className="as-preview-pct">
-                {pnl >= 0 ? '+' : '−'}{Math.abs(pnlPct).toFixed(1)}%
-              </span>
-              <span className="as-preview-dollar">{fmt$(pnl)}</span>
-            </div>
-          ) : (
-            <div className="as-preview-hero as-preview-hero-pending">
-              Live P&L will appear here
-            </div>
-          )}
-          <div className="as-preview-row">
-            <div>
-              <div className="as-preview-label">Cost basis</div>
-              <div className="as-preview-val">{fmt$(basis)}</div>
-            </div>
-            {curVal != null && (
-              <div style={{ textAlign: 'right' }}>
-                <div className="as-preview-label">Current value</div>
-                <div className="as-preview-val">{fmt$(curVal)}</div>
-              </div>
-            )}
+        <div className="as-summary">
+          <div className="as-summary-row as-summary-total">
+            <span>Total cost</span>
+            <span>{fmt$(basis)}</span>
           </div>
           {(targetGain != null || stopLoss != null) && (
-            <div className="as-preview-scenarios">
-              <div className="as-preview-scenarios-label">If AI signal plays out</div>
+            <>
+              <div className="as-summary-div" />
+              <div className="as-summary-sclabel">If the AI signal plays out</div>
               {targetGain != null && (
-                <div className="as-preview-scenario-row">
-                  <span>Reaches target ${targetMid.toFixed(2)}</span>
-                  <span className={targetGain >= 0 ? 'up' : 'down'}>
-                    {targetGain >= 0 ? '+' : '−'}{fmt$(targetGain).replace('−', '').replace('$', '$')}
+                <div className="as-summary-row">
+                  <span>Hits target ${targetMid.toFixed(2)}</span>
+                  <span className={targetGain >= 0 ? 'as-sum-up' : 'as-sum-down'}>
+                    {fmtSigned(targetGain)}
+                    {basis > 0 ? `  (${targetGain >= 0 ? '+' : '−'}${Math.abs(targetGain / basis * 100).toFixed(1)}%)` : ''}
                   </span>
                 </div>
               )}
               {stopLoss != null && (
-                <div className="as-preview-scenario-row">
+                <div className="as-summary-row">
                   <span>Hits stop ${stopPrice.toFixed(2)}</span>
-                  <span className={stopLoss >= 0 ? 'up' : 'down'}>
-                    {stopLoss >= 0 ? '+' : '−'}{fmt$(stopLoss).replace('−', '').replace('$', '$')}
+                  <span className={stopLoss >= 0 ? 'as-sum-up' : 'as-sum-down'}>
+                    {fmtSigned(stopLoss)}
+                    {basis > 0 ? `  (${stopLoss >= 0 ? '+' : '−'}${Math.abs(stopLoss / basis * 100).toFixed(1)}%)` : ''}
                   </span>
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       )}
 
-      <button className="as-btn-primary" onClick={onLogPosition} disabled={busy}>
-        {busy ? 'Saving…' : 'Save position'}
+      <button className="as-btn-buy" onClick={onLogPosition} disabled={busy}>
+        {busy
+          ? 'Saving…'
+          : shareCount >= 1
+            ? `Buy ${shareCount} ${shareCount === 1 ? 'share' : 'shares'}`
+            : 'Buy shares'}
       </button>
     </>
   );
