@@ -494,6 +494,24 @@ export default function AddStockSheet({
         }
         .as-sheet.as-open { transform: translateY(0); }
 
+        /* Desktop — condense the sheet into a centered, fixed-width floating
+           panel instead of a full-bleed bottom sheet. Below this breakpoint
+           (phones in portrait) the original full-width bottom sheet is kept. */
+        @media (min-width: 600px) {
+          .as-sheet {
+            left: 50%;
+            right: auto;
+            width: 100%;
+            max-width: 440px;
+            bottom: 24px;
+            border-radius: 24px;
+            max-height: calc(100vh - 48px);
+            box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+            transform: translate(-50%, calc(100% + 24px));
+          }
+          .as-sheet.as-open { transform: translate(-50%, 0); }
+        }
+
         .as-handle-wrap { padding: 10px 0 4px; display: grid; place-items: center; flex-shrink: 0; }
         .as-handle { width: 38px; height: 4px; background: #2a3447; border-radius: 2px; }
 
@@ -1554,8 +1572,8 @@ function SelectedStockPanel({
         </button>
         <div className="as-action-helper">
           {view.alreadyWatching
-            ? `We'll alert you when ${view.ticker} enters the AI buy zone.`
-            : `No shares logged — just get an alert when ${view.ticker} enters the AI buy zone.`}
+            ? `${view.ticker} is on your Watchlist — following its AI signal.`
+            : `No position logged — just keeps ${view.ticker} on your Watchlist to follow the AI signal.`}
         </div>
 
         <div className="as-choice-footer">
@@ -1605,14 +1623,11 @@ function SelectedStockPanel({
         </div>
         <div className="as-done-title">Added to watchlist</div>
         <div className="as-done-line">
-          {a?.entry_low != null
-            ? `We'll alert you the moment ${view.ticker} enters the AI buy zone of $${a.entry_low}${a.entry_high && a.entry_high !== a.entry_low ? `–${a.entry_high}` : ''}.`
-            : `We'll alert you when the AI signal updates for ${view.ticker}.`}
+          {`${view.ticker} is on your Watchlist — follow its AI signal anytime from the Watchlist tab.`}
         </div>
         <div className="as-done-card as-done-card-watch">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
-            <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
           <span>Find it under the <strong>Watchlist</strong> tab — no shares logged yet. Tap it anytime to buy.</span>
         </div>
