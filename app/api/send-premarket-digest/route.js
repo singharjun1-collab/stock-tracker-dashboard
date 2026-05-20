@@ -72,6 +72,21 @@ function shortET() {
   return fmt.format(new Date()); // e.g. "April 30"
 }
 
+// "6:30 AM" in NY time — captured at email-build time so even a hand-triggered
+// re-send shows the right "as of" stamp. Used in the per-card price caption.
+// We say "NY Time (ET)" rather than bare "ET" because the audience is global
+// (US + AU) and "ET" is opaque to non-US readers.
+function priceAsOfLabelET() {
+  const fmt = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true,
+  });
+  // en-US gives "6:30 AM" — already in the right shape.
+  return `as of ${fmt.format(new Date())} NY Time (ET)`;
+}
+
 async function loadDigestData() {
   const admin = createSupabaseAdminClient();
 
@@ -317,15 +332,21 @@ function renderLivePrice(p, prices) {
       `<span style="color:#64748b;">Prev close</span> <span style="color:#94a3b8;font-weight:600;">${fmtMoney(prevClose)}</span>`,
     );
   }
+  // "Pre-market" is the standard brokerage label for prices captured before
+  // the 9:30 AM ET open — matches Robinhood / Yahoo / Stake conventions and
+  // implicitly tells the reader "this will move once the bell rings".
   bits.push(
-    `<span style="color:#64748b;">Now</span> <span style="color:#fff;font-weight:700;">${fmtMoney(current)}</span>`,
+    `<span style="color:#64748b;">Pre-market</span> <span style="color:#fff;font-weight:700;">${fmtMoney(current)}</span>`,
   );
   if (changePct != null) {
     bits.push(
       `<span style="color:${changeColor};font-weight:700;">${arrow} ${sign}${changePct.toFixed(2)}%</span>`,
     );
   }
-  return `<div style="font-size:12px;line-height:1.5;margin-top:10px;letter-spacing:.01em;">${bits.join(' &nbsp;·&nbsp; ')}</div>`;
+  return `<div style="margin-top:10px;">
+    <div style="font-size:12px;line-height:1.5;letter-spacing:.01em;">${bits.join(' &nbsp;·&nbsp; ')}</div>
+    <div style="font-size:11px;color:#475569;margin-top:4px;font-style:italic;">${priceAsOfLabelET()}</div>
+  </div>`;
 }
 
 // "Above entry — chase risk" chip — appears when the current price has
@@ -663,8 +684,10 @@ function buildText({ data, recipientEmail }) {
     prices,
   } = data;
 
-  // Helper — compact "now $X (+Y.YY%) prev $Z" line for plain-text rendering.
-  // Mirrors renderLivePrice() above. Returns '' when we don't have a price.
+  // Helper — compact "pre-market $X (+Y.YY%) prev $Z" line for plain-text
+  // rendering. Mirrors renderLivePrice() above. Returns '' when we don't
+  // have a price. NY-Time "as of" is added once at the top of the text body
+  // rather than per-row to keep lines from getting too long.
   const priceLine = (ticker) => {
     const pr = prices?.[ticker];
     if (!pr || pr.price == null) return '';
@@ -674,7 +697,7 @@ function buildText({ data, recipientEmail }) {
     const pct = (prev != null && prev > 0) ? ((cur - prev) / prev) * 100 : null;
     const pctStr = pct != null ? ` (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)` : '';
     const prevStr = prev != null ? ` · prev $${prev.toFixed(2)}` : '';
-    return ` · now $${cur.toFixed(2)}${pctStr}${prevStr}`;
+    return ` · pre-market $${cur.toFixed(2)}${pctStr}${prevStr}`;
   };
   const aboveEntryStr = (p) => {
     const pr = prices?.[p.ticker];
@@ -690,6 +713,7 @@ function buildText({ data, recipientEmail }) {
   const unsubUrl = makeUnsubscribeUrl(APP_URL, recipientEmail);
   const lines = [];
   lines.push(`Stock Chatter — Pre-market digest · ${shortET()}`);
+  lines.push(`Prices ${priceAsOfLabelET()}`);
   lines.push('');
 
   // Pre-market mood — futures snapshot + AI sentiment (mirrors HTML card).
