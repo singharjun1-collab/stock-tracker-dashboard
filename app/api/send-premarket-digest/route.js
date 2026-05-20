@@ -288,6 +288,66 @@ function dedupeFlipsByTicker(recChanges) {
   return out;
 }
 
+// Live-price line — previous close → current price (+% change), color-coded.
+// Renders right above the entry/target/stop band on each card so the reader
+// can instantly see how the stock sits relative to the entry range without
+// flipping over to a brokerage app. Returns '' if we don't have current price
+// data (defensive — never block the card from rendering).
+function renderLivePrice(p, prices) {
+  const pr = prices?.[p.ticker];
+  if (!pr || pr.price == null) return '';
+  const current = Number(pr.price);
+  const prevClose = pr.previous_close != null ? Number(pr.previous_close) : null;
+  if (!isFinite(current)) return '';
+
+  const hasChange = prevClose != null && isFinite(prevClose) && prevClose > 0;
+  const changePct = hasChange ? ((current - prevClose) / prevClose) * 100 : null;
+  const positive = changePct != null ? changePct >= 0 : null;
+  const changeColor = positive == null
+    ? '#94a3b8'
+    : positive
+      ? '#22c55e'
+      : '#ef4444';
+  const arrow = positive == null ? '' : positive ? '▲' : '▼';
+  const sign = changePct != null && changePct >= 0 ? '+' : '';
+
+  const bits = [];
+  if (prevClose != null) {
+    bits.push(
+      `<span style="color:#64748b;">Prev close</span> <span style="color:#94a3b8;font-weight:600;">${fmtMoney(prevClose)}</span>`,
+    );
+  }
+  bits.push(
+    `<span style="color:#64748b;">Now</span> <span style="color:#fff;font-weight:700;">${fmtMoney(current)}</span>`,
+  );
+  if (changePct != null) {
+    bits.push(
+      `<span style="color:${changeColor};font-weight:700;">${arrow} ${sign}${changePct.toFixed(2)}%</span>`,
+    );
+  }
+  return `<div style="font-size:12px;line-height:1.5;margin-top:10px;letter-spacing:.01em;">${bits.join(' &nbsp;·&nbsp; ')}</div>`;
+}
+
+// "Above entry — chase risk" chip — appears when the current price has
+// already broken above the top of the entry range. Matches AJ's no-post-surge
+// rule: if we'd be chasing the move, surface that visibly so the reader
+// pauses before placing the order.
+function isAboveEntry(p, prices) {
+  const pr = prices?.[p.ticker];
+  if (!pr || pr.price == null || p.entry_high == null) return false;
+  const current = Number(pr.price);
+  const top = Number(p.entry_high);
+  if (!isFinite(current) || !isFinite(top)) return false;
+  return current > top;
+}
+
+function renderChaseRiskChip(p, prices) {
+  if (!isAboveEntry(p, prices)) return '';
+  return `<div style="margin-top:10px;">
+    <span style="display:inline-block;font-size:10px;font-weight:800;color:#fb923c;background:rgba(251,146,60,0.12);border:1px solid rgba(251,146,60,0.35);padding:4px 9px;border-radius:6px;letter-spacing:.08em;text-transform:uppercase;">Above entry · chase risk</span>
+  </div>`;
+}
+
 // Compact "Entry $X.XX – $Y.YY · Target … · Stop …" line. Skips fields that
 // are null so a pick with no stop loss doesn't render "Stop —".
 function renderPriceBands(p) {
@@ -316,6 +376,7 @@ function buildHtml({ data, recipientEmail }) {
     freshSignalPicks: allFreshSignalPicks,
     activePicks: allActivePicks,
     emailToUserId,
+    prices,
   } = data;
 
   // Per-recipient personalization. Each user only sees picks the AI scored
@@ -450,7 +511,9 @@ function buildHtml({ data, recipientEmail }) {
               </tr>
             </table>
             ${p.ai_read ? `<div style="font-size:13px;color:#cbd5e1;margin-top:10px;line-height:1.5;">${truncate(p.ai_read, 140)}</div>` : ''}
+            ${renderLivePrice(p, prices)}
             ${renderPriceBands(p)}
+            ${renderChaseRiskChip(p, prices)}
           </div>`,
           )
           .join('')}
@@ -496,6 +559,7 @@ function buildHtml({ data, recipientEmail }) {
                 </td>
               </tr>
             </table>
+            ${renderLivePrice({ ticker: c.ticker }, prices)}
             ${trail ? `<div style="font-size:12px;color:#cbd5e1;margin-top:8px;line-height:1.5;">
               <span style="color:#94a3b8;">Trail stop</span> <span style="color:#4ade80;font-weight:700;">${trail}</span>
               ${lockedPct != null && lockedPct > 0 ? ` <span style="color:#475569;">·</span> <span style="color:#94a3b8;">locks in</span> <span style="color:#4ade80;font-weight:700;">+${lockedPct.toFixed(1)}%</span>` : ''}
@@ -542,6 +606,7 @@ function buildHtml({ data, recipientEmail }) {
                 </td>
               </tr>
             </table>
+            ${renderLivePrice({ ticker: c.ticker }, prices)}
             ${why ? `<div style="font-size:12px;color:#94a3b8;margin-top:6px;line-height:1.5;">${why}</div>` : ''}
           </div>`;
           })
@@ -595,7 +660,27 @@ function buildText({ data, recipientEmail }) {
     newPicks: allNewPicks,
     freshSignalPicks: allFreshSignalPicks,
     emailToUserId,
+    prices,
   } = data;
+
+  // Helper — compact "now $X (+Y.YY%) prev $Z" line for plain-text rendering.
+  // Mirrors renderLivePrice() above. Returns '' when we don't have a price.
+  const priceLine = (ticker) => {
+    const pr = prices?.[ticker];
+    if (!pr || pr.price == null) return '';
+    const cur = Number(pr.price);
+    if (!isFinite(cur)) return '';
+    const prev = pr.previous_close != null ? Number(pr.previous_close) : null;
+    const pct = (prev != null && prev > 0) ? ((cur - prev) / prev) * 100 : null;
+    const pctStr = pct != null ? ` (${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%)` : '';
+    const prevStr = prev != null ? ` · prev $${prev.toFixed(2)}` : '';
+    return ` · now $${cur.toFixed(2)}${pctStr}${prevStr}`;
+  };
+  const aboveEntryStr = (p) => {
+    const pr = prices?.[p.ticker];
+    if (!pr || pr.price == null || p.entry_high == null) return '';
+    return Number(pr.price) > Number(p.entry_high) ? ' [ABOVE ENTRY — chase risk]' : '';
+  };
   const recipientUserId = emailToUserId?.[recipientEmail?.toLowerCase()] || null;
   const ownedBy = (row) =>
     !recipientUserId || !row.user_id || row.user_id === recipientUserId;
@@ -639,7 +724,7 @@ function buildText({ data, recipientEmail }) {
   if (newPicks.length > 0) {
     lines.push(`FRESH PICKS (${newPicks.length})`);
     for (const p of newPicks.slice(0, 5)) {
-      lines.push(`  · ${p.ticker} [${p.recommendation || '—'}] — ${truncate(p.ai_read || p.signal_type || '', 120)}`);
+      lines.push(`  · ${p.ticker} [${p.recommendation || '—'}]${priceLine(p.ticker)}${aboveEntryStr(p)} — ${truncate(p.ai_read || p.signal_type || '', 120)}`);
     }
     if (newPicks.length > 5) lines.push(`  +${newPicks.length - 5} more on the dashboard`);
     lines.push('');
@@ -649,7 +734,7 @@ function buildText({ data, recipientEmail }) {
     for (const c of ridingFlips.slice(0, 6)) {
       const active = activeByTicker[c.ticker] || {};
       const trail = active.trail_stop != null ? `$${Number(active.trail_stop).toFixed(2)}` : null;
-      lines.push(`  · ${c.ticker}${trail ? ` — trail stop ${trail}` : ''}${active.ai_read ? ` — ${truncate(active.ai_read, 110)}` : ''}`);
+      lines.push(`  · ${c.ticker}${priceLine(c.ticker)}${trail ? ` — trail stop ${trail}` : ''}${active.ai_read ? ` — ${truncate(active.ai_read, 110)}` : ''}`);
     }
     if (ridingFlips.length > 6) lines.push(`  +${ridingFlips.length - 6} more on the dashboard`);
     lines.push('');
@@ -657,7 +742,7 @@ function buildText({ data, recipientEmail }) {
   if (dedupedFlips.length > 0) {
     lines.push(`CHATTER — rec flips (${dedupedFlips.length})`);
     for (const c of dedupedFlips.slice(0, 8)) {
-      lines.push(`  · ${c.ticker}: ${c.old_recommendation || '—'} → ${c.new_recommendation || '—'}`);
+      lines.push(`  · ${c.ticker}: ${c.old_recommendation || '—'} → ${c.new_recommendation || '—'}${priceLine(c.ticker)}`);
     }
     if (dedupedFlips.length > 8) lines.push(`  +${dedupedFlips.length - 8} more on the dashboard`);
     lines.push('');
