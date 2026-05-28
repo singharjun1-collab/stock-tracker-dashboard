@@ -278,6 +278,21 @@ function recColor(rec) {
   }
 }
 
+// Color-code only the three NEW signal types added 2026-05-28 so they pop
+// in AJ's morning scan. Existing types keep the muted slate-400 they had
+// before — minimal visual change, maximum signal for the new sources.
+//   - STEALTH MOMENTUM      → violet (quiet accumulation, slow build)
+//   - AFTER-HOURS CATALYST  → amber  (overnight catalyst, before-the-bell heat)
+//   - NEWS CATALYST         → brand-blue (fundamental PR/news driver)
+function signalTypeColor(signalType) {
+  if (!signalType) return '#94a3b8';
+  const s = String(signalType).toUpperCase();
+  if (s.includes('STEALTH MOMENTUM')) return '#a78bfa';
+  if (s.includes('AFTER-HOURS CATALYST') || s.includes('AH POP')) return '#fbbf24';
+  if (s.includes('NEWS CATALYST') || s.includes('NEWS + ') || s.includes('NEWS-DRIVEN')) return '#4fc3f7';
+  return '#94a3b8';
+}
+
 // Trim long AI-read strings to keep card height predictable on mobile.
 // Cuts on a word boundary so we never end mid-token like "the comp…".
 function truncate(s, n = 120) {
@@ -524,7 +539,7 @@ function buildHtml({ data, recipientEmail }) {
               <tr>
                 <td style="vertical-align:middle;">
                   <div style="font-size:20px;font-weight:800;color:#fff;letter-spacing:-.01em;">${p.ticker}</div>
-                  <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''}${p.signal_type ? ` <span style="color:#475569;">·</span> ${p.signal_type}` : ''}</div>
+                  <div style="font-size:12px;color:#94a3b8;margin-top:2px;">${p.company || ''}${p.signal_type ? ` <span style="color:#475569;">·</span> <span style="color:${signalTypeColor(p.signal_type)};font-weight:${signalTypeColor(p.signal_type) === '#94a3b8' ? '400' : '600'};">${p.signal_type}</span>` : ''}</div>
                 </td>
                 <td align="right" style="vertical-align:middle;white-space:nowrap;">
                   <span style="display:inline-block;font-size:11px;font-weight:800;letter-spacing:.06em;color:${recColor(p.recommendation)};background:${recColor(p.recommendation)}22;padding:5px 10px;border-radius:6px;">${p.recommendation || '—'}</span>
