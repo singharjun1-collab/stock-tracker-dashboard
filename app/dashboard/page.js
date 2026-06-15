@@ -454,51 +454,65 @@ function RedditLinks({ ticker }) {
   );
 }
 
-// ── News Headlines (foldable, last 7 days) ──
-function NewsHeadlines({ ticker }) {
-  const [news, setNews] = useState(null);
+// ── Company Overview (foldable "what the company does", Yahoo-style) ──
+function CompanyOverview({ ticker }) {
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    if (!open || news !== null) return;
+    if (!open || profile !== null) return;
     let cancelled = false;
     setLoading(true);
-    fetch(`/api/news?ticker=${encodeURIComponent(ticker)}`)
+    fetch(`/api/company-profile?ticker=${encodeURIComponent(ticker)}`)
       .then(res => res.ok ? res.json() : Promise.reject())
-      .then(d => { if (!cancelled) { setNews(d.news || []); setLoading(false); } })
-      .catch(() => { if (!cancelled) { setNews([]); setLoading(false); } });
+      .then(d => { if (!cancelled) { setProfile(d || {}); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setProfile({}); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [ticker, open, news]);
+  }, [ticker, open, profile]);
+
+  const employeesFmt = profile?.employees
+    ? Number(profile.employees).toLocaleString('en-US')
+    : null;
 
   return (
-    <div className="news-section">
-      <button className="news-toggle" onClick={() => setOpen(!open)}>
-        {open ? '\u25BE' : '\u25B8'} {"\uD83D\uDCF0"} News Headlines (7d)
+    <div className="overview-section">
+      <button className="overview-toggle" onClick={() => setOpen(!open)}>
+        {open ? '\u25BE' : '\u25B8'} About this company
       </button>
       {open && (
-        <div className="news-body">
-          {loading && <div className="news-loading">Loading news...</div>}
-          {!loading && news && news.length === 0 && (
-            <div className="news-empty">No recent news found</div>
+        <div className="overview-body">
+          {loading && <div className="overview-loading">Loading{"\u2026"}</div>}
+          {!loading && profile && !profile.summary && (
+            <div className="overview-empty">No company description available</div>
           )}
-          {!loading && news && news.length > 0 && (
-            <div className="news-list">
-              {news.map((item, i) => {
-                const dateStr = item.publishedAt
-                  ? new Date(item.publishedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                  : '';
-                return (
-                  <a key={i} href={item.link} target="_blank" rel="noopener noreferrer" className="news-item">
-                    <span className="news-title">{item.title}</span>
-                    <span className="news-meta">
-                      {item.publisher && <span className="news-publisher">{item.publisher}</span>}
-                      {dateStr && <span className="news-date">{dateStr}</span>}
-                    </span>
-                  </a>
-                );
-              })}
-            </div>
+          {!loading && profile && profile.summary && (
+            <>
+              <p className="overview-summary">{profile.summary}</p>
+              {(profile.sector || profile.industry || employeesFmt || profile.website) && (
+                <div className="overview-meta">
+                  {profile.sector && (
+                    <span className="overview-chip">{profile.sector}</span>
+                  )}
+                  {profile.industry && (
+                    <span className="overview-chip">{profile.industry}</span>
+                  )}
+                  {employeesFmt && (
+                    <span className="overview-chip">{employeesFmt} employees</span>
+                  )}
+                  {profile.website && (
+                    <a
+                      href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="overview-website"
+                    >
+                      Website {"\u2192"}
+                    </a>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       )}
@@ -1501,7 +1515,7 @@ function AlertCard({
       </button>
 
       {/* RESEARCH FOOTER */}
-      <NewsHeadlines ticker={alert.ticker} />
+      <CompanyOverview ticker={alert.ticker} />
       <RedditLinks ticker={alert.ticker} />
       <div className="research-row">
         <a href={`https://finance.yahoo.com/quote/${alert.ticker}`} target="_blank" rel="noopener noreferrer" className="research-link">

@@ -1006,47 +1006,45 @@ body {
 }
 .reddit-link:hover { background: #991b1b; border-color: #ef4444; transform: translateY(-1px); }
 
-/* ── NEWS HEADLINES (foldable) ── */
-.news-section { margin-top: 10px; }
-.news-toggle {
-  background: none; border: none; color: #a78bfa; cursor: pointer;
+/* ── COMPANY OVERVIEW (foldable "what the company does") ── */
+.overview-section { margin-top: 10px; }
+.overview-toggle {
+  background: none; border: none; color: #7a9bc0; cursor: pointer;
   font-size: 0.78rem; font-weight: 600; padding: 4px 0;
+  display: flex; align-items: center; gap: 6px;
   transition: color 0.2s;
 }
-.news-toggle:hover { color: #c4b5fd; }
-.news-body {
-  margin-top: 6px; padding: 10px;
-  background: rgba(10, 14, 26, 0.6); border: 1px solid #1e3a5f; border-radius: 8px;
-  max-height: 260px; overflow-y: auto;
+.overview-toggle:hover { color: #c4d4e8; }
+.overview-body {
+  margin-top: 8px; padding: 14px;
+  background: rgba(10, 14, 26, 0.6); border: 1px solid #1e3a5f; border-radius: 10px;
+  animation: overviewFade 0.2s ease;
 }
-.news-body::-webkit-scrollbar { width: 4px; }
-.news-body::-webkit-scrollbar-thumb { background: #1e3a5f; border-radius: 4px; }
-.news-loading { color: #7a9bc0; font-size: 0.75rem; text-align: center; padding: 8px 0; }
-.news-empty { color: #5a7a9c; font-size: 0.75rem; text-align: center; padding: 8px 0; font-style: italic; }
-.news-list { display: flex; flex-direction: column; gap: 6px; }
-.news-item {
-  display: flex; flex-direction: column; gap: 2px;
-  padding: 8px 10px; border-radius: 6px;
-  background: rgba(30, 58, 95, 0.25); border: 1px solid rgba(30, 58, 95, 0.4);
-  text-decoration: none; color: inherit;
-  transition: all 0.2s;
+@keyframes overviewFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
-.news-item:hover {
-  background: rgba(30, 58, 95, 0.45);
-  border-color: #4fc3f7;
-  transform: translateY(-1px);
+.overview-loading { color: #7a9bc0; font-size: 0.78rem; text-align: center; padding: 8px 0; }
+.overview-empty { color: #5a7a9c; font-size: 0.78rem; text-align: center; padding: 8px 0; font-style: italic; }
+.overview-summary {
+  margin: 0; font-size: 0.82rem; line-height: 1.55; color: #c4d4e8;
 }
-.news-title {
-  font-size: 0.76rem; font-weight: 600; color: #e0e6f0;
-  line-height: 1.35;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+.overview-meta {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  margin-top: 12px;
 }
-.news-meta {
-  display: flex; gap: 8px; align-items: center;
-  font-size: 0.65rem; color: #5a7a9c;
+.overview-chip {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 600; letter-spacing: 0.01em;
+  background: rgba(30, 58, 95, 0.4); border: 1px solid rgba(79, 195, 247, 0.25);
+  color: #9ec5e8;
 }
-.news-publisher { font-weight: 600; color: #7a9bc0; }
-.news-date { opacity: 0.8; }
+.overview-website {
+  font-size: 0.72rem; font-weight: 600; color: #4fc3f7;
+  text-decoration: none; margin-left: auto;
+  transition: color 0.2s;
+}
+.overview-website:hover { color: #81d4fa; }
 
 /* ── NEXT EARNINGS DATE ── */
 .earnings-badge {
