@@ -1029,6 +1029,7 @@ body {
 .overview-summary {
   margin: 0; font-size: 0.82rem; line-height: 1.55; color: #c4d4e8;
 }
+.overview-name-only { font-weight: 600; color: #e0e6f0; }
 .overview-meta {
   display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
   margin-top: 12px;

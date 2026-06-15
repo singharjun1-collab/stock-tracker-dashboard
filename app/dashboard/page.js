@@ -480,42 +480,50 @@ function CompanyOverview({ ticker }) {
       <button className="overview-toggle" onClick={() => setOpen(!open)}>
         {open ? '\u25BE' : '\u25B8'} About this company
       </button>
-      {open && (
-        <div className="overview-body">
-          {loading && <div className="overview-loading">Loading{"\u2026"}</div>}
-          {!loading && profile && !profile.summary && (
-            <div className="overview-empty">No company description available</div>
-          )}
-          {!loading && profile && profile.summary && (
-            <>
-              <p className="overview-summary">{profile.summary}</p>
-              {(profile.sector || profile.industry || employeesFmt || profile.website) && (
-                <div className="overview-meta">
-                  {profile.sector && (
-                    <span className="overview-chip">{profile.sector}</span>
-                  )}
-                  {profile.industry && (
-                    <span className="overview-chip">{profile.industry}</span>
-                  )}
-                  {employeesFmt && (
-                    <span className="overview-chip">{employeesFmt} employees</span>
-                  )}
-                  {profile.website && (
-                    <a
-                      href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="overview-website"
-                    >
-                      Website {"\u2192"}
-                    </a>
-                  )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {open && (() => {
+        const hasAny = profile && (profile.summary || profile.name || profile.sector || profile.industry);
+        return (
+          <div className="overview-body">
+            {loading && <div className="overview-loading">Loading{"\u2026"}</div>}
+            {!loading && !hasAny && (
+              <div className="overview-empty">No company description available</div>
+            )}
+            {!loading && hasAny && (
+              <>
+                {profile.name && !profile.summary && (
+                  <p className="overview-summary overview-name-only">{profile.name}</p>
+                )}
+                {profile.summary && (
+                  <p className="overview-summary">{profile.summary}</p>
+                )}
+                {(profile.sector || profile.industry || employeesFmt || profile.website) && (
+                  <div className="overview-meta">
+                    {profile.sector && (
+                      <span className="overview-chip">{profile.sector}</span>
+                    )}
+                    {profile.industry && (
+                      <span className="overview-chip">{profile.industry}</span>
+                    )}
+                    {employeesFmt && (
+                      <span className="overview-chip">{employeesFmt} employees</span>
+                    )}
+                    {profile.website && (
+                      <a
+                        href={profile.website.startsWith('http') ? profile.website : `https://${profile.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="overview-website"
+                      >
+                        Website {"\u2192"}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -1172,6 +1180,9 @@ function AlertCard({
         </div>
       </div>
 
+      {/* ABOUT — "what the company does" (under the name, above the rec) */}
+      <CompanyOverview ticker={alert.ticker} />
+
       {/* HERO — AI recommendation + since-alert (with original entry price) */}
       <div className={`ac-hero ac-hero-${heroTone || recVariant}`}>
         <span className={`ac-rec-chip ac-rec-${recVariant}`}>{recDisplay}</span>
@@ -1515,7 +1526,6 @@ function AlertCard({
       </button>
 
       {/* RESEARCH FOOTER */}
-      <CompanyOverview ticker={alert.ticker} />
       <RedditLinks ticker={alert.ticker} />
       <div className="research-row">
         <a href={`https://finance.yahoo.com/quote/${alert.ticker}`} target="_blank" rel="noopener noreferrer" className="research-link">
